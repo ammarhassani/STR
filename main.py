@@ -1,10 +1,9 @@
 """
 FIU Report Management System - Main Application
-Version 2.1.0 - Enhanced Stability & Error Handling
+Version 2.1.0 - Complete Rewrite with Enhanced Workflow
 """
 import flet as ft
 import sys
-import traceback
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -12,12 +11,16 @@ from datetime import datetime
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Configure logging first
+# Ensure log directory exists
+log_dir = Path.home() / '.fiu_system'
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(Path.home() / '.fiu_system' / 'app.log'),
+        logging.FileHandler(log_dir / 'app.log'),
         logging.StreamHandler()
     ]
 )
@@ -29,483 +32,794 @@ try:
     from database.queue_manager import WriteQueue
     from database.init_db import initialize_database, validate_database
     from utils.permissions import has_permission
+    logger.info("All modules imported successfully")
 except ImportError as e:
     logger.error(f"Import error: {e}")
-    # Continue - we'll handle this gracefully
+    logger.error("Please ensure all required files are present")
 
 
 class FIUApplication:
-    """Main application class with enhanced error handling"""
+    """Main application class"""
     
     def __init__(self, page: ft.Page):
         self.page = page
         self.db_manager = None
         self.write_queue = None
         self.current_user = None
-        self.content_area = ft.Container(expand=True)
-        self.is_initialized = False
+        self.setup_step = 0
+        self.temp_db_path = None
+        self.temp_backup_path = None
         
-        logger.info("Initializing FIU Application v2.1.0")
+        logger.info("=== FIU Application Starting ===")
         
-        # Safe page configuration
+        # Configure page
         try:
-            self.page.title = "FIU Report Management System v2.1.0"
-            self.page.window.width = 1400
-            self.page.window.height = 800
+            self.page.title = "FIU Report Management System"
+            self.page.window_width = 1400
+            self.page.window_height = 800
+            self.page.window_min_width = 1000
+            self.page.window_min_height = 600
             self.page.theme_mode = ft.ThemeMode.LIGHT
             self.page.padding = 0
-            self.page.fonts = {
-                "default": "Arial"
-            }
+            self.page.bgcolor = ft.colors.BLUE_GREY_50
+            logger.info("Page configured successfully")
         except Exception as e:
-            logger.error(f"Page configuration failed: {e}")
+            logger.error(f"Page configuration error: {e}")
         
-        # Initialize application state
-        self.initialize_application()
+        # Start application flow
+        self.start_application()
     
-    def initialize_application(self):
-        """Initialize application with comprehensive error handling"""
+    def start_application(self):
+        """Start application with proper workflow"""
         try:
-            # Load configuration
-            if not self.safe_load_config():
-                return
+            logger.info("Starting application workflow")
             
-            # Check configuration state
-            if not Config.is_configured():
-                self.show_first_time_setup()
-                return
+            # Try to load existing configuration
+            if Config.load():
+                logger.info("Configuration loaded successfully")
+                
+                # Check if configuration is complete
+                if Config.is_configured():
+                    logger.info("Configuration is complete")
+                    
+                    # Validate paths
+                    is_valid, message = Config.validate_paths()
+                    if is_valid:
+                        logger.info("Paths validated successfully")
+                        
+                        # Initialize database
+                        if self.init_database():
+                            logger.info("Database initialized successfully")
+                            # Go directly to login
+                            self.show_login_screen()
+                            return
+                        else:
+                            logger.warning("Database initialization failed, showing setup")
+                    else:
+                        logger.warning(f"Path validation failed: {message}")
             
-            # Validate paths
-            is_valid, message = Config.validate_paths()
-            if not is_valid:
-                self.show_config_error(message)
-                return
-            
-            # Initialize database system
-            if not self.initialize_database_system():
-                return
-            
-            # Application is ready
-            self.is_initialized = True
-            self.show_login_screen()
+            # If we get here, show welcome screen
+            logger.info("Showing welcome screen")
+            self.show_welcome_screen()
             
         except Exception as e:
-            logger.error(f"Application initialization failed: {e}")
-            self.show_fatal_error(f"Application failed to start: {str(e)}")
+            logger.error(f"Application start error: {e}")
+            self.show_error_screen("Application failed to start", str(e))
     
-    def safe_load_config(self) -> bool:
-        """Safely load configuration with fallbacks"""
-        try:
-            if not Config.load():
-                logger.warning("Configuration file not found or invalid")
-                return True  # Continue to first-time setup
-            return True
-        except Exception as e:
-            logger.error(f"Config loading failed: {e}")
-            self.show_error_dialog(
-                "Configuration Error", 
-                f"Failed to load configuration: {str(e)}"
-            )
-            return False
+    def show_welcome_screen(self):
+        """Step 1: Welcome Screen"""
+        logger.info("=== Showing Welcome Screen ===")
+        
+        def start_setup(e):
+            logger.info("User clicked Start Setup")
+            self.show_setup_wizard_step1()
+        
+        welcome_view = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Icon(ft.icons.SECURITY, size=100, color=ft.colors.BLUE_700),
+                    ft.Container(height=20),
+                    ft.Text(
+                        "FIU Report Management System",
+                        size=36,
+                        weight=ft.FontWeight.BOLD,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Container(height=10),
+                    ft.Text(
+                        "Financial Intelligence Unit",
+                        size=20,
+                        color=ft.colors.GREY_700,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Text(
+                        "Enterprise Report Management Solution",
+                        size=16,
+                        color=ft.colors.GREY_600,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Container(height=40),
+                    ft.ElevatedButton(
+                        text="Start Setup",
+                        icon=ft.icons.ARROW_FORWARD,
+                        on_click=start_setup,
+                        height=50,
+                        width=200,
+                        style=ft.ButtonStyle(
+                            text_style=ft.TextStyle(size=18, weight=ft.FontWeight.BOLD)
+                        ),
+                    ),
+                    ft.Container(height=20),
+                    ft.Text(
+                        "Version 2.1.0",
+                        size=12,
+                        color=ft.colors.GREY_500,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            expand=True,
+            alignment=ft.alignment.center,
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left,
+                end=ft.alignment.bottom_right,
+                colors=[ft.colors.BLUE_50, ft.colors.WHITE],
+            ),
+        )
+        
+        self.page.clean()
+        self.page.add(welcome_view)
+        self.page.update()
     
-    def initialize_database_system(self) -> bool:
-        """Initialize database with comprehensive error handling"""
-        try:
-            db_path = Path(Config.DATABASE_PATH)
+    def show_setup_wizard_step1(self):
+        """Step 2: Setup Wizard - Choose Paths"""
+        logger.info("=== Setup Wizard Step 1: Choose Paths ===")
+        
+        # Default paths
+        default_db_dir = str(Path.home() / "FIU_System")
+        default_db_path = str(Path(default_db_dir) / "database" / "fiu_reports.db")
+        default_backup_path = str(Path(default_db_dir) / "backups")
+        
+        db_path_field = ft.TextField(
+            label="Database File Path",
+            value=default_db_path,
+            hint_text="Full path to database file",
+            prefix_icon=ft.icons.STORAGE,
+            expand=True,
+        )
+        
+        backup_path_field = ft.TextField(
+            label="Backup Directory",
+            value=default_backup_path,
+            hint_text="Directory for backup files",
+            prefix_icon=ft.icons.BACKUP,
+            expand=True,
+        )
+        
+        status_text = ft.Text("", size=12)
+        
+        def validate_and_continue(e):
+            db_path = db_path_field.value.strip()
+            backup_path = backup_path_field.value.strip()
+            
+            if not db_path or not backup_path:
+                status_text.value = "⚠ Both paths are required"
+                status_text.color = ft.colors.RED_700
+                self.page.update()
+                return
+            
+            # Store paths temporarily
+            self.temp_db_path = db_path
+            self.temp_backup_path = backup_path
+            
+            logger.info(f"Paths selected - DB: {db_path}, Backup: {backup_path}")
             
             # Check if database exists
-            if not db_path.exists():
-                return self.handle_missing_database()
+            if Path(db_path).exists():
+                logger.info("Database file exists, asking user")
+                self.show_database_found_dialog()
+            else:
+                logger.info("Database file doesn't exist, prompting for admin credentials")
+                self.show_admin_credentials_prompt()
+        
+        def go_back(e):
+            self.show_welcome_screen()
+        
+        setup_view = ft.Container(
+            content=ft.Column(
+                [
+                    # Header
+                    ft.Container(
+                        content=ft.Row(
+                            [
+                                ft.IconButton(
+                                    icon=ft.icons.ARROW_BACK,
+                                    on_click=go_back,
+                                    tooltip="Back",
+                                ),
+                                ft.Text(
+                                    "Setup Wizard - Step 1 of 2",
+                                    size=24,
+                                    weight=ft.FontWeight.BOLD,
+                                ),
+                            ],
+                        ),
+                        padding=20,
+                    ),
+                    
+                    ft.Divider(height=1),
+                    
+                    # Content
+                    ft.Container(
+                        content=ft.Column(
+                            [
+                                ft.Icon(ft.icons.FOLDER_SPECIAL, size=60, color=ft.colors.BLUE_700),
+                                ft.Text(
+                                    "Choose Database and Backup Locations",
+                                    size=20,
+                                    weight=ft.FontWeight.BOLD,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                                ft.Text(
+                                    "Select where to store your database and backups",
+                                    size=14,
+                                    color=ft.colors.GREY_700,
+                                    text_align=ft.TextAlign.CENTER,
+                                ),
+                                ft.Container(height=30),
+                                
+                                # Database path
+                                ft.Card(
+                                    content=ft.Container(
+                                        content=ft.Column(
+                                            [
+                                                ft.Text("Database File Location", size=16, weight=ft.FontWeight.BOLD),
+                                                ft.Text(
+                                                    "This file will store all your reports and system data",
+                                                    size=12,
+                                                    color=ft.colors.GREY_600,
+                                                ),
+                                                ft.Container(height=10),
+                                                db_path_field,
+                                            ],
+                                        ),
+                                        padding=20,
+                                    ),
+                                    elevation=2,
+                                ),
+                                
+                                ft.Container(height=15),
+                                
+                                # Backup path
+                                ft.Card(
+                                    content=ft.Container(
+                                        content=ft.Column(
+                                            [
+                                                ft.Text("Backup Directory", size=16, weight=ft.FontWeight.BOLD),
+                                                ft.Text(
+                                                    "Automatic backups will be stored here",
+                                                    size=12,
+                                                    color=ft.colors.GREY_600,
+                                                ),
+                                                ft.Container(height=10),
+                                                backup_path_field,
+                                            ],
+                                        ),
+                                        padding=20,
+                                    ),
+                                    elevation=2,
+                                ),
+                                
+                                ft.Container(height=10),
+                                status_text,
+                                ft.Container(height=20),
+                                
+                                ft.ElevatedButton(
+                                    text="Continue",
+                                    icon=ft.icons.ARROW_FORWARD,
+                                    on_click=validate_and_continue,
+                                    height=45,
+                                    width=200,
+                                ),
+                            ],
+                            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            scroll=ft.ScrollMode.AUTO,
+                        ),
+                        padding=40,
+                        expand=True,
+                    ),
+                ],
+                spacing=0,
+            ),
+            expand=True,
+            bgcolor=ft.colors.WHITE,
+        )
+        
+        self.page.clean()
+        self.page.add(setup_view)
+        self.page.update()
+    
+    def show_database_found_dialog(self):
+        """Step 3: Database exists - ask to use it"""
+        logger.info("=== Showing Database Found Dialog ===")
+        
+        def use_existing(e):
+            logger.info("User chose to use existing database")
+            self.page.dialog.open = False
+            self.page.update()
             
-            # Initialize database manager
-            self.db_manager = DatabaseManager(Config.DATABASE_PATH)
-            self.write_queue = WriteQueue(self.db_manager)
+            # Save configuration
+            Config.DATABASE_PATH = self.temp_db_path
+            Config.BACKUP_PATH = self.temp_backup_path
+            Config.save()
+            
+            # Initialize database
+            if self.init_database():
+                self.show_login_screen()
+            else:
+                self.show_error_dialog("Database Error", "Failed to initialize existing database")
+        
+        def create_new(e):
+            logger.info("User chose to create new database")
+            self.page.dialog.open = False
+            self.page.update()
+            self.show_admin_credentials_prompt()
+        
+        def cancel(e):
+            logger.info("User cancelled")
+            self.page.dialog.open = False
+            self.page.update()
+            self.show_setup_wizard_step1()
+        
+        dialog = ft.AlertDialog(
+            title=ft.Text("Database Found"),
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.icons.INFO_OUTLINE, size=48, color=ft.colors.BLUE_700),
+                        ft.Container(height=10),
+                        ft.Text(
+                            "An existing database was found at:",
+                            size=14,
+                        ),
+                        ft.Container(
+                            content=ft.Text(
+                                self.temp_db_path,
+                                size=12,
+                                color=ft.colors.BLUE_700,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                            padding=10,
+                            bgcolor=ft.colors.BLUE_50,
+                            border_radius=5,
+                        ),
+                        ft.Container(height=15),
+                        ft.Text(
+                            "Would you like to use this existing database or create a new one?",
+                            size=14,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    tight=True,
+                ),
+                width=400,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel),
+                ft.OutlinedButton("Create New", on_click=create_new),
+                ft.ElevatedButton("Use Existing", on_click=use_existing),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+    
+    def show_admin_credentials_prompt(self):
+        """Step 4: Admin Verification - Must enter admin/admin123"""
+        logger.info("=== Showing Admin Credentials Prompt ===")
+        
+        username_field = ft.TextField(
+            label="Admin Username",
+            hint_text="Enter: admin",
+            prefix_icon=ft.icons.ADMIN_PANEL_SETTINGS,
+            autofocus=True,
+        )
+        
+        password_field = ft.TextField(
+            label="Admin Password",
+            hint_text="Enter: admin123",
+            prefix_icon=ft.icons.LOCK,
+            password=True,
+            can_reveal_password=True,
+        )
+        
+        error_text = ft.Text("", color=ft.colors.RED_700, size=12)
+        
+        def verify_and_create(e):
+            username = username_field.value.strip()
+            password = password_field.value
+            
+            if username != "admin" or password != "admin123":
+                error_text.value = "⚠ Invalid credentials. Use: admin / admin123"
+                logger.warning("Invalid admin credentials entered")
+                self.page.update()
+                return
+            
+            logger.info("Admin credentials verified")
+            self.page.dialog.open = False
+            self.page.update()
+            
+            # Create new database
+            self.create_new_database()
+        
+        def cancel(e):
+            self.page.dialog.open = False
+            self.page.update()
+            self.show_setup_wizard_step1()
+        
+        dialog = ft.AlertDialog(
+            title=ft.Text("Admin Verification Required"),
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.icons.VERIFIED_USER, size=48, color=ft.colors.AMBER_700),
+                        ft.Container(height=10),
+                        ft.Text(
+                            "To create a new database, please verify admin credentials:",
+                            size=14,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Container(height=15),
+                        username_field,
+                        ft.Container(height=10),
+                        password_field,
+                        ft.Container(height=5),
+                        error_text,
+                        ft.Container(height=10),
+                        ft.Container(
+                            content=ft.Text(
+                                "Default credentials:\nUsername: admin\nPassword: admin123",
+                                size=12,
+                                color=ft.colors.GREY_600,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            padding=10,
+                            bgcolor=ft.colors.GREY_100,
+                            border_radius=5,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                    tight=True,
+                ),
+                width=400,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel),
+                ft.ElevatedButton("Verify & Create", on_click=verify_and_create),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+    
+    def create_new_database(self):
+        """Create new database with progress indicator"""
+        logger.info("=== Creating New Database ===")
+        
+        # Show progress dialog
+        progress = ft.ProgressRing()
+        status_text = ft.Text("Creating database...", size=14)
+        
+        dialog = ft.AlertDialog(
+            title=ft.Text("Setting Up Database"),
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        progress,
+                        ft.Container(height=15),
+                        status_text,
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    tight=True,
+                ),
+                width=300,
+            ),
+            modal=True,
+        )
+        
+        self.page.dialog = dialog
+        dialog.open = True
+        self.page.update()
+        
+        try:
+            # Create directories
+            db_path = Path(self.temp_db_path)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            Path(self.temp_backup_path).mkdir(parents=True, exist_ok=True)
+            
+            status_text.value = "Initializing database schema..."
+            self.page.update()
+            
+            # Initialize database
+            success, message = initialize_database(self.temp_db_path)
+            
+            if not success:
+                logger.error(f"Database creation failed: {message}")
+                dialog.open = False
+                self.page.update()
+                self.show_error_dialog("Database Creation Failed", message)
+                return
+            
+            status_text.value = "Saving configuration..."
+            self.page.update()
+            
+            # Save configuration
+            Config.DATABASE_PATH = self.temp_db_path
+            Config.BACKUP_PATH = self.temp_backup_path
+            if not Config.save():
+                logger.error("Failed to save configuration")
+                dialog.open = False
+                self.page.update()
+                self.show_error_dialog("Setup Failed", "Failed to save configuration")
+                return
+            
+            status_text.value = "Database created successfully!"
+            self.page.update()
+            
+            logger.info("Database created successfully")
+            
+            # Close dialog and show auto-login
+            import time
+            time.sleep(1)
+            dialog.open = False
+            self.page.update()
+            
+            # Initialize database connection
+            if self.init_database():
+                self.show_auto_login()
+            else:
+                self.show_error_dialog("Initialization Error", "Failed to initialize database connection")
+            
+        except Exception as e:
+            logger.error(f"Database creation error: {e}")
+            dialog.open = False
+            self.page.update()
+            self.show_error_dialog("Setup Error", f"Failed to create database: {str(e)}")
+    
+    def show_auto_login(self):
+        """Step 5: Auto-login with pre-filled credentials"""
+        logger.info("=== Showing Auto-Login Screen ===")
+        
+        username_field = ft.TextField(
+            label="Username",
+            value="admin",
+            prefix_icon=ft.icons.PERSON,
+            read_only=True,
+        )
+        
+        password_field = ft.TextField(
+            label="Password",
+            value="admin123",
+            prefix_icon=ft.icons.LOCK,
+            password=True,
+            can_reveal_password=True,
+            read_only=True,
+        )
+        
+        def proceed_to_login(e):
+            logger.info("Proceeding to main login")
+            self.show_login_screen()
+        
+        auto_login_view = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Icon(ft.icons.CHECK_CIRCLE, size=80, color=ft.colors.GREEN_700),
+                    ft.Container(height=20),
+                    ft.Text(
+                        "Setup Complete!",
+                        size=32,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.colors.GREEN_700,
+                    ),
+                    ft.Container(height=10),
+                    ft.Text(
+                        "Your database has been created successfully",
+                        size=16,
+                        color=ft.colors.GREY_700,
+                    ),
+                    ft.Container(height=30),
+                    
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Text("Default Admin Credentials", size=18, weight=ft.FontWeight.BOLD),
+                                    ft.Divider(),
+                                    username_field,
+                                    ft.Container(height=10),
+                                    password_field,
+                                    ft.Container(height=15),
+                                    ft.Container(
+                                        content=ft.Text(
+                                            "⚠ Please change these credentials after first login",
+                                            size=12,
+                                            color=ft.colors.ORANGE_700,
+                                            text_align=ft.TextAlign.CENTER,
+                                        ),
+                                        padding=10,
+                                        bgcolor=ft.colors.ORANGE_50,
+                                        border_radius=5,
+                                    ),
+                                ],
+                            ),
+                            padding=30,
+                            width=400,
+                        ),
+                        elevation=5,
+                    ),
+                    
+                    ft.Container(height=30),
+                    ft.ElevatedButton(
+                        text="Proceed to Login",
+                        icon=ft.icons.LOGIN,
+                        on_click=proceed_to_login,
+                        height=50,
+                        width=200,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            expand=True,
+            alignment=ft.alignment.center,
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left,
+                end=ft.alignment.bottom_right,
+                colors=[ft.colors.GREEN_50, ft.colors.WHITE],
+            ),
+        )
+        
+        self.page.clean()
+        self.page.add(auto_login_view)
+        self.page.update()
+    
+    def show_login_screen(self):
+        """Step 6: Main Login Screen"""
+        logger.info("=== Showing Login Screen ===")
+        
+        username_field = ft.TextField(
+            label="Username",
+            prefix_icon=ft.icons.PERSON,
+            autofocus=True,
+            width=350,
+        )
+        
+        password_field = ft.TextField(
+            label="Password",
+            prefix_icon=ft.icons.LOCK,
+            password=True,
+            can_reveal_password=True,
+            width=350,
+            on_submit=lambda e: attempt_login(),
+        )
+        
+        error_text = ft.Text("", color=ft.colors.RED_700, visible=False)
+        loading = ft.ProgressRing(visible=False, width=20, height=20)
+        
+        def attempt_login():
+            username = username_field.value.strip()
+            password = password_field.value
+            
+            if not username or not password:
+                error_text.value = "Please enter username and password"
+                error_text.visible = True
+                self.page.update()
+                return
+            
+            loading.visible = True
+            error_text.visible = False
+            self.page.update()
+            
+            # Authenticate
+            user = self.authenticate_user(username, password)
+            
+            if user:
+                logger.info(f"User logged in: {username}")
+                self.current_user = user
+                self.show_main_application()
+            else:
+                logger.warning(f"Login failed for: {username}")
+                error_text.value = "Invalid username or password"
+                error_text.visible = True
+                loading.visible = False
+                self.page.update()
+        
+        login_card = ft.Card(
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Icon(ft.icons.SECURITY, size=70, color=ft.colors.BLUE_700),
+                        ft.Container(height=15),
+                        ft.Text("FIU Report System", size=26, weight=ft.FontWeight.BOLD),
+                        ft.Text("Secure Login", size=14, color=ft.colors.GREY_600),
+                        ft.Container(height=25),
+                        username_field,
+                        ft.Container(height=15),
+                        password_field,
+                        ft.Container(height=10),
+                        ft.Row(
+                            [loading, error_text],
+                            alignment=ft.MainAxisAlignment.CENTER,
+                        ),
+                        ft.Container(height=20),
+                        ft.ElevatedButton(
+                            text="Sign In",
+                            icon=ft.icons.LOGIN,
+                            on_click=lambda e: attempt_login(),
+                            width=350,
+                            height=45,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                padding=40,
+            ),
+            elevation=8,
+        )
+        
+        login_view = ft.Container(
+            content=ft.Column(
+                [login_card],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            expand=True,
+            alignment=ft.alignment.center,
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left,
+                end=ft.alignment.bottom_right,
+                colors=[ft.colors.BLUE_50, ft.colors.WHITE],
+            ),
+        )
+        
+        self.page.clean()
+        self.page.add(login_view)
+        self.page.update()
+    
+    def init_database(self):
+        """Initialize database manager"""
+        try:
+            logger.info("Initializing database manager")
             
             # Validate database
             is_valid, message = validate_database(Config.DATABASE_PATH)
             if not is_valid:
-                return self.handle_database_validation_failed(message)
-            
-            logger.info("Database system initialized successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Database initialization failed: {e}")
-            self.show_error_dialog(
-                "Database Error",
-                f"Failed to initialize database: {str(e)}"
-            )
-            return False
-    
-    def handle_missing_database(self) -> bool:
-        """Handle missing database file"""
-        logger.warning(f"Database file not found: {Config.DATABASE_PATH}")
-        
-        # Ask user if they want to create the database
-        def create_database(e):
-            if self.create_new_database():
-                self.page.dialog.open = False
-                self.page.clean()
-                self.initialize_application()
-            else:
-                self.show_fatal_error("Failed to create database. Application cannot continue.")
-        
-        def exit_app(e):
-            self.page.window_destroy()
-        
-        dialog = ft.AlertDialog(
-            title=ft.Text("Database Not Found"),
-            content=ft.Column([
-                ft.Text(f"Database file not found at:", size=14),
-                ft.Text(Config.DATABASE_PATH, size=12, color=ft.Colors.BLUE_700),
-                ft.Container(height=10),
-                ft.Text("Would you like to create a new database?", size=16),
-            ], tight=True),
-            actions=[
-                ft.TextButton("Exit", on_click=exit_app),
-                ft.ElevatedButton("Create Database", on_click=create_database),
-            ]
-        )
-        
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-        return False
-    
-    def handle_database_validation_failed(self, error_message: str) -> bool:
-        """Handle database validation failures"""
-        logger.error(f"Database validation failed: {error_message}")
-        
-        def repair_database(e):
-            if self.repair_database():
-                self.page.dialog.open = False
-                self.page.clean()
-                self.initialize_application()
-        
-        def exit_app(e):
-            self.page.window_destroy()
-        
-        dialog = ft.AlertDialog(
-            title=ft.Text("Database Error"),
-            content=ft.Column([
-                ft.Text("Database validation failed:", size=14),
-                ft.Text(error_message, size=12, color=ft.Colors.ORANGE_700),
-                ft.Container(height=10),
-                ft.Text("Attempt automatic repair?", size=16),
-                ft.Text("Note: This may result in data loss", size=12, color=ft.Colors.RED_700),
-            ], tight=True),
-            actions=[
-                ft.TextButton("Exit", on_click=exit_app),
-                ft.ElevatedButton("Repair Database", on_click=repair_database),
-            ]
-        )
-        
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-        return False
-    
-    def create_new_database(self) -> bool:
-        """Create a new database with admin credentials"""
-        try:
-            # Create parent directories
-            db_path = Path(Config.DATABASE_PATH)
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Initialize database
-            success, message = initialize_database(Config.DATABASE_PATH)
-            if not success:
-                logger.error(f"Database creation failed: {message}")
+                logger.error(f"Database validation failed: {message}")
+                self.show_error_dialog("Database Error", message)
                 return False
             
-            # Ensure backup directory exists
-            Path(Config.BACKUP_PATH).mkdir(parents=True, exist_ok=True)
+            # Create database manager
+            self.db_manager = DatabaseManager(Config.DATABASE_PATH)
+            self.write_queue = WriteQueue(self.db_manager)
             
-            logger.info("New database created successfully")
+            logger.info("Database manager initialized")
             return True
             
         except Exception as e:
-            logger.error(f"Database creation error: {e}")
+            logger.error(f"Database initialization error: {e}")
             return False
-    
-    def repair_database(self) -> bool:
-        """Attempt to repair corrupted database"""
-        try:
-            # Close existing connections
-            self.db_manager = None
-            self.write_queue = None
-            
-            # Backup existing database
-            db_path = Path(Config.DATABASE_PATH)
-            if db_path.exists():
-                backup_path = Path(Config.BACKUP_PATH) / f"corrupted_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-                db_path.rename(backup_path)
-                logger.info(f"Backed up corrupted database to: {backup_path}")
-            
-            # Create new database
-            return self.create_new_database()
-            
-        except Exception as e:
-            logger.error(f"Database repair failed: {e}")
-            return False
-    
-    def show_first_time_setup(self):
-        """Show first-time setup wizard"""
-        try:
-            # Default paths
-            default_db_path = str(Path.home() / "fiu_system" / "database.db")
-            default_backup_path = str(Path.home() / "fiu_system" / "backups")
-            
-            db_path_field = ft.TextField(
-                label="Database File Path",
-                value=default_db_path,
-                width=500,
-                prefix_icon=ft.icons.STORAGE,
-            )
-            
-            backup_path_field = ft.TextField(
-                label="Backup Directory",
-                value=default_backup_path,
-                width=500,
-                prefix_icon=ft.icons.BACKUP,
-            )
-            
-            status_text = ft.Text("", color=ft.Colors.GREY_600, size=12)
-            
-            def validate_paths():
-                db_path = db_path_field.value.strip()
-                backup_path = backup_path_field.value.strip()
-                
-                if not db_path or not backup_path:
-                    return False, "Both paths are required"
-                
-                try:
-                    # Check if we can create directories
-                    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-                    Path(backup_path).mkdir(parents=True, exist_ok=True)
-                    return True, "Paths are valid"
-                except Exception as e:
-                    return False, f"Invalid path: {str(e)}"
-            
-            def on_path_change(e):
-                is_valid, message = validate_paths()
-                status_text.value = message
-                status_text.color = ft.Colors.GREEN if is_valid else ft.Colors.RED
-                self.page.update()
-            
-            def complete_setup(e):
-                is_valid, message = validate_paths()
-                if not is_valid:
-                    self.show_error_dialog("Invalid Paths", message)
-                    return
-                
-                # Save configuration
-                Config.DATABASE_PATH = db_path_field.value.strip()
-                Config.BACKUP_PATH = backup_path_field.value.strip()
-                
-                if not Config.save():
-                    self.show_error_dialog("Setup Failed", "Failed to save configuration")
-                    return
-                
-                # Create database
-                if self.create_new_database():
-                    self.show_success_message("Setup completed successfully!")
-                    self.page.clean()
-                    self.initialize_application()
-                else:
-                    self.show_error_dialog("Setup Failed", "Failed to create database")
-            
-            # Setup form
-            setup_form = ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Icon(ft.icons.SETTINGS, size=80, color=ft.Colors.BLUE_700),
-                        ft.Text("First Time Setup", size=32, weight=ft.FontWeight.BOLD),
-                        ft.Text("Configure your database and backup locations", 
-                               size=16, color=ft.Colors.GREY_700),
-                        ft.Container(height=30),
-                        
-                        ft.Card(
-                            content=ft.Container(
-                                content=ft.Column([
-                                    ft.Text("Database Configuration", size=20, 
-                                           weight=ft.FontWeight.BOLD),
-                                    ft.Container(height=10),
-                                    db_path_field,
-                                    ft.Container(height=10),
-                                    backup_path_field,
-                                    ft.Container(height=10),
-                                    status_text,
-                                ], spacing=0),
-                                padding=20,
-                            ),
-                            elevation=5,
-                        ),
-                        
-                        ft.Container(height=20),
-                        ft.Row([
-                            ft.ElevatedButton(
-                                text="Complete Setup",
-                                icon=ft.icons.CHECK_CIRCLE,
-                                on_click=complete_setup,
-                                width=200,
-                            ),
-                            ft.TextButton(
-                                text="Exit",
-                                icon=ft.icons.EXIT_TO_APP,
-                                on_click=lambda e: self.page.window_destroy(),
-                            ),
-                        ], alignment=ft.MainAxisAlignment.CENTER),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    scroll=ft.ScrollMode.ADAPTIVE,
-                ),
-                padding=40,
-                alignment=ft.Alignment.center,
-                expand=True,
-            )
-            
-            # Register change listeners
-            db_path_field.on_change = on_path_change
-            backup_path_field.on_change = on_path_change
-            
-            self.page.clean()
-            self.page.add(setup_form)
-            self.page.update()
-            
-        except Exception as e:
-            logger.error(f"First-time setup failed: {e}")
-            self.show_fatal_error(f"Setup failed: {str(e)}")
-    
-    def show_login_screen(self):
-        """Show login screen with enhanced validation"""
-        try:
-            username_field = ft.TextField(
-                label="Username",
-                width=350,
-                autofocus=True,
-                prefix_icon=ft.icons.PERSON,
-                text_size=14,
-            )
-            
-            password_field = ft.TextField(
-                label="Password",
-                width=350,
-                password=True,
-                can_reveal_password=True,
-                prefix_icon=ft.icons.LOCK,
-                text_size=14,
-                on_submit=lambda e: attempt_login(),
-            )
-            
-            error_text = ft.Text("", color=ft.Colors.RED_700, visible=False)
-            loading_indicator = ft.ProgressRing(visible=False, width=20, height=20)
-            
-            def attempt_login():
-                username = username_field.value.strip()
-                password = password_field.value
-                
-                if not username or not password:
-                    error_text.value = "Please enter both username and password"
-                    error_text.visible = True
-                    self.page.update()
-                    return
-                
-                # Show loading
-                loading_indicator.visible = True
-                error_text.visible = False
-                self.page.update()
-                
-                # Authenticate (simulate some delay for better UX)
-                def login_task():
-                    user = self.authenticate_user(username, password)
-                    if user:
-                        self.current_user = user
-                        self.log_session(user['user_id'], user['username'])
-                        self.page.clean()
-                        self.show_main_application()
-                    else:
-                        error_text.value = "Invalid username or password"
-                        error_text.visible = True
-                        loading_indicator.visible = False
-                        self.page.update()
-                
-                # Use timer to avoid blocking UI
-                self.page.run_task(login_task)
-            
-            login_card = ft.Card(
-                content=ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Icon(ft.icons.SECURITY, size=80, color=ft.Colors.BLUE_700),
-                            ft.Container(height=10),
-                            ft.Text("FIU Report System", size=28, weight=ft.FontWeight.BOLD),
-                            ft.Text("v2.1.0 - Secure Access", size=14, color=ft.Colors.GREY_700),
-                            ft.Container(height=30),
-                            
-                            username_field,
-                            ft.Container(height=15),
-                            password_field,
-                            ft.Container(height=10),
-                            
-                            ft.Row([
-                                loading_indicator,
-                                error_text,
-                            ], alignment=ft.MainAxisAlignment.CENTER),
-                            
-                            ft.Container(height=20),
-                            ft.ElevatedButton(
-                                text="Sign In",
-                                icon=ft.icons.LOGIN,
-                                width=350,
-                                on_click=lambda e: attempt_login(),
-                            ),
-                            
-                            ft.Container(height=10),
-                            ft.Text(
-                                "Default: admin / admin123",
-                                size=12,
-                                color=ft.Colors.GREY_600,
-                                italic=True,
-                            ),
-                        ],
-                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    padding=40,
-                    width=500,
-                ),
-                elevation=10,
-            )
-            
-            login_view = ft.Container(
-                content=ft.Row([login_card], alignment=ft.MainAxisAlignment.CENTER),
-                padding=20,
-                alignment=ft.Alignment.center,
-                expand=True,
-                gradient=ft.LinearGradient(
-                    begin=ft.alignment.top_left,
-                    end=ft.alignment.bottom_right,
-                    colors=[ft.Colors.BLUE_50, ft.Colors.WHITE],
-                ),
-            )
-            
-            self.page.clean()
-            self.page.add(login_view)
-            self.page.update()
-            
-        except Exception as e:
-            logger.error(f"Login screen failed: {e}")
-            self.show_fatal_error(f"Login screen error: {str(e)}")
     
     def authenticate_user(self, username: str, password: str):
-        """Authenticate user with enhanced error handling"""
+        """Authenticate user"""
         try:
-            if not self.db_manager:
-                logger.error("Database manager not initialized")
-                return None
-            
             query = """
-                SELECT user_id, username, password, full_name, role, is_active, last_login
+                SELECT user_id, username, full_name, role, is_active
                 FROM users 
                 WHERE username = ? AND password = ? AND is_active = 1
             """
@@ -513,7 +827,6 @@ class FIUApplication:
             
             if results:
                 user = dict(results[0])
-                logger.info(f"User authenticated: {username}")
                 
                 # Update last login
                 update_query = """
@@ -524,463 +837,381 @@ class FIUApplication:
                 self.db_manager.execute_with_retry(update_query, (user['user_id'],))
                 
                 return user
-            else:
-                # Log failed attempt
-                logger.warning(f"Failed login attempt for user: {username}")
-                return None
-                
+            
+            return None
+            
         except Exception as e:
-            logger.error(f"Authentication error for {username}: {e}")
+            logger.error(f"Authentication error: {e}")
             return None
     
-    def log_session(self, user_id: int, username: str):
-        """Log user session with error handling"""
-        try:
-            query = """
-                INSERT INTO session_log (user_id, username, login_time, ip_address)
-                VALUES (?, ?, datetime('now'), 'local')
-            """
-            self.db_manager.execute_with_retry(query, (user_id, username))
-        except Exception as e:
-            logger.error(f"Session logging failed: {e}")
-    
     def show_main_application(self):
-        """Show main application interface"""
-        try:
-            # Create navigation rail
-            nav_rail = self.create_navigation_rail()
-            
-            # Header with user info
-            header = ft.Container(
-                content=ft.Row([
-                    ft.Column([
-                        ft.Text(f"Welcome, {self.current_user['full_name']}", 
-                               size=20, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"Role: {self.current_user['role'].title()} | "
-                               f"Last Login: {self.current_user.get('last_login', 'Never')}",
-                               size=12, color=ft.Colors.GREY_700),
-                    ], expand=True),
-                    ft.IconButton(
-                        icon=ft.icons.LOGOUT,
-                        tooltip="Logout",
-                        on_click=lambda e: self.logout(),
-                    ),
-                ]),
-                padding=15,
-                bgcolor=ft.Colors.BLUE_50,
-                border_radius=ft.border_radius.only(top_left=10, top_right=10),
+        """Main application interface"""
+        logger.info("=== Loading Main Application ===")
+        
+        # Navigation
+        nav_items = [
+            ("Dashboard", ft.icons.DASHBOARD_OUTLINED, ft.icons.DASHBOARD),
+            ("Reports", ft.icons.LIST_ALT_OUTLINED, ft.icons.LIST_ALT),
+        ]
+        
+        # Add navigation items based on role
+        if has_permission(self.current_user['role'], 'add_report'):
+            nav_items.append(("Add Report", ft.icons.ADD_CIRCLE_OUTLINE, ft.icons.ADD_CIRCLE))
+        
+        if has_permission(self.current_user['role'], 'access_admin_panel'):
+            nav_items.append(("Admin", ft.icons.ADMIN_PANEL_SETTINGS_OUTLINED, ft.icons.ADMIN_PANEL_SETTINGS))
+        
+        if has_permission(self.current_user['role'], 'export'):
+            nav_items.append(("Export", ft.icons.DOWNLOAD_OUTLINED, ft.icons.DOWNLOAD))
+        
+        destinations = [
+            ft.NavigationRailDestination(
+                icon=icon_out,
+                selected_icon=icon_sel,
+                label=label,
             )
-            
-            # Main content area
-            main_content = ft.Column([
-                header,
-                ft.Divider(height=1),
-                ft.Container(
-                    content=self.content_area,
-                    expand=True,
-                    padding=0,
-                ),
-            ], spacing=0, expand=True)
-            
-            # Main layout
-            main_layout = ft.Row(
+            for label, icon_out, icon_sel in nav_items
+        ]
+        
+        nav_rail = ft.NavigationRail(
+            selected_index=0,
+            label_type=ft.NavigationRailLabelType.ALL,
+            min_width=100,
+            min_extended_width=200,
+            destinations=destinations,
+            on_change=self.handle_navigation,
+            bgcolor=ft.colors.BLUE_GREY_50,
+        )
+        
+        # Header
+        header = ft.Container(
+            content=ft.Row(
                 [
-                    nav_rail,
-                    ft.VerticalDivider(width=1),
-                    main_content,
+                    ft.Column(
+                        [
+                            ft.Text(
+                                f"Welcome, {self.current_user['full_name']}",
+                                size=18,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                            ft.Text(
+                                f"Role: {self.current_user['role'].title()}",
+                                size=12,
+                                color=ft.colors.GREY_700,
+                            ),
+                        ],
+                        spacing=2,
+                    ),
+                    ft.Row(
+                        [
+                            ft.IconButton(
+                                icon=ft.icons.REFRESH,
+                                tooltip="Refresh",
+                                on_click=lambda e: self.refresh_current_view(),
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.LOGOUT,
+                                tooltip="Logout",
+                                on_click=lambda e: self.logout(),
+                            ),
+                        ],
+                    ),
                 ],
-                expand=True,
-            )
-            
-            self.page.clean()
-            self.page.add(main_layout)
-            
-            # Load default view
-            self.load_dashboard()
-            
-        except Exception as e:
-            logger.error(f"Main application failed: {e}")
-            self.show_error_dialog("Interface Error", f"Failed to load main application: {str(e)}")
-    
-    def create_navigation_rail(self):
-        """Create navigation rail based on user permissions"""
-        try:
-            role = self.current_user['role']
-            destinations = []
-            
-            # Dashboard - available to all
-            destinations.append(
-                ft.NavigationRailDestination(
-                    icon=ft.icons.DASHBOARD_OUTLINED,
-                    selected_icon=ft.icons.DASHBOARD,
-                    label="Dashboard",
-                )
-            )
-            
-            # Reports - available to all
-            destinations.append(
-                ft.NavigationRailDestination(
-                    icon=ft.icons.LIST_ALT_OUTLINED,
-                    selected_icon=ft.icons.LIST_ALT,
-                    label="Reports",
-                )
-            )
-            
-            # Add Report - for agents and admins
-            if has_permission(role, 'add_report'):
-                destinations.append(
-                    ft.NavigationRailDestination(
-                        icon=ft.icons.ADD_CIRCLE_OUTLINE,
-                        selected_icon=ft.icons.ADD_CIRCLE,
-                        label="Add Report",
-                    )
-                )
-            
-            # Admin Panel - for admins only
-            if has_permission(role, 'access_admin_panel'):
-                destinations.append(
-                    ft.NavigationRailDestination(
-                        icon=ft.icons.ADMIN_PANEL_SETTINGS_OUTLINED,
-                        selected_icon=ft.icons.ADMIN_PANEL_SETTINGS,
-                        label="Admin",
-                    )
-                )
-            
-            # Export - for all roles
-            if has_permission(role, 'export'):
-                destinations.append(
-                    ft.NavigationRailDestination(
-                        icon=ft.icons.DOWNLOAD_OUTLINED,
-                        selected_icon=ft.icons.DOWNLOAD,
-                        label="Export",
-                    )
-                )
-            
-            rail = ft.NavigationRail(
-                selected_index=0,
-                label_type=ft.NavigationRailLabelType.ALL,
-                min_width=100,
-                min_extended_width=200,
-                destinations=destinations,
-                on_change=self.handle_navigation,
-            )
-            
-            return rail
-            
-        except Exception as e:
-            logger.error(f"Navigation creation failed: {e}")
-            # Return basic navigation as fallback
-            return ft.NavigationRail(
-                selected_index=0,
-                destinations=[
-                    ft.NavigationRailDestination(icon=ft.icons.DASHBOARD, label="Dashboard"),
-                ],
-                on_change=self.handle_navigation,
-            )
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
+            padding=15,
+            bgcolor=ft.colors.BLUE_50,
+        )
+        
+        # Content area
+        self.content_area = ft.Container(expand=True, padding=20)
+        
+        # Main layout
+        main_layout = ft.Row(
+            [
+                nav_rail,
+                ft.VerticalDivider(width=1),
+                ft.Column(
+                    [
+                        header,
+                        ft.Divider(height=1),
+                        self.content_area,
+                    ],
+                    spacing=0,
+                    expand=True,
+                ),
+            ],
+            spacing=0,
+            expand=True,
+        )
+        
+        self.page.clean()
+        self.page.add(main_layout)
+        
+        # Load dashboard
+        self.load_dashboard()
     
     def handle_navigation(self, e):
-        """Handle navigation events"""
+        """Handle navigation"""
         try:
             index = e.control.selected_index
-            navigation_map = {
-                0: self.load_dashboard,
-                1: self.load_reports_list,
-                2: self.load_add_report,
-                3: self.load_admin_panel,
-                4: self.load_export_view,
-            }
             
-            if index in navigation_map:
-                navigation_map[index]()
-            else:
-                logger.warning(f"Invalid navigation index: {index}")
-                
-        except Exception as ex:
-            logger.error(f"Navigation failed: {ex}")
-            self.show_error_dialog("Navigation Error", f"Failed to load view: {str(ex)}")
+            views = [
+                self.load_dashboard,
+                self.load_reports,
+            ]
+            
+            # Add conditional views
+            if has_permission(self.current_user['role'], 'add_report'):
+                views.append(self.load_add_report)
+            
+            if has_permission(self.current_user['role'], 'access_admin_panel'):
+                views.append(self.load_admin_panel)
+            
+            if has_permission(self.current_user['role'], 'export'):
+                views.append(self.load_export)
+            
+            if index < len(views):
+                views[index]()
+            
+        except Exception as e:
+            logger.error(f"Navigation error: {e}")
+            self.show_error_snackbar(f"Navigation failed: {str(e)}")
     
     def load_dashboard(self):
-        """Load dashboard view"""
+        """Load dashboard"""
+        logger.info("Loading dashboard")
+        
         try:
-            # Simple dashboard with basic widgets
-            welcome_card = ft.Card(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Text("Dashboard", size=24, weight=ft.FontWeight.BOLD),
-                        ft.Divider(),
-                        ft.Text(f"Welcome back, {self.current_user['full_name']}!", size=16),
-                        ft.Text(f"System Status: Operational", size=14, color=ft.Colors.GREEN_700),
-                        ft.Container(height=10),
-                        ft.Text("Quick Actions:", size=16, weight=ft.FontWeight.W_500),
-                        ft.Row([
-                            ft.FilledButton("View Reports", on_click=lambda e: self.load_reports_list()),
-                            ft.OutlinedButton("Add Report", on_click=lambda e: self.load_add_report()),
-                        ]),
-                    ]),
+            # Get statistics
+            total_reports = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) as count FROM reports WHERE is_deleted = 0"
+            )[0]['count']
+            
+            open_reports = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) as count FROM reports WHERE status = 'Open' AND is_deleted = 0"
+            )[0]['count']
+            
+            under_investigation = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) as count FROM reports WHERE status = 'Under Investigation' AND is_deleted = 0"
+            )[0]['count']
+            
+            closed_reports = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) as count FROM reports WHERE status IN ('Close Case', 'Closed with STR') AND is_deleted = 0"
+            )[0]['count']
+            
+            # Create stat cards
+            def create_stat_card(title, value, color, icon):
+                return ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Icon(icon, size=40, color=color),
+                            ft.Container(height=10),
+                            ft.Text(str(value), size=32, weight=ft.FontWeight.BOLD),
+                            ft.Text(title, size=14, color=ft.colors.GREY_700),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
                     padding=20,
-                ),
-                elevation=3,
-            )
+                    bgcolor=ft.colors.WHITE,
+                    border_radius=10,
+                    border=ft.border.all(2, color),
+                    width=200,
+                )
             
             dashboard_content = ft.Column(
                 [
-                    welcome_card,
+                    ft.Text("Dashboard", size=28, weight=ft.FontWeight.BOLD),
                     ft.Container(height=20),
-                    ft.Text("System Overview", size=20, weight=ft.FontWeight.BOLD),
-                    ft.GridView(
+                    
+                    ft.Row(
                         [
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Icon(ft.icons.STORAGE, size=40, color=ft.Colors.BLUE_700),
-                                    ft.Text("Database", size=16),
-                                    ft.Text("Operational", size=14, color=ft.Colors.GREEN_700),
-                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                                padding=20,
-                                border_radius=10,
-                                bgcolor=ft.Colors.BLUE_50,
-                            ),
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Icon(ft.icons.SECURITY, size=40, color=ft.Colors.GREEN_700),
-                                    ft.Text("Security", size=16),
-                                    ft.Text("Active", size=14, color=ft.Colors.GREEN_700),
-                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                                padding=20,
-                                border_radius=10,
-                                bgcolor=ft.Colors.GREEN_50,
-                            ),
+                            create_stat_card("Total Reports", total_reports, ft.colors.BLUE_700, ft.icons.DESCRIPTION),
+                            create_stat_card("Open Reports", open_reports, ft.colors.GREEN_700, ft.icons.FOLDER_OPEN),
+                            create_stat_card("Under Investigation", under_investigation, ft.colors.ORANGE_700, ft.icons.SEARCH),
+                            create_stat_card("Closed Cases", closed_reports, ft.colors.RED_700, ft.icons.CHECK_CIRCLE),
                         ],
-                        runs_count=2,
-                        max_extent=200,
-                        spacing=10,
-                        run_spacing=10,
+                        wrap=True,
+                        spacing=15,
+                        run_spacing=15,
+                    ),
+                    
+                    ft.Container(height=30),
+                    
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Text("Quick Actions", size=20, weight=ft.FontWeight.BOLD),
+                                    ft.Divider(),
+                                    ft.Row(
+                                        [
+                                            ft.ElevatedButton(
+                                                "View All Reports",
+                                                icon=ft.icons.LIST,
+                                                on_click=lambda e: self.load_reports(),
+                                            ),
+                                            ft.ElevatedButton(
+                                                "Add New Report",
+                                                icon=ft.icons.ADD,
+                                                on_click=lambda e: self.load_add_report(),
+                                            ) if has_permission(self.current_user['role'], 'add_report') else ft.Container(),
+                                            ft.ElevatedButton(
+                                                "Export Data",
+                                                icon=ft.icons.DOWNLOAD,
+                                                on_click=lambda e: self.load_export(),
+                                            ) if has_permission(self.current_user['role'], 'export') else ft.Container(),
+                                        ],
+                                        wrap=True,
+                                        spacing=10,
+                                    ),
+                                ],
+                            ),
+                            padding=20,
+                        ),
+                        elevation=2,
                     ),
                 ],
-                scroll=ft.ScrollMode.ADAPTIVE,
+                scroll=ft.ScrollMode.AUTO,
             )
             
-            self.content_area.content = ft.Container(
-                content=dashboard_content,
-                padding=30,
-                expand=True,
-            )
+            self.content_area.content = dashboard_content
             self.page.update()
             
         except Exception as e:
-            logger.error(f"Dashboard load failed: {e}")
-            self.show_error_dialog("Dashboard Error", f"Failed to load dashboard: {str(e)}")
+            logger.error(f"Dashboard load error: {e}")
+            self.show_error_snackbar("Failed to load dashboard")
     
-    def load_reports_list(self):
-        """Load reports list view"""
-        try:
-            # Simple reports list
-            reports_content = ft.Column([
-                ft.Text("Reports", size=24, weight=ft.FontWeight.BOLD),
-                ft.Divider(),
-                ft.Text("Reports functionality will be implemented here.", size=16),
-                ft.Container(height=20),
-                ft.FilledButton(
-                    "View Sample Report", 
-                    on_click=lambda e: self.show_info_dialog(
-                        "Sample Report", 
-                        "This is a sample report dialog. Full implementation coming soon."
-                    )
-                ),
-            ])
-            
-            self.content_area.content = ft.Container(
-                content=reports_content,
-                padding=30,
-                expand=True,
-            )
-            self.page.update()
-            
-        except Exception as e:
-            logger.error(f"Reports list load failed: {e}")
-            self.show_error_dialog("Reports Error", f"Failed to load reports: {str(e)}")
+    def load_reports(self):
+        """Load reports list"""
+        logger.info("Loading reports")
+        self.show_info_snackbar("Reports view - Implementation in progress")
     
     def load_add_report(self):
         """Load add report form"""
-        self.show_info_dialog(
-            "Add Report", 
-            "Report creation form will be implemented here with full validation."
-        )
+        logger.info("Loading add report form")
+        self.show_info_snackbar("Add report form - Implementation in progress")
     
     def load_admin_panel(self):
-        """Load admin panel"""
-        self.show_info_dialog(
-            "Admin Panel", 
-            "Administrative functions for user management and system configuration."
-        )
+        """Load admin panel with user management"""
+        logger.info("Loading admin panel")
+        
+        from admin_panel import AdminPanel
+        panel = AdminPanel(self.page, self.db_manager, self.current_user, self.content_area)
+        panel.show()
     
-    def load_export_view(self):
+    def load_export(self):
         """Load export view"""
-        self.show_info_dialog(
-            "Export Data", 
-            "Data export functionality with CSV and Excel formats."
-        )
+        logger.info("Loading export view")
+        self.show_info_snackbar("Export functionality - Implementation in progress")
+    
+    def refresh_current_view(self):
+        """Refresh current view"""
+        self.show_info_snackbar("Refreshed")
     
     def logout(self):
-        """Logout user and return to login screen"""
-        try:
-            self.current_user = None
-            self.db_manager = None
-            self.write_queue = None
-            self.page.clean()
-            self.show_login_screen()
-        except Exception as e:
-            logger.error(f"Logout failed: {e}")
-            self.page.restart()  # Force restart if logout fails
+        """Logout user"""
+        logger.info(f"User logging out: {self.current_user['username']}")
+        self.current_user = None
+        self.show_login_screen()
     
-    # UI Helper Methods
-    def show_error_dialog(self, title: str, message: str):
+    # Helper methods
+    def show_error_dialog(self, title, message):
         """Show error dialog"""
-        try:
-            dialog = ft.AlertDialog(
-                title=ft.Text(title),
-                content=ft.Text(message),
-                actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
-            )
-            self.page.dialog = dialog
-            dialog.open = True
-            self.page.update()
-        except Exception as e:
-            logger.error(f"Error dialog failed: {e}")
-    
-    def show_info_dialog(self, title: str, message: str):
-        """Show info dialog"""
-        try:
-            dialog = ft.AlertDialog(
-                title=ft.Text(title),
-                content=ft.Text(message),
-                actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
-            )
-            self.page.dialog = dialog
-            dialog.open = True
-            self.page.update()
-        except Exception as e:
-            logger.error(f"Info dialog failed: {e}")
-    
-    def show_success_message(self, message: str):
-        """Show success snackbar"""
-        try:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(message),
-                bgcolor=ft.Colors.GREEN_700,
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-        except Exception as e:
-            logger.error(f"Success message failed: {e}")
-    
-    def show_config_error(self, message: str):
-        """Show configuration error screen"""
-        error_view = ft.Container(
-            content=ft.Column([
-                ft.Icon(ft.icons.ERROR_OUTLINE, size=64, color=ft.Colors.ORANGE_700),
-                ft.Text("Configuration Error", size=24, weight=ft.FontWeight.BOLD),
-                ft.Text(message, size=16, text_align=ft.TextAlign.CENTER),
-                ft.Container(height=20),
-                ft.Row([
-                    ft.ElevatedButton(
-                        "Reconfigure", 
-                        icon=ft.icons.SETTINGS,
-                        on_click=lambda e: self.show_first_time_setup()
-                    ),
-                    ft.TextButton(
-                        "Exit", 
-                        icon=ft.icons.EXIT_TO_APP,
-                        on_click=lambda e: self.page.window_destroy()
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=40,
-            alignment=ft.Alignment.center,
-            expand=True,
+        dialog = ft.AlertDialog(
+            title=ft.Text(title),
+            content=ft.Text(message),
+            actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
         )
-        self.page.clean()
-        self.page.add(error_view)
+        self.page.dialog = dialog
+        dialog.open = True
         self.page.update()
     
-    def show_fatal_error(self, message: str):
-        """Show fatal error screen"""
-        error_view = ft.Container(
-            content=ft.Column([
-                ft.Icon(ft.icons.ERROR, size=80, color=ft.Colors.RED_700),
-                ft.Text("Fatal Error", size=28, weight=ft.FontWeight.BOLD),
-                ft.Text(message, size=16, text_align=ft.TextAlign.CENTER),
-                ft.Container(height=10),
-                ft.Text("Please check the application logs for details.", 
-                       size=14, color=ft.Colors.GREY_700),
-                ft.Container(height=30),
-                ft.Row([
-                    ft.ElevatedButton(
-                        "Restart Application", 
-                        icon=ft.icons.REFRESH,
-                        on_click=lambda e: self.page.restart()
-                    ),
-                    ft.TextButton(
-                        "Exit", 
-                        icon=ft.icons.EXIT_TO_APP,
-                        on_click=lambda e: self.page.window_destroy()
-                    ),
-                ], alignment=ft.MainAxisAlignment.CENTER),
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=40,
-            alignment=ft.Alignment.center,
-            expand=True,
+    def show_info_snackbar(self, message):
+        """Show info snackbar"""
+        self.page.snack_bar = ft.SnackBar(content=ft.Text(message))
+        self.page.snack_bar.open = True
+        self.page.update()
+    
+    def show_error_snackbar(self, message):
+        """Show error snackbar"""
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(message),
+            bgcolor=ft.colors.RED_700,
         )
-        self.page.clean()
-        self.page.add(error_view)
+        self.page.snack_bar.open = True
         self.page.update()
     
     def close_dialog(self):
-        """Close current dialog"""
-        try:
-            if self.page.dialog:
-                self.page.dialog.open = False
-                self.page.update()
-        except Exception as e:
-            logger.error(f"Dialog close failed: {e}")
+        """Close dialog"""
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.page.update()
+    
+    def show_error_screen(self, title, message):
+        """Show error screen"""
+        error_view = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Icon(ft.icons.ERROR, size=80, color=ft.colors.RED_700),
+                    ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(message, size=16, text_align=ft.TextAlign.CENTER),
+                    ft.Container(height=20),
+                    ft.ElevatedButton(
+                        "Restart",
+                        icon=ft.icons.REFRESH,
+                        on_click=lambda e: self.page.window_destroy(),
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            expand=True,
+            alignment=ft.alignment.center,
+            padding=40,
+        )
+        self.page.clean()
+        self.page.add(error_view)
+        self.page.update()
 
 
 def main(page: ft.Page):
-    """Application entry point with global error handling"""
+    """Application entry point"""
     try:
-        # Set window properties
-        page.window.center()
-        page.window.min_width = 1000
-        page.window.min_height = 600
+        logger.info("=" * 50)
+        logger.info("FIU Report Management System Starting")
+        logger.info("=" * 50)
         
-        # Initialize application
+        # Center window
+        page.window_center()
+        
+        # Create application
         FIUApplication(page)
         
     except Exception as e:
-        # Ultimate fallback - show basic error
-        logger.critical(f"Fatal application error: {e}")
-        traceback.print_exc()
+        logger.critical(f"Fatal error: {e}")
+        logger.critical(f"Traceback: {__import__('traceback').format_exc()}")
         
+        # Show basic error screen
         page.clean()
         page.add(
             ft.Container(
-                content=ft.Column([
-                    ft.Text("FIU System - Critical Error", size=24, weight=ft.FontWeight.BOLD),
-                    ft.Text(str(e), size=14),
-                    ft.Container(height=20),
-                    ft.ElevatedButton("Restart", on_click=lambda e: page.restart()),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                alignment=ft.Alignment.center,
+                content=ft.Column(
+                    [
+                        ft.Text("Critical Error", size=24, weight=ft.FontWeight.BOLD),
+                        ft.Text(str(e), size=14),
+                        ft.Container(height=20),
+                        ft.ElevatedButton("Exit", on_click=lambda e: page.window_destroy()),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                alignment=ft.alignment.center,
                 expand=True,
-                padding=40
+                padding=40,
             )
         )
         page.update()
 
 
 if __name__ == "__main__":
-    # Launch application
-    ft.app(
-        target=main,
-        view=ft.AppView.FLET_APP,
-        assets_dir="assets"
-    )
+    logger.info("Starting Flet application")
+    ft.app(target=main, view=ft.AppView.FLET_APP)
