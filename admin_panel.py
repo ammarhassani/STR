@@ -163,13 +163,38 @@ class AdminPanel:
     
     def build_system_settings(self):
         """Build system settings tab"""
+        # Create tabs for different settings
+        settings_tabs = ft.Tabs(
+            selected_index=0,
+            animation_duration=200,
+            tabs=[
+                ft.Tab(
+                    text="General Settings",
+                    icon=ft.Icons.SETTINGS,
+                    content=self.build_general_settings(),
+                ),
+                ft.Tab(
+                    text="Dropdown Values",
+                    icon=ft.Icons.LIST,
+                    content=self.build_dropdown_settings(),
+                ),
+                ft.Tab(
+                    text="Field Configuration",
+                    icon=ft.Icons.VIEW_COLUMN,
+                    content=self.build_field_settings(),
+                ),
+            ],
+            expand=1,
+        )
+
         return ft.Container(
             content=ft.Column(
                 [
                     ft.Text("System Settings", size=20, weight=ft.FontWeight.BOLD),
                     ft.Divider(),
-                    ft.Text("System configuration options will be implemented here"),
+                    settings_tabs,
                 ],
+                expand=True,
             ),
             padding=20,
         )
@@ -617,7 +642,236 @@ class AdminPanel:
             'reporter': ft.Colors.GREEN_700,
         }
         return colors.get(role, ft.Colors.GREY_700)
-    
+
+    def build_general_settings(self):
+        """Build general settings section"""
+        try:
+            # Load current settings
+            query = "SELECT * FROM system_config WHERE config_category = 'general' ORDER BY display_order"
+            settings = [dict(row) for row in self.db_manager.execute_with_retry(query)]
+
+            settings_controls = []
+            for setting in settings:
+                settings_controls.append(
+                    ft.Row(
+                        [
+                            ft.Text(setting['config_key'].replace('_', ' ').title(), size=14, weight=ft.FontWeight.BOLD, expand=2),
+                            ft.TextField(
+                                value=setting['config_value'],
+                                expand=3,
+                                on_blur=lambda e, key=setting['config_key']: self.update_setting(key, e.control.value),
+                            ),
+                        ],
+                        spacing=10,
+                    )
+                )
+
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("General Application Settings", size=16, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
+                        ft.Column(settings_controls, spacing=15, scroll=ft.ScrollMode.AUTO),
+                    ],
+                    spacing=10,
+                ),
+                padding=20,
+            )
+        except Exception as e:
+            logger.error(f"Failed to load general settings: {e}")
+            return ft.Container(content=ft.Text("Failed to load settings"))
+
+    def build_dropdown_settings(self):
+        """Build dropdown values management section"""
+        try:
+            # Load dropdown options by category
+            query = """
+                SELECT config_category, config_value, config_key, display_order
+                FROM system_config
+                WHERE config_type = 'dropdown'
+                ORDER BY config_category, display_order
+            """
+            dropdown_data = [dict(row) for row in self.db_manager.execute_with_retry(query)]
+
+            # Group by category
+            categories = {}
+            for item in dropdown_data:
+                cat = item['config_category']
+                if cat not in categories:
+                    categories[cat] = []
+                categories[cat].append(item)
+
+            # Build UI for each category
+            category_sections = []
+            for category, items in categories.items():
+                item_widgets = []
+                for item in items:
+                    item_widgets.append(
+                        ft.Row(
+                            [
+                                ft.TextField(value=item['config_value'], expand=2),
+                                ft.IconButton(
+                                    icon=ft.Icons.DELETE,
+                                    icon_color=ft.Colors.RED_700,
+                                    tooltip="Delete option",
+                                    on_click=lambda e, key=item['config_key']: self.delete_dropdown_option(key),
+                                ),
+                            ],
+                            spacing=5,
+                        )
+                    )
+
+                category_sections.append(
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Row(
+                                        [
+                                            ft.Text(category.replace('_', ' ').title(), size=14, weight=ft.FontWeight.BOLD),
+                                            ft.IconButton(
+                                                icon=ft.Icons.ADD,
+                                                icon_color=ft.Colors.GREEN_700,
+                                                tooltip="Add option",
+                                                on_click=lambda e, cat=category: self.add_dropdown_option(cat),
+                                            ),
+                                        ],
+                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                    ),
+                                    ft.Divider(),
+                                    ft.Column(item_widgets, spacing=10),
+                                ],
+                                spacing=10,
+                            ),
+                            padding=15,
+                        ),
+                        elevation=1,
+                    )
+                )
+
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("Manage Dropdown Options", size=16, weight=ft.FontWeight.BOLD),
+                        ft.Divider(),
+                        ft.Column(category_sections, spacing=15, scroll=ft.ScrollMode.AUTO),
+                    ],
+                    spacing=10,
+                ),
+                padding=20,
+            )
+        except Exception as e:
+            logger.error(f"Failed to load dropdown settings: {e}")
+            return ft.Container(content=ft.Text("Failed to load dropdown settings"))
+
+    def build_field_settings(self):
+        """Build field configuration section"""
+        try:
+            # Load column settings
+            query = "SELECT * FROM column_settings ORDER BY display_order"
+            fields = [dict(row) for row in self.db_manager.execute_with_retry(query)]
+
+            field_rows = []
+            for field in fields:
+                field_rows.append(
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Row(
+                                [
+                                    ft.Column(
+                                        [
+                                            ft.Text(field['display_name_en'], weight=ft.FontWeight.BOLD),
+                                            ft.Text(field['column_name'], size=12, color=ft.Colors.GREY_600),
+                                        ],
+                                        spacing=2,
+                                        expand=2,
+                                    ),
+                                    ft.Checkbox(
+                                        label="Visible",
+                                        value=bool(field['is_visible']),
+                                        on_change=lambda e, f=field: self.toggle_field_visibility(f['column_id'], e.control.value),
+                                    ),
+                                    ft.Checkbox(
+                                        label="Required",
+                                        value=bool(field['is_required']),
+                                        on_change=lambda e, f=field: self.toggle_field_required(f['column_id'], e.control.value),
+                                    ),
+                                    ft.Text(field['data_type'], size=12, color=ft.Colors.BLUE_700),
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            ),
+                            padding=15,
+                        ),
+                        elevation=1,
+                    )
+                )
+
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("Field Configuration", size=16, weight=ft.FontWeight.BOLD),
+                        ft.Text("Toggle field visibility and required status", size=12, color=ft.Colors.GREY_600),
+                        ft.Divider(),
+                        ft.Column(field_rows, spacing=10, scroll=ft.ScrollMode.AUTO),
+                    ],
+                    spacing=10,
+                ),
+                padding=20,
+            )
+        except Exception as e:
+            logger.error(f"Failed to load field settings: {e}")
+            return ft.Container(content=ft.Text("Failed to load field settings"))
+
+    def update_setting(self, key, value):
+        """Update system setting"""
+        try:
+            query = "UPDATE system_config SET config_value = ? WHERE config_key = ?"
+            self.db_manager.execute_with_retry(query, (value, key))
+            logger.info(f"Setting updated: {key} = {value}")
+            self.show_success(f"Setting '{key}' updated")
+        except Exception as e:
+            logger.error(f"Failed to update setting: {e}")
+            self.show_error(f"Failed to update setting: {str(e)}")
+
+    def delete_dropdown_option(self, key):
+        """Delete dropdown option"""
+        try:
+            query = "DELETE FROM system_config WHERE config_key = ?"
+            self.db_manager.execute_with_retry(query, (key,))
+            logger.info(f"Dropdown option deleted: {key}")
+            self.show()  # Refresh view
+            self.show_success("Option deleted")
+        except Exception as e:
+            logger.error(f"Failed to delete option: {e}")
+            self.show_error(f"Failed to delete option: {str(e)}")
+
+    def add_dropdown_option(self, category):
+        """Add new dropdown option"""
+        # TODO: Implement add dropdown dialog
+        self.show_success(f"Add option for {category} - Coming soon")
+
+    def toggle_field_visibility(self, column_id, visible):
+        """Toggle field visibility"""
+        try:
+            query = "UPDATE column_settings SET is_visible = ? WHERE column_id = ?"
+            self.db_manager.execute_with_retry(query, (1 if visible else 0, column_id))
+            logger.info(f"Field visibility updated: {column_id} = {visible}")
+            self.show_success("Field visibility updated")
+        except Exception as e:
+            logger.error(f"Failed to update visibility: {e}")
+            self.show_error(f"Failed to update visibility: {str(e)}")
+
+    def toggle_field_required(self, column_id, required):
+        """Toggle field required status"""
+        try:
+            query = "UPDATE column_settings SET is_required = ? WHERE column_id = ?"
+            self.db_manager.execute_with_retry(query, (1 if required else 0, column_id))
+            logger.info(f"Field required updated: {column_id} = {required}")
+            self.show_success("Field requirement updated")
+        except Exception as e:
+            logger.error(f"Failed to update required: {e}")
+            self.show_error(f"Failed to update required: {str(e)}")
+
     def show_success(self, message):
         """Show success message"""
         self.page.snack_bar = ft.SnackBar(
