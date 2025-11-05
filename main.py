@@ -1087,12 +1087,92 @@ class FIUApplication:
     def load_reports(self):
         """Load reports list"""
         logger.info("Loading reports")
-        self.show_info_snackbar("Reports view - Implementation in progress")
+
+        # Placeholder content
+        reports_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Reports", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.CONSTRUCTION, size=64, color=ft.Colors.ORANGE_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Reports View - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will display all reports with filtering and search capabilities.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = reports_content
+        self.page.update()
     
     def load_add_report(self):
         """Load add report form"""
         logger.info("Loading add report form")
-        self.show_info_snackbar("Add report form - Implementation in progress")
+
+        # Placeholder content
+        add_report_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Add New Report", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, size=64, color=ft.Colors.BLUE_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Add Report Form - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will provide a form to add new STR reports to the system.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = add_report_content
+        self.page.update()
     
     def load_admin_panel(self):
         """Load admin panel with user management"""
@@ -1105,7 +1185,47 @@ class FIUApplication:
     def load_export(self):
         """Load export view"""
         logger.info("Loading export view")
-        self.show_info_snackbar("Export functionality - Implementation in progress")
+
+        # Placeholder content
+        export_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Export Data", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.DOWNLOAD, size=64, color=ft.Colors.GREEN_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Export Functionality - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will allow you to export reports to Excel and PDF formats.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = export_content
+        self.page.update()
     
     def refresh_current_view(self):
         """Refresh current view"""

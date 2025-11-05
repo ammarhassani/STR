@@ -344,24 +344,23 @@ class AdminPanel:
                 )
                 
                 logger.info(f"User added: {username_field.value}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{username_field.value}' added successfully")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to add user: {ex}")
                 error_text.value = f"Failed to add user: {str(ex)}"
                 error_text.visible = True
                 self.page.update()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Add New User"),
             content=ft.Container(
                 content=ft.Column(
@@ -391,9 +390,7 @@ class AdminPanel:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_edit_user_dialog(self, user):
         """Show edit user dialog"""
@@ -488,24 +485,23 @@ class AdminPanel:
                 self.db_manager.execute_with_retry(update_query, params)
                 
                 logger.info(f"User updated: {user['username']}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{user['username']}' updated successfully")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to update user: {ex}")
                 error_text.value = f"Failed to update user: {str(ex)}"
                 error_text.visible = True
                 self.page.update()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text(f"Edit User: {user['username']}"),
             content=ft.Container(
                 content=ft.Column(
@@ -535,9 +531,7 @@ class AdminPanel:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_delete_user_dialog(self, user):
         """Show delete user confirmation dialog"""
@@ -562,22 +556,21 @@ class AdminPanel:
                 )
                 
                 logger.info(f"User deleted: {user['username']}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{user['username']}' has been deactivated")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to delete user: {ex}")
                 self.show_error(f"Failed to delete user: {str(ex)}")
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Confirm Delete"),
             content=ft.Container(
                 content=ft.Column(
@@ -614,9 +607,7 @@ class AdminPanel:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def get_role_color(self, role):
         """Get color for role badge"""
