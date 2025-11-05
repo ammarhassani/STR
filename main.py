@@ -1,9 +1,8 @@
 """
 FIU Report Management System - Main Application
-Version 2.1.0
+Version 2.1.0 - Complete Rewrite with Enhanced Workflow
 """
 import flet as ft
-from flet import Icons, colors
 import sys
 import logging
 from pathlib import Path
@@ -56,13 +55,13 @@ class FIUApplication:
         # Configure page
         try:
             self.page.title = "FIU Report Management System"
-            self.page.window.width = 1400
-            self.page.window.height = 800
-            self.page.window.min_width = 1000
-            self.page.window.min_height = 600
+            self.page.window_width = 1400
+            self.page.window_height = 800
+            self.page.window_min_width = 1000
+            self.page.window_min_height = 600
             self.page.theme_mode = ft.ThemeMode.LIGHT
             self.page.padding = 0
-            self.page.bgcolor = colors.BLUE_GREY_50
+            self.page.bgcolor = ft.Colors.BLUE_GREY_50
             logger.info("Page configured successfully")
         except Exception as e:
             logger.error(f"Page configuration error: {e}")
@@ -118,7 +117,7 @@ class FIUApplication:
         welcome_view = ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(Icons.SECURITY, size=100, color=colors.BLUE_700),
+                    ft.Icon(ft.Icons.SECURITY, size=100, color=ft.Colors.BLUE_700),
                     ft.Container(height=20),
                     ft.Text(
                         "FIU Report Management System",
@@ -130,19 +129,19 @@ class FIUApplication:
                     ft.Text(
                         "Financial Intelligence Unit",
                         size=20,
-                        color=colors.GREY_700,
+                        color=ft.Colors.GREY_700,
                         text_align=ft.TextAlign.CENTER,
                     ),
                     ft.Text(
                         "Enterprise Report Management Solution",
                         size=16,
-                        color=colors.GREY_600,
+                        color=ft.Colors.GREY_600,
                         text_align=ft.TextAlign.CENTER,
                     ),
                     ft.Container(height=40),
                     ft.ElevatedButton(
                         text="Start Setup",
-                        icon=Icons.ARROW_FORWARD,
+                        icon=ft.Icons.ARROW_FORWARD,
                         on_click=start_setup,
                         height=50,
                         width=200,
@@ -154,7 +153,7 @@ class FIUApplication:
                     ft.Text(
                         "Version 2.1.0",
                         size=12,
-                        color=colors.GREY_500,
+                        color=ft.Colors.GREY_500,
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -165,7 +164,7 @@ class FIUApplication:
             gradient=ft.LinearGradient(
                 begin=ft.alignment.top_left,
                 end=ft.alignment.bottom_right,
-                colors=[colors.BLUE_50, colors.WHITE],
+                colors=[ft.Colors.BLUE_50, ft.Colors.WHITE],
             ),
         )
         
@@ -186,7 +185,7 @@ class FIUApplication:
             label="Database File Path",
             value=default_db_path,
             hint_text="Full path to database file",
-            prefix_icon=Icons.STORAGE,
+            prefix_icon=ft.Icons.STORAGE,
             expand=True,
         )
         
@@ -194,7 +193,7 @@ class FIUApplication:
             label="Backup Directory",
             value=default_backup_path,
             hint_text="Directory for backup files",
-            prefix_icon=Icons.BACKUP,
+            prefix_icon=ft.Icons.BACKUP,
             expand=True,
         )
         
@@ -206,7 +205,7 @@ class FIUApplication:
             
             if not db_path or not backup_path:
                 status_text.value = "⚠ Both paths are required"
-                status_text.color = colors.RED_700
+                status_text.color = ft.Colors.RED_700
                 self.page.update()
                 return
             
@@ -235,7 +234,7 @@ class FIUApplication:
                         content=ft.Row(
                             [
                                 ft.IconButton(
-                                    icon=Icons.ARROW_BACK,
+                                    icon=ft.Icons.ARROW_BACK,
                                     on_click=go_back,
                                     tooltip="Back",
                                 ),
@@ -255,7 +254,7 @@ class FIUApplication:
                     ft.Container(
                         content=ft.Column(
                             [
-                                ft.Icon(Icons.FOLDER_SPECIAL, size=60, color=colors.BLUE_700),
+                                ft.Icon(ft.Icons.FOLDER_SPECIAL, size=60, color=ft.Colors.BLUE_700),
                                 ft.Text(
                                     "Choose Database and Backup Locations",
                                     size=20,
@@ -265,7 +264,7 @@ class FIUApplication:
                                 ft.Text(
                                     "Select where to store your database and backups",
                                     size=14,
-                                    color=colors.GREY_700,
+                                    color=ft.Colors.GREY_700,
                                     text_align=ft.TextAlign.CENTER,
                                 ),
                                 ft.Container(height=30),
@@ -279,7 +278,7 @@ class FIUApplication:
                                                 ft.Text(
                                                     "This file will store all your reports and system data",
                                                     size=12,
-                                                    color=colors.GREY_600,
+                                                    color=ft.Colors.GREY_600,
                                                 ),
                                                 ft.Container(height=10),
                                                 db_path_field,
@@ -301,7 +300,7 @@ class FIUApplication:
                                                 ft.Text(
                                                     "Automatic backups will be stored here",
                                                     size=12,
-                                                    color=colors.GREY_600,
+                                                    color=ft.Colors.GREY_600,
                                                 ),
                                                 ft.Container(height=10),
                                                 backup_path_field,
@@ -318,7 +317,7 @@ class FIUApplication:
                                 
                                 ft.ElevatedButton(
                                     text="Continue",
-                                    icon=Icons.ARROW_FORWARD,
+                                    icon=ft.Icons.ARROW_FORWARD,
                                     on_click=validate_and_continue,
                                     height=45,
                                     width=200,
@@ -334,7 +333,7 @@ class FIUApplication:
                 spacing=0,
             ),
             expand=True,
-            bgcolor=colors.WHITE,
+            bgcolor=ft.Colors.WHITE,
         )
         
         self.page.clean()
@@ -378,7 +377,7 @@ class FIUApplication:
             content=ft.Container(
                 content=ft.Column(
                     [
-                        ft.Icon(Icons.INFO_OUTLINE, size=48, color=colors.BLUE_700),
+                        ft.Icon(ft.Icons.INFO_OUTLINE, size=48, color=ft.Colors.BLUE_700),
                         ft.Container(height=10),
                         ft.Text(
                             "An existing database was found at:",
@@ -388,11 +387,11 @@ class FIUApplication:
                             content=ft.Text(
                                 self.temp_db_path,
                                 size=12,
-                                color=colors.BLUE_700,
+                                color=ft.Colors.BLUE_700,
                                 weight=ft.FontWeight.BOLD,
                             ),
                             padding=10,
-                            bgcolor=colors.BLUE_50,
+                            bgcolor=ft.Colors.BLUE_50,
                             border_radius=5,
                         ),
                         ft.Container(height=15),
@@ -426,19 +425,19 @@ class FIUApplication:
         username_field = ft.TextField(
             label="Admin Username",
             hint_text="Enter: admin",
-            prefix_icon=Icons.ADMIN_PANEL_SETTINGS,
+            prefix_icon=ft.Icons.ADMIN_PANEL_SETTINGS,
             autofocus=True,
         )
         
         password_field = ft.TextField(
             label="Admin Password",
             hint_text="Enter: admin123",
-            prefix_icon=Icons.LOCK,
+            prefix_icon=ft.Icons.LOCK,
             password=True,
             can_reveal_password=True,
         )
         
-        error_text = ft.Text("", color=colors.RED_700, size=12)
+        error_text = ft.Text("", color=ft.Colors.RED_700, size=12)
         
         def verify_and_create(e):
             username = username_field.value.strip()
@@ -467,7 +466,7 @@ class FIUApplication:
             content=ft.Container(
                 content=ft.Column(
                     [
-                        ft.Icon(Icons.VERIFIED_USER, size=48, color=colors.AMBER_700),
+                        ft.Icon(ft.Icons.VERIFIED_USER, size=48, color=ft.Colors.AMBER_700),
                         ft.Container(height=10),
                         ft.Text(
                             "To create a new database, please verify admin credentials:",
@@ -485,11 +484,11 @@ class FIUApplication:
                             content=ft.Text(
                                 "Default credentials:\nUsername: admin\nPassword: admin123",
                                 size=12,
-                                color=colors.GREY_600,
+                                color=ft.Colors.GREY_600,
                                 text_align=ft.TextAlign.CENTER,
                             ),
                             padding=10,
-                            bgcolor=colors.GREY_100,
+                            bgcolor=ft.Colors.GREY_100,
                             border_radius=5,
                         ),
                     ],
@@ -600,14 +599,14 @@ class FIUApplication:
         username_field = ft.TextField(
             label="Username",
             value="admin",
-            prefix_icon=Icons.PERSON,
+            prefix_icon=ft.Icons.PERSON,
             read_only=True,
         )
         
         password_field = ft.TextField(
             label="Password",
             value="admin123",
-            prefix_icon=Icons.LOCK,
+            prefix_icon=ft.Icons.LOCK,
             password=True,
             can_reveal_password=True,
             read_only=True,
@@ -620,19 +619,19 @@ class FIUApplication:
         auto_login_view = ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(Icons.CHECK_CIRCLE, size=80, color=colors.GREEN_700),
+                    ft.Icon(ft.Icons.CHECK_CIRCLE, size=80, color=ft.Colors.GREEN_700),
                     ft.Container(height=20),
                     ft.Text(
                         "Setup Complete!",
                         size=32,
                         weight=ft.FontWeight.BOLD,
-                        color=colors.GREEN_700,
+                        color=ft.Colors.GREEN_700,
                     ),
                     ft.Container(height=10),
                     ft.Text(
                         "Your database has been created successfully",
                         size=16,
-                        color=colors.GREY_700,
+                        color=ft.Colors.GREY_700,
                     ),
                     ft.Container(height=30),
                     
@@ -650,11 +649,11 @@ class FIUApplication:
                                         content=ft.Text(
                                             "⚠ Please change these credentials after first login",
                                             size=12,
-                                            color=colors.ORANGE_700,
+                                            color=ft.Colors.ORANGE_700,
                                             text_align=ft.TextAlign.CENTER,
                                         ),
                                         padding=10,
-                                        bgcolor=colors.ORANGE_50,
+                                        bgcolor=ft.Colors.ORANGE_50,
                                         border_radius=5,
                                     ),
                                 ],
@@ -668,7 +667,7 @@ class FIUApplication:
                     ft.Container(height=30),
                     ft.ElevatedButton(
                         text="Proceed to Login",
-                        icon=Icons.LOGIN,
+                        icon=ft.Icons.LOGIN,
                         on_click=proceed_to_login,
                         height=50,
                         width=200,
@@ -682,7 +681,7 @@ class FIUApplication:
             gradient=ft.LinearGradient(
                 begin=ft.alignment.top_left,
                 end=ft.alignment.bottom_right,
-                colors=[colors.GREEN_50, colors.WHITE],
+                colors=[ft.Colors.GREEN_50, ft.Colors.WHITE],
             ),
         )
         
@@ -696,21 +695,21 @@ class FIUApplication:
         
         username_field = ft.TextField(
             label="Username",
-            prefix_icon=Icons.PERSON,
+            prefix_icon=ft.Icons.PERSON,
             autofocus=True,
             width=350,
         )
         
         password_field = ft.TextField(
             label="Password",
-            prefix_icon=Icons.LOCK,
+            prefix_icon=ft.Icons.LOCK,
             password=True,
             can_reveal_password=True,
             width=350,
             on_submit=lambda e: attempt_login(),
         )
         
-        error_text = ft.Text("", color=colors.RED_700, visible=False)
+        error_text = ft.Text("", color=ft.Colors.RED_700, visible=False)
         loading = ft.ProgressRing(visible=False, width=20, height=20)
         
         def attempt_login():
@@ -745,10 +744,10 @@ class FIUApplication:
             content=ft.Container(
                 content=ft.Column(
                     [
-                        ft.Icon(Icons.SECURITY, size=70, color=colors.BLUE_700),
+                        ft.Icon(ft.Icons.SECURITY, size=70, color=ft.Colors.BLUE_700),
                         ft.Container(height=15),
                         ft.Text("FIU Report System", size=26, weight=ft.FontWeight.BOLD),
-                        ft.Text("Secure Login", size=14, color=colors.GREY_600),
+                        ft.Text("Secure Login", size=14, color=ft.Colors.GREY_600),
                         ft.Container(height=25),
                         username_field,
                         ft.Container(height=15),
@@ -761,7 +760,7 @@ class FIUApplication:
                         ft.Container(height=20),
                         ft.ElevatedButton(
                             text="Sign In",
-                            icon=Icons.LOGIN,
+                            icon=ft.Icons.LOGIN,
                             on_click=lambda e: attempt_login(),
                             width=350,
                             height=45,
@@ -785,7 +784,7 @@ class FIUApplication:
             gradient=ft.LinearGradient(
                 begin=ft.alignment.top_left,
                 end=ft.alignment.bottom_right,
-                colors=[colors.BLUE_50, colors.WHITE],
+                colors=[ft.Colors.BLUE_50, ft.Colors.WHITE],
             ),
         )
         
@@ -851,19 +850,19 @@ class FIUApplication:
         
         # Navigation
         nav_items = [
-            ("Dashboard", Icons.DASHBOARD_OUTLINED, Icons.DASHBOARD),
-            ("Reports", Icons.LIST_ALT_OUTLINED, Icons.LIST_ALT),
+            ("Dashboard", ft.Icons.DASHBOARD_OUTLINED, ft.Icons.DASHBOARD),
+            ("Reports", ft.Icons.LIST_ALT_OUTLINED, ft.Icons.LIST_ALT),
         ]
         
         # Add navigation items based on role
         if has_permission(self.current_user['role'], 'add_report'):
-            nav_items.append(("Add Report", Icons.ADD_CIRCLE_OUTLINE, Icons.ADD_CIRCLE))
+            nav_items.append(("Add Report", ft.Icons.ADD_CIRCLE_OUTLINE, ft.Icons.ADD_CIRCLE))
         
         if has_permission(self.current_user['role'], 'access_admin_panel'):
-            nav_items.append(("Admin", Icons.ADMIN_PANEL_SETTINGS_OUTLINED, Icons.ADMIN_PANEL_SETTINGS))
+            nav_items.append(("Admin", ft.Icons.ADMIN_PANEL_SETTINGS_OUTLINED, ft.Icons.ADMIN_PANEL_SETTINGS))
         
         if has_permission(self.current_user['role'], 'export'):
-            nav_items.append(("Export", Icons.DOWNLOAD_OUTLINED, Icons.DOWNLOAD))
+            nav_items.append(("Export", ft.Icons.DOWNLOAD_OUTLINED, ft.Icons.DOWNLOAD))
         
         destinations = [
             ft.NavigationRailDestination(
@@ -881,7 +880,7 @@ class FIUApplication:
             min_extended_width=200,
             destinations=destinations,
             on_change=self.handle_navigation,
-            bgcolor=colors.BLUE_GREY_50,
+            bgcolor=ft.Colors.BLUE_GREY_50,
         )
         
         # Header
@@ -898,7 +897,7 @@ class FIUApplication:
                             ft.Text(
                                 f"Role: {self.current_user['role'].title()}",
                                 size=12,
-                                color=colors.GREY_700,
+                                color=ft.Colors.GREY_700,
                             ),
                         ],
                         spacing=2,
@@ -906,12 +905,12 @@ class FIUApplication:
                     ft.Row(
                         [
                             ft.IconButton(
-                                icon=Icons.REFRESH,
+                                icon=ft.Icons.REFRESH,
                                 tooltip="Refresh",
                                 on_click=lambda e: self.refresh_current_view(),
                             ),
                             ft.IconButton(
-                                icon=Icons.LOGOUT,
+                                icon=ft.Icons.LOGOUT,
                                 tooltip="Logout",
                                 on_click=lambda e: self.logout(),
                             ),
@@ -921,7 +920,7 @@ class FIUApplication:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=15,
-            bgcolor=colors.BLUE_50,
+            bgcolor=ft.Colors.BLUE_50,
         )
         
         # Content area
@@ -1009,12 +1008,12 @@ class FIUApplication:
                             ft.Icon(icon, size=40, color=color),
                             ft.Container(height=10),
                             ft.Text(str(value), size=32, weight=ft.FontWeight.BOLD),
-                            ft.Text(title, size=14, color=colors.GREY_700),
+                            ft.Text(title, size=14, color=ft.Colors.GREY_700),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     padding=20,
-                    bgcolor=colors.WHITE,
+                    bgcolor=ft.Colors.WHITE,
                     border_radius=10,
                     border=ft.border.all(2, color),
                     width=200,
@@ -1027,10 +1026,10 @@ class FIUApplication:
                     
                     ft.Row(
                         [
-                            create_stat_card("Total Reports", total_reports, colors.BLUE_700, Icons.DESCRIPTION),
-                            create_stat_card("Open Reports", open_reports, colors.GREEN_700, Icons.FOLDER_OPEN),
-                            create_stat_card("Under Investigation", under_investigation, colors.ORANGE_700, Icons.SEARCH),
-                            create_stat_card("Closed Cases", closed_reports, colors.RED_700, Icons.CHECK_CIRCLE),
+                            create_stat_card("Total Reports", total_reports, ft.Colors.BLUE_700, ft.Icons.DESCRIPTION),
+                            create_stat_card("Open Reports", open_reports, ft.Colors.GREEN_700, ft.Icons.FOLDER_OPEN),
+                            create_stat_card("Under Investigation", under_investigation, ft.Colors.ORANGE_700, ft.Icons.SEARCH),
+                            create_stat_card("Closed Cases", closed_reports, ft.Colors.RED_700, ft.Icons.CHECK_CIRCLE),
                         ],
                         wrap=True,
                         spacing=15,
@@ -1049,17 +1048,17 @@ class FIUApplication:
                                         [
                                             ft.ElevatedButton(
                                                 "View All Reports",
-                                                icon=Icons.LIST,
+                                                icon=ft.Icons.LIST,
                                                 on_click=lambda e: self.load_reports(),
                                             ),
                                             ft.ElevatedButton(
                                                 "Add New Report",
-                                                icon=Icons.ADD,
+                                                icon=ft.Icons.ADD,
                                                 on_click=lambda e: self.load_add_report(),
                                             ) if has_permission(self.current_user['role'], 'add_report') else ft.Container(),
                                             ft.ElevatedButton(
                                                 "Export Data",
-                                                icon=Icons.DOWNLOAD,
+                                                icon=ft.Icons.DOWNLOAD,
                                                 on_click=lambda e: self.load_export(),
                                             ) if has_permission(self.current_user['role'], 'export') else ft.Container(),
                                         ],
@@ -1138,7 +1137,7 @@ class FIUApplication:
         """Show error snackbar"""
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message),
-            bgcolor=colors.RED_700,
+            bgcolor=ft.Colors.RED_700,
         )
         self.page.snack_bar.open = True
         self.page.update()
@@ -1154,14 +1153,14 @@ class FIUApplication:
         error_view = ft.Container(
             content=ft.Column(
                 [
-                    ft.Icon(Icons.ERROR, size=80, color=colors.RED_700),
+                    ft.Icon(ft.Icons.ERROR, size=80, color=ft.Colors.RED_700),
                     ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
                     ft.Text(message, size=16, text_align=ft.TextAlign.CENTER),
                     ft.Container(height=20),
                     ft.ElevatedButton(
                         "Restart",
-                        icon=Icons.REFRESH,
-                        on_click=lambda e: self.page.window.close(),
+                        icon=ft.Icons.REFRESH,
+                        on_click=lambda e: self.page.window_destroy(),
                     ),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -1182,6 +1181,9 @@ def main(page: ft.Page):
         logger.info("FIU Report Management System Starting")
         logger.info("=" * 50)
         
+        # Center window
+        page.window_center()
+        
         # Create application
         FIUApplication(page)
         
@@ -1198,7 +1200,7 @@ def main(page: ft.Page):
                         ft.Text("Critical Error", size=24, weight=ft.FontWeight.BOLD),
                         ft.Text(str(e), size=14),
                         ft.Container(height=20),
-                        ft.ElevatedButton("Exit", on_click=lambda e: page.window.close()),
+                        ft.ElevatedButton("Exit", on_click=lambda e: page.window_destroy()),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
