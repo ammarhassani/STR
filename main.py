@@ -49,6 +49,7 @@ class FIUApplication:
         self.setup_step = 0
         self.temp_db_path = None
         self.temp_backup_path = None
+        self.current_dialog = None
         
         logger.info("=== FIU Application Starting ===")
         
@@ -214,9 +215,10 @@ class FIUApplication:
             self.temp_backup_path = backup_path
             
             logger.info(f"Paths selected - DB: {db_path}, Backup: {backup_path}")
-            
-            # Check if database exists
-            if Path(db_path).exists():
+
+            # Check if database FILE exists (not just the directory)
+            db_file = Path(db_path)
+            if db_file.is_file():
                 logger.info("Database file exists, asking user")
                 self.show_database_found_dialog()
             else:
@@ -343,36 +345,34 @@ class FIUApplication:
     def show_database_found_dialog(self):
         """Step 3: Database exists - ask to use it"""
         logger.info("=== Showing Database Found Dialog ===")
-        
+
         def use_existing(e):
             logger.info("User chose to use existing database")
-            self.page.dialog.open = False
-            self.page.update()
-            
+            self.page.close(dialog)
+
             # Save configuration
             Config.DATABASE_PATH = self.temp_db_path
             Config.BACKUP_PATH = self.temp_backup_path
             Config.save()
-            
+
             # Initialize database
             if self.init_database():
                 self.show_login_screen()
             else:
                 self.show_error_dialog("Database Error", "Failed to initialize existing database")
-        
+
         def create_new(e):
             logger.info("User chose to create new database")
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_admin_credentials_prompt()
-        
+
         def cancel(e):
             logger.info("User cancelled")
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Database Found"),
             content=ft.Container(
                 content=ft.Column(
@@ -414,9 +414,7 @@ class FIUApplication:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_admin_credentials_prompt(self):
         """Step 4: Admin Verification - Must enter admin/admin123"""
@@ -442,26 +440,25 @@ class FIUApplication:
         def verify_and_create(e):
             username = username_field.value.strip()
             password = password_field.value
-            
+
             if username != "admin" or password != "admin123":
                 error_text.value = "⚠ Invalid credentials. Use: admin / admin123"
                 logger.warning("Invalid admin credentials entered")
                 self.page.update()
                 return
-            
+
             logger.info("Admin credentials verified")
-            self.page.dialog.open = False
-            self.page.update()
-            
+            self.page.close(dialog)
+
             # Create new database
             self.create_new_database()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Admin Verification Required"),
             content=ft.Container(
                 content=ft.Column(
@@ -504,9 +501,7 @@ class FIUApplication:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def create_new_database(self):
         """Create new database with progress indicator"""
@@ -533,52 +528,60 @@ class FIUApplication:
             modal=True,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
         
         try:
-            # Create directories
+            # Validate and create directories
             db_path = Path(self.temp_db_path)
+
+            # Ensure the path ends with .db extension
+            if not str(db_path).lower().endswith('.db'):
+                db_path = Path(str(db_path) + '.db')
+                self.temp_db_path = str(db_path)
+                logger.info(f"Added .db extension to path: {self.temp_db_path}")
+
+            # Create parent directory
+            logger.info(f"Creating directory: {db_path.parent}")
             db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create backup directory
+            logger.info(f"Creating backup directory: {self.temp_backup_path}")
             Path(self.temp_backup_path).mkdir(parents=True, exist_ok=True)
-            
+
             status_text.value = "Initializing database schema..."
             self.page.update()
-            
+
             # Initialize database
+            logger.info(f"Initializing database at: {self.temp_db_path}")
             success, message = initialize_database(self.temp_db_path)
             
             if not success:
                 logger.error(f"Database creation failed: {message}")
-                dialog.open = False
-                self.page.update()
+                self.page.close(dialog)
                 self.show_error_dialog("Database Creation Failed", message)
                 return
-            
+
             status_text.value = "Saving configuration..."
             self.page.update()
-            
+
             # Save configuration
             Config.DATABASE_PATH = self.temp_db_path
             Config.BACKUP_PATH = self.temp_backup_path
             if not Config.save():
                 logger.error("Failed to save configuration")
-                dialog.open = False
-                self.page.update()
+                self.page.close(dialog)
                 self.show_error_dialog("Setup Failed", "Failed to save configuration")
                 return
-            
+
             status_text.value = "Database created successfully!"
             self.page.update()
-            
+
             logger.info("Database created successfully")
-            
+
             # Close dialog and show auto-login
             import time
             time.sleep(1)
-            dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             
             # Initialize database connection
             if self.init_database():
@@ -588,8 +591,7 @@ class FIUApplication:
             
         except Exception as e:
             logger.error(f"Database creation error: {e}")
-            dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_error_dialog("Setup Error", f"Failed to create database: {str(e)}")
     
     def show_auto_login(self):
@@ -1085,12 +1087,92 @@ class FIUApplication:
     def load_reports(self):
         """Load reports list"""
         logger.info("Loading reports")
-        self.show_info_snackbar("Reports view - Implementation in progress")
+
+        # Placeholder content
+        reports_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Reports", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.CONSTRUCTION, size=64, color=ft.Colors.ORANGE_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Reports View - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will display all reports with filtering and search capabilities.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = reports_content
+        self.page.update()
     
     def load_add_report(self):
         """Load add report form"""
         logger.info("Loading add report form")
-        self.show_info_snackbar("Add report form - Implementation in progress")
+
+        # Placeholder content
+        add_report_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Add New Report", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.ADD_CIRCLE_OUTLINE, size=64, color=ft.Colors.BLUE_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Add Report Form - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will provide a form to add new STR reports to the system.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = add_report_content
+        self.page.update()
     
     def load_admin_panel(self):
         """Load admin panel with user management"""
@@ -1103,7 +1185,47 @@ class FIUApplication:
     def load_export(self):
         """Load export view"""
         logger.info("Loading export view")
-        self.show_info_snackbar("Export functionality - Implementation in progress")
+
+        # Placeholder content
+        export_content = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Export Data", size=28, weight=ft.FontWeight.BOLD),
+                    ft.Container(height=20),
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Icon(ft.Icons.DOWNLOAD, size=64, color=ft.Colors.GREEN_700),
+                                    ft.Container(height=15),
+                                    ft.Text(
+                                        "Export Functionality - Coming Soon",
+                                        size=20,
+                                        weight=ft.FontWeight.BOLD,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                    ft.Container(height=10),
+                                    ft.Text(
+                                        "This section will allow you to export reports to Excel and PDF formats.",
+                                        size=14,
+                                        color=ft.Colors.GREY_700,
+                                        text_align=ft.TextAlign.CENTER,
+                                    ),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=40,
+                        ),
+                        elevation=2,
+                    ),
+                ],
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            padding=20,
+        )
+
+        self.content_area.content = export_content
+        self.page.update()
     
     def refresh_current_view(self):
         """Refresh current view"""
@@ -1118,21 +1240,20 @@ class FIUApplication:
     # Helper methods
     def show_error_dialog(self, title, message):
         """Show error dialog"""
-        dialog = ft.AlertDialog(
+        self.current_dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text(title),
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
         )
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
-    
+        self.page.open(self.current_dialog)
+
     def show_info_snackbar(self, message):
         """Show info snackbar"""
         self.page.snack_bar = ft.SnackBar(content=ft.Text(message))
         self.page.snack_bar.open = True
         self.page.update()
-    
+
     def show_error_snackbar(self, message):
         """Show error snackbar"""
         self.page.snack_bar = ft.SnackBar(
@@ -1141,12 +1262,12 @@ class FIUApplication:
         )
         self.page.snack_bar.open = True
         self.page.update()
-    
+
     def close_dialog(self):
         """Close dialog"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
+        if self.current_dialog:
+            self.page.close(self.current_dialog)
+            self.current_dialog = None
     
     def show_error_screen(self, title, message):
         """Show error screen"""
@@ -1180,10 +1301,7 @@ def main(page: ft.Page):
         logger.info("=" * 50)
         logger.info("FIU Report Management System Starting")
         logger.info("=" * 50)
-        
-        # Center window
-        page.window_center()
-        
+
         # Create application
         FIUApplication(page)
         

@@ -31,17 +31,17 @@ class AdminPanel:
             tabs=[
                 ft.Tab(
                     text="User Management",
-                    icon=ft.icons.PEOPLE,
+                    icon=ft.Icons.PEOPLE,
                     content=self.build_user_management(),
                 ),
                 ft.Tab(
                     text="System Settings",
-                    icon=ft.icons.SETTINGS,
+                    icon=ft.Icons.SETTINGS,
                     content=self.build_system_settings(),
                 ),
                 ft.Tab(
                     text="Database",
-                    icon=ft.icons.STORAGE,
+                    icon=ft.Icons.STORAGE,
                     content=self.build_database_management(),
                 ),
             ],
@@ -52,7 +52,7 @@ class AdminPanel:
             [
                 ft.Row(
                     [
-                        ft.Icon(ft.icons.ADMIN_PANEL_SETTINGS, size=32, color=ft.colors.BLUE_700),
+                        ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, size=32, color=ft.Colors.BLUE_700),
                         ft.Text("Administration Panel", size=28, weight=ft.FontWeight.BOLD),
                     ],
                 ),
@@ -90,7 +90,7 @@ class AdminPanel:
                                 content=ft.Text(
                                     user['role'].title(),
                                     size=12,
-                                    color=ft.colors.WHITE,
+                                    color=ft.Colors.WHITE,
                                 ),
                                 bgcolor=self.get_role_color(user['role']),
                                 padding=5,
@@ -100,24 +100,24 @@ class AdminPanel:
                                 content=ft.Text(
                                     "Active" if user['is_active'] else "Inactive",
                                     size=12,
-                                    color=ft.colors.WHITE,
+                                    color=ft.Colors.WHITE,
                                 ),
-                                bgcolor=ft.colors.GREEN_700 if user['is_active'] else ft.colors.RED_700,
+                                bgcolor=ft.Colors.GREEN_700 if user['is_active'] else ft.Colors.RED_700,
                                 padding=5,
                                 border_radius=5,
                             ),
                             ft.Row(
                                 [
                                     ft.IconButton(
-                                        icon=ft.icons.EDIT,
+                                        icon=ft.Icons.EDIT,
                                         tooltip="Edit User",
                                         on_click=lambda e, u=user: self.show_edit_user_dialog(u),
                                     ),
                                     ft.IconButton(
-                                        icon=ft.icons.DELETE,
+                                        icon=ft.Icons.DELETE,
                                         tooltip="Delete User",
                                         on_click=lambda e, u=user: self.show_delete_user_dialog(u),
-                                        icon_color=ft.colors.RED_700,
+                                        icon_color=ft.Colors.RED_700,
                                         disabled=user['user_id'] == 1,  # Cannot delete default admin
                                     ),
                                 ],
@@ -126,9 +126,9 @@ class AdminPanel:
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
                     padding=15,
-                    border=ft.border.all(1, ft.colors.GREY_300),
+                    border=ft.border.all(1, ft.Colors.GREY_300),
                     border_radius=10,
-                    bgcolor=ft.colors.WHITE,
+                    bgcolor=ft.Colors.WHITE,
                 )
             )
         
@@ -139,7 +139,7 @@ class AdminPanel:
                         ft.Text("User Management", size=20, weight=ft.FontWeight.BOLD),
                         ft.ElevatedButton(
                             text="Add New User",
-                            icon=ft.icons.PERSON_ADD,
+                            icon=ft.Icons.PERSON_ADD,
                             on_click=lambda e: self.show_add_user_dialog(),
                         ),
                     ],
@@ -203,10 +203,10 @@ class AdminPanel:
                             content=ft.Column(
                                 [
                                     ft.Text("Database Location", size=16, weight=ft.FontWeight.BOLD),
-                                    ft.Text(Config.DATABASE_PATH, size=12, color=ft.colors.GREY_700),
+                                    ft.Text(Config.DATABASE_PATH, size=12, color=ft.Colors.GREY_700),
                                     ft.Container(height=10),
                                     ft.Text("Backup Directory", size=16, weight=ft.FontWeight.BOLD),
-                                    ft.Text(Config.BACKUP_PATH, size=12, color=ft.colors.GREY_700),
+                                    ft.Text(Config.BACKUP_PATH, size=12, color=ft.Colors.GREY_700),
                                 ],
                             ),
                             padding=20,
@@ -224,7 +224,7 @@ class AdminPanel:
                                     ft.Divider(),
                                     ft.ElevatedButton(
                                         text="Create Backup Now",
-                                        icon=ft.icons.BACKUP,
+                                        icon=ft.Icons.BACKUP,
                                         on_click=create_backup,
                                     ),
                                 ],
@@ -260,14 +260,14 @@ class AdminPanel:
         username_field = ft.TextField(
             label="Username",
             hint_text="Enter username",
-            prefix_icon=ft.icons.PERSON,
+            prefix_icon=ft.Icons.PERSON,
             autofocus=True,
         )
         
         password_field = ft.TextField(
             label="Password",
             hint_text="Enter password",
-            prefix_icon=ft.icons.LOCK,
+            prefix_icon=ft.Icons.LOCK,
             password=True,
             can_reveal_password=True,
         )
@@ -275,7 +275,7 @@ class AdminPanel:
         full_name_field = ft.TextField(
             label="Full Name",
             hint_text="Enter full name",
-            prefix_icon=ft.icons.BADGE,
+            prefix_icon=ft.Icons.BADGE,
         )
         
         role_dropdown = ft.Dropdown(
@@ -294,7 +294,7 @@ class AdminPanel:
             value=True,
         )
         
-        error_text = ft.Text("", color=ft.colors.RED_700, visible=False)
+        error_text = ft.Text("", color=ft.Colors.RED_700, visible=False)
         
         def validate_and_add(e):
             # Validation
@@ -344,24 +344,23 @@ class AdminPanel:
                 )
                 
                 logger.info(f"User added: {username_field.value}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{username_field.value}' added successfully")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to add user: {ex}")
                 error_text.value = f"Failed to add user: {str(ex)}"
                 error_text.visible = True
                 self.page.update()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Add New User"),
             content=ft.Container(
                 content=ft.Column(
@@ -391,9 +390,7 @@ class AdminPanel:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_edit_user_dialog(self, user):
         """Show edit user dialog"""
@@ -403,13 +400,13 @@ class AdminPanel:
             label="Username",
             value=user['username'],
             read_only=True,
-            prefix_icon=ft.icons.PERSON,
+            prefix_icon=ft.Icons.PERSON,
         )
         
         password_field = ft.TextField(
             label="New Password (leave empty to keep current)",
             hint_text="Enter new password or leave empty",
-            prefix_icon=ft.icons.LOCK,
+            prefix_icon=ft.Icons.LOCK,
             password=True,
             can_reveal_password=True,
         )
@@ -417,7 +414,7 @@ class AdminPanel:
         full_name_field = ft.TextField(
             label="Full Name",
             value=user['full_name'],
-            prefix_icon=ft.icons.BADGE,
+            prefix_icon=ft.Icons.BADGE,
         )
         
         role_dropdown = ft.Dropdown(
@@ -435,7 +432,7 @@ class AdminPanel:
             value=bool(user['is_active']),
         )
         
-        error_text = ft.Text("", color=ft.colors.RED_700, visible=False)
+        error_text = ft.Text("", color=ft.Colors.RED_700, visible=False)
         
         def validate_and_update(e):
             # Validation
@@ -488,24 +485,23 @@ class AdminPanel:
                 self.db_manager.execute_with_retry(update_query, params)
                 
                 logger.info(f"User updated: {user['username']}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{user['username']}' updated successfully")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to update user: {ex}")
                 error_text.value = f"Failed to update user: {str(ex)}"
                 error_text.visible = True
                 self.page.update()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text(f"Edit User: {user['username']}"),
             content=ft.Container(
                 content=ft.Column(
@@ -535,9 +531,7 @@ class AdminPanel:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_delete_user_dialog(self, user):
         """Show delete user confirmation dialog"""
@@ -562,27 +556,26 @@ class AdminPanel:
                 )
                 
                 logger.info(f"User deleted: {user['username']}")
-                self.page.dialog.open = False
-                self.page.update()
-                
+                self.page.close(dialog)
+
                 # Refresh user list
                 self.show()
                 self.show_success(f"User '{user['username']}' has been deactivated")
-                
+
             except Exception as ex:
                 logger.error(f"Failed to delete user: {ex}")
                 self.show_error(f"Failed to delete user: {str(ex)}")
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Confirm Delete"),
             content=ft.Container(
                 content=ft.Column(
                     [
-                        ft.Icon(ft.icons.WARNING, size=48, color=ft.colors.ORANGE_700),
+                        ft.Icon(ft.Icons.WARNING, size=48, color=ft.Colors.ORANGE_700),
                         ft.Container(height=10),
                         ft.Text(
                             f"Are you sure you want to delete user '{user['username']}'?",
@@ -593,7 +586,7 @@ class AdminPanel:
                         ft.Text(
                             "This action will deactivate the user account.",
                             size=12,
-                            color=ft.colors.GREY_700,
+                            color=ft.Colors.GREY_700,
                             text_align=ft.TextAlign.CENTER,
                         ),
                     ],
@@ -607,31 +600,29 @@ class AdminPanel:
                 ft.ElevatedButton(
                     "Delete User",
                     on_click=confirm_delete,
-                    bgcolor=ft.colors.RED_700,
-                    color=ft.colors.WHITE,
+                    bgcolor=ft.Colors.RED_700,
+                    color=ft.Colors.WHITE,
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def get_role_color(self, role):
         """Get color for role badge"""
         colors = {
-            'admin': ft.colors.PURPLE_700,
-            'agent': ft.colors.BLUE_700,
-            'reporter': ft.colors.GREEN_700,
+            'admin': ft.Colors.PURPLE_700,
+            'agent': ft.Colors.BLUE_700,
+            'reporter': ft.Colors.GREEN_700,
         }
-        return colors.get(role, ft.colors.GREY_700)
+        return colors.get(role, ft.Colors.GREY_700)
     
     def show_success(self, message):
         """Show success message"""
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message),
-            bgcolor=ft.colors.GREEN_700,
+            bgcolor=ft.Colors.GREEN_700,
         )
         self.page.snack_bar.open = True
         self.page.update()
@@ -640,7 +631,7 @@ class AdminPanel:
         """Show error message"""
         self.page.snack_bar = ft.SnackBar(
             content=ft.Text(message),
-            bgcolor=ft.colors.RED_700,
+            bgcolor=ft.Colors.RED_700,
         )
         self.page.snack_bar.open = True
         self.page.update()
