@@ -214,9 +214,10 @@ class FIUApplication:
             self.temp_backup_path = backup_path
             
             logger.info(f"Paths selected - DB: {db_path}, Backup: {backup_path}")
-            
-            # Check if database exists
-            if Path(db_path).exists():
+
+            # Check if database FILE exists (not just the directory)
+            db_file = Path(db_path)
+            if db_file.is_file():
                 logger.info("Database file exists, asking user")
                 self.show_database_found_dialog()
             else:
@@ -373,6 +374,7 @@ class FIUApplication:
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Database Found"),
             content=ft.Container(
                 content=ft.Column(
@@ -462,6 +464,7 @@ class FIUApplication:
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("Admin Verification Required"),
             content=ft.Container(
                 content=ft.Column(
@@ -1119,6 +1122,7 @@ class FIUApplication:
     def show_error_dialog(self, title, message):
         """Show error dialog"""
         dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text(title),
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
