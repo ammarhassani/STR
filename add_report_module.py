@@ -82,6 +82,10 @@ class AddReportModule:
             expand=True,
         )
 
+        # Pre-fill form if in edit mode
+        if self.edit_mode and self.report_data:
+            self.prefill_form()
+
         self.content_area.content = form_view
         self.page.update()
 
@@ -125,7 +129,7 @@ class AddReportModule:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            # bgcolor removed for theme compatibility
         )
 
     def build_form(self):
@@ -391,11 +395,13 @@ class AddReportModule:
 
     def build_actions(self):
         """Build form action buttons"""
+        button_text = "Update Report" if self.edit_mode else "Save Report"
+
         return ft.Container(
             content=ft.Row(
                 [
                     ft.ElevatedButton(
-                        "Save Report",
+                        button_text,
                         icon=ft.Icons.SAVE,
                         on_click=lambda e: self.save_report(),
                         height=45,
@@ -414,7 +420,7 @@ class AddReportModule:
                 spacing=10,
             ),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            # bgcolor removed for theme compatibility
         )
 
     def load_column_settings(self):
@@ -513,7 +519,7 @@ class AddReportModule:
         return errors
 
     def save_report(self):
-        """Save report to database"""
+        """Save report to database (INSERT or UPDATE based on edit_mode)"""
         # Validate form
         errors = self.validate_form()
         if errors:
@@ -524,11 +530,7 @@ class AddReportModule:
             # Collect form data
             form_data = {}
 
-            # Add auto-generated fields
-            form_data['sn'] = self.generate_next_sn()
-            form_data['report_number'] = self.generate_report_number()
-
-            # Collect other fields
+            # Collect field values
             for field_name, control in self.field_controls.items():
                 if isinstance(control, ft.Column):
                     # Handle special fields (ID/CR, Account/Membership)
@@ -543,28 +545,61 @@ class AddReportModule:
             # Add account type
             form_data['account_type'] = 'Membership' if (self.account_type_checkbox and self.account_type_checkbox.value) else 'Account'
 
-            # Add metadata
-            form_data['created_by'] = self.current_user['username']
-            form_data['created_at'] = datetime.now().isoformat()
-            form_data['status'] = 'Open'
-            form_data['is_deleted'] = 0
+            if self.edit_mode:
+                # UPDATE existing report
+                report_id = self.report_data.get('report_id')
+                if not report_id:
+                    raise ValueError("Cannot update report: missing report_id")
 
-            # Build insert query
-            fields = ', '.join(form_data.keys())
-            placeholders = ', '.join(['?' for _ in form_data])
-            query = f"INSERT INTO reports ({fields}) VALUES ({placeholders})"
+                # Add update metadata
+                form_data['updated_by'] = self.current_user['username']
+                form_data['updated_at'] = datetime.now().isoformat()
 
-            # Execute
-            self.db_manager.execute_with_retry(query, tuple(form_data.values()))
+                # Build UPDATE query
+                set_clause = ', '.join([f"{k} = ?" for k in form_data.keys()])
+                query = f"UPDATE reports SET {set_clause} WHERE report_id = ?"
+                params = tuple(list(form_data.values()) + [report_id])
 
-            logger.info(f"Report saved: {form_data['report_number']}, SN: {form_data['sn']}")
-            self.show_success_dialog(
-                "Success",
-                f"Report saved successfully!\n\nReport Number: {form_data['report_number']}\nSerial Number: {form_data['sn']}"
-            )
+                # Execute
+                self.db_manager.execute_with_retry(query, params)
 
-            # Clear form
-            self.clear_form()
+                logger.info(f"Report updated: {self.report_data.get('report_number')}")
+                self.show_success_dialog(
+                    "Success",
+                    f"Report updated successfully!\n\nReport Number: {self.report_data.get('report_number')}"
+                )
+
+                # Return to reports list
+                self.cancel()
+
+            else:
+                # INSERT new report
+                # Add auto-generated fields
+                form_data['sn'] = self.generate_next_sn()
+                form_data['report_number'] = self.generate_report_number()
+
+                # Add metadata
+                form_data['created_by'] = self.current_user['username']
+                form_data['created_at'] = datetime.now().isoformat()
+                form_data['status'] = 'Open'
+                form_data['is_deleted'] = 0
+
+                # Build INSERT query
+                fields = ', '.join(form_data.keys())
+                placeholders = ', '.join(['?' for _ in form_data])
+                query = f"INSERT INTO reports ({fields}) VALUES ({placeholders})"
+
+                # Execute
+                self.db_manager.execute_with_retry(query, tuple(form_data.values()))
+
+                logger.info(f"Report saved: {form_data['report_number']}, SN: {form_data['sn']}")
+                self.show_success_dialog(
+                    "Success",
+                    f"Report saved successfully!\n\nReport Number: {form_data['report_number']}\nSerial Number: {form_data['sn']}"
+                )
+
+                # Clear form
+                self.clear_form()
 
         except Exception as e:
             logger.error(f"Failed to save report: {e}")
@@ -593,6 +628,53 @@ class AddReportModule:
 
         self.page.update()
         self.show_snackbar("Form cleared")
+
+    def prefill_form(self):
+        """Pre-fill form fields with existing report data"""
+        logger.info(f"Pre-filling form with report data: {self.report_data.get('report_number')}")
+
+        for field_name, control in self.field_controls.items():
+            # Get value from report data
+            value = self.report_data.get(field_name)
+
+            if value is None or value == '':
+                continue
+
+            try:
+                # Handle different control types
+                if isinstance(control, ft.Column):
+                    # Special fields (id_cr, account_membership)
+                    if field_name == 'id_cr':
+                        # Set checkbox based on id_type
+                        if self.id_type_checkbox and self.report_data.get('id_type') == 'CR':
+                            self.id_type_checkbox.value = True
+                        # Set the text field value
+                        if len(control.controls) > 1 and isinstance(control.controls[1], ft.TextField):
+                            control.controls[1].value = str(value)
+
+                    elif field_name == 'account_membership':
+                        # Set checkbox based on account_type
+                        if self.account_type_checkbox and self.report_data.get('account_type') == 'Membership':
+                            self.account_type_checkbox.value = True
+                        # Set the text field value
+                        if len(control.controls) > 1 and isinstance(control.controls[1], ft.TextField):
+                            control.controls[1].value = str(value)
+
+                elif isinstance(control, ft.TextField):
+                    # Regular text fields and date fields
+                    control.value = str(value)
+
+                elif isinstance(control, ft.Dropdown):
+                    # Dropdown fields
+                    control.value = str(value)
+
+                logger.info(f"Pre-filled field '{field_name}' with value: {value}")
+
+            except Exception as e:
+                logger.warning(f"Failed to pre-fill field '{field_name}': {e}")
+
+        self.page.update()
+        logger.info("Form pre-fill completed")
 
     def show_error_dialog(self, title, message):
         """Show error dialog"""

@@ -133,7 +133,7 @@ class AdminPanel:
                     padding=15,
                     border=ft.border.all(1, ft.Colors.GREY_300),
                     border_radius=10,
-                    bgcolor=ft.Colors.WHITE,
+                    # bgcolor removed for theme compatibility
                 )
             )
         

@@ -106,7 +106,7 @@ class ReportsModule:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            # bgcolor removed for theme compatibility
         )
 
     def build_filters(self):
@@ -315,7 +315,7 @@ class ReportsModule:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=20,
-            bgcolor=ft.Colors.WHITE,
+            # bgcolor removed for theme compatibility
         )
 
     def load_available_columns(self):
