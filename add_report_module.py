@@ -1,6 +1,6 @@
 """
-Add Report Module - Production-Grade Dynamic Form
-Implements dynamic report form based on column_settings table
+Add Report Module - Production-Grade Dynamic Form (Enhanced)
+Implements dynamic report form with date pickers, auto-generation, and validation
 """
 import flet as ft
 import logging
@@ -9,6 +9,32 @@ import re
 import json
 
 logger = logging.getLogger('fiu_system')
+
+# Comprehensive nationality list
+NATIONALITIES = [
+    "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Antiguans", "Argentinean", "Armenian",
+    "Australian", "Austrian", "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", "Barbudans",
+    "Batswana", "Belarusian", "Belgian", "Belizean", "Beninese", "Bhutanese", "Bolivian", "Bosnian", "Brazilian",
+    "British", "Bruneian", "Bulgarian", "Burkinabe", "Burmese", "Burundian", "Cambodian", "Cameroonian", "Canadian",
+    "Cape Verdean", "Central African", "Chadian", "Chilean", "Chinese", "Colombian", "Comoran", "Congolese",
+    "Costa Rican", "Croatian", "Cuban", "Cypriot", "Czech", "Danish", "Djibouti", "Dominican", "Dutch", "East Timorese",
+    "Ecuadorean", "Egyptian", "Emirian", "Equatorial Guinean", "Eritrean", "Estonian", "Ethiopian", "Fijian", "Filipino",
+    "Finnish", "French", "Gabonese", "Gambian", "Georgian", "German", "Ghanaian", "Greek", "Grenadian", "Guatemalan",
+    "Guinea-Bissauan", "Guinean", "Guyanese", "Haitian", "Herzegovinian", "Honduran", "Hungarian", "I-Kiribati",
+    "Icelander", "Indian", "Indonesian", "Iranian", "Iraqi", "Irish", "Israeli", "Italian", "Ivorian", "Jamaican",
+    "Japanese", "Jordanian", "Kazakhstani", "Kenyan", "Kittian and Nevisian", "Kuwaiti", "Kyrgyz", "Laotian", "Latvian",
+    "Lebanese", "Liberian", "Libyan", "Liechtensteiner", "Lithuanian", "Luxembourger", "Macedonian", "Malagasy",
+    "Malawian", "Malaysian", "Maldivian", "Malian", "Maltese", "Marshallese", "Mauritanian", "Mauritian", "Mexican",
+    "Micronesian", "Moldovan", "Monacan", "Mongolian", "Moroccan", "Mosotho", "Motswana", "Mozambican", "Namibian",
+    "Nauruan", "Nepalese", "New Zealander", "Nicaraguan", "Nigerian", "Nigerien", "North Korean", "Northern Irish",
+    "Norwegian", "Omani", "Pakistani", "Palauan", "Panamanian", "Papua New Guinean", "Paraguayan", "Peruvian", "Polish",
+    "Portuguese", "Qatari", "Romanian", "Russian", "Rwandan", "Saint Lucian", "Salvadoran", "Samoan", "San Marinese",
+    "Sao Tomean", "Saudi", "Saudi Arabian", "Scottish", "Senegalese", "Serbian", "Seychellois", "Sierra Leonean",
+    "Singaporean", "Slovakian", "Slovenian", "Solomon Islander", "Somali", "South African", "South Korean", "Spanish",
+    "Sri Lankan", "Sudanese", "Surinamer", "Swazi", "Swedish", "Swiss", "Syrian", "Taiwanese", "Tajik", "Tanzanian",
+    "Thai", "Togolese", "Tongan", "Trinidadian or Tobagonian", "Tunisian", "Turkish", "Tuvaluan", "Ugandan", "Ukrainian",
+    "Uruguayan", "Uzbekistani", "Venezuelan", "Vietnamese", "Welsh", "Yemenite", "Zambian", "Zimbabwean"
+]
 
 
 class AddReportModule:
@@ -25,6 +51,10 @@ class AddReportModule:
         self.field_controls = {}
         self.column_settings = []
         self.dropdown_options = {}
+
+        # Special fields
+        self.id_type_checkbox = None
+        self.account_type_checkbox = None
 
     def show(self):
         """Display add report form"""
@@ -62,7 +92,7 @@ class AddReportModule:
                             ft.Column(
                                 [
                                     ft.Text("Add New Report", size=24, weight=ft.FontWeight.BOLD),
-                                    ft.Text("Fill in the required fields", size=12, color=ft.Colors.GREY_700),
+                                    ft.Text("Report number and serial number will be auto-generated", size=12, color=ft.Colors.GREY_700),
                                 ],
                                 spacing=2,
                             ),
@@ -96,6 +126,10 @@ class AddReportModule:
         section_4_fields = []  # FIU Details
 
         for column in self.column_settings:
+            # Skip auto-generated fields
+            if column['column_name'] in ['sn', 'report_number']:
+                continue
+
             field_control = self.create_field_control(column)
             if field_control:
                 self.field_controls[column['column_name']] = field_control
@@ -165,23 +199,20 @@ class AddReportModule:
             except:
                 validation_rules = {}
 
+        # Special handling for specific fields
+        if field_name == 'nationality':
+            return self.create_nationality_field(label, is_required)
+        elif field_name == 'id_cr':
+            return self.create_id_cr_field(label, is_required)
+        elif field_name == 'account_membership':
+            return self.create_account_membership_field(label, is_required)
+
         # Create control based on data type
         if data_type == 'DATE':
-            return ft.TextField(
-                label=label + (" *" if is_required else ""),
-                hint_text="DD/MM/YYYY",
-                prefix_icon=ft.Icons.CALENDAR_TODAY,
-                keyboard_type=ft.KeyboardType.DATETIME,
-                max_length=10,
-            )
+            return self.create_date_field(label, is_required, field_name)
 
         elif data_type == 'DROPDOWN':
-            options = validation_rules.get('options', [])
-            # Get options from dropdown_options if available
-            category = field_name
-            if category in self.dropdown_options:
-                options = self.dropdown_options[category]
-
+            options = self.get_dropdown_options(field_name, validation_rules)
             return ft.Dropdown(
                 label=label + (" *" if is_required else ""),
                 hint_text=f"Select {label.lower()}",
@@ -197,7 +228,6 @@ class AddReportModule:
             )
 
         else:  # TEXT
-            # Check if multiline
             max_length = validation_rules.get('maxLength', 255)
             is_multiline = max_length > 100
 
@@ -208,6 +238,133 @@ class AddReportModule:
                 max_lines=3 if is_multiline else 1,
                 max_length=max_length,
             )
+
+    def create_date_field(self, label, is_required, field_name):
+        """Create date field with date picker and TODAY button"""
+        date_field = ft.TextField(
+            label=label + (" *" if is_required else ""),
+            hint_text="DD/MM/YYYY",
+            prefix_icon=ft.Icons.CALENDAR_TODAY,
+            read_only=True,
+            value="",
+        )
+
+        def open_date_picker(e):
+            def on_date_change(e):
+                if date_picker.value:
+                    date_field.value = date_picker.value.strftime("%d/%m/%Y")
+                    self.page.close(date_dialog)
+                    self.page.update()
+
+            def set_today(e):
+                date_field.value = datetime.now().strftime("%d/%m/%Y")
+                self.page.close(date_dialog)
+                self.page.update()
+
+            def close_dialog(e):
+                self.page.close(date_dialog)
+
+            date_picker = ft.DatePicker(
+                on_change=on_date_change,
+                first_date=datetime(2000, 1, 1),
+                last_date=datetime(2100, 12, 31),
+            )
+
+            date_dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text(f"Select {label}"),
+                content=ft.Container(
+                    content=ft.Column(
+                        [
+                            date_picker,
+                            ft.Divider(),
+                            ft.Row(
+                                [
+                                    ft.ElevatedButton(
+                                        "TODAY",
+                                        icon=ft.Icons.TODAY,
+                                        on_click=set_today,
+                                        style=ft.ButtonStyle(
+                                            bgcolor=ft.Colors.GREEN_700,
+                                            color=ft.Colors.WHITE,
+                                        ),
+                                    ),
+                                    ft.TextButton("Cancel", on_click=close_dialog),
+                                ],
+                                alignment=ft.MainAxisAlignment.END,
+                            ),
+                        ],
+                        tight=True,
+                    ),
+                    width=400,
+                ),
+            )
+
+            self.page.open(date_dialog)
+
+        date_field.on_click = open_date_picker
+
+        return date_field
+
+    def create_nationality_field(self, label, is_required):
+        """Create searchable nationality dropdown"""
+        return ft.Dropdown(
+            label=label + (" *" if is_required else ""),
+            hint_text="Select or search nationality",
+            options=[ft.dropdown.Option(nat, nat) for nat in sorted(NATIONALITIES)],
+        )
+
+    def create_id_cr_field(self, label, is_required):
+        """Create ID/CR field with type selector"""
+        self.id_type_checkbox = ft.Checkbox(
+            label="Commercial Registration (CR)",
+            value=False,
+        )
+
+        id_field = ft.TextField(
+            label=label + (" *" if is_required else ""),
+            hint_text="Enter ID or CR number",
+            prefix_icon=ft.Icons.BADGE,
+        )
+
+        return ft.Column(
+            [
+                self.id_type_checkbox,
+                id_field,
+            ],
+            spacing=10,
+        )
+
+    def create_account_membership_field(self, label, is_required):
+        """Create Account/Membership field with type selector"""
+        self.account_type_checkbox = ft.Checkbox(
+            label="Membership (not Account)",
+            value=False,
+        )
+
+        account_field = ft.TextField(
+            label=label + (" *" if is_required else ""),
+            hint_text="Enter account or membership number",
+            prefix_icon=ft.Icons.ACCOUNT_CIRCLE,
+        )
+
+        return ft.Column(
+            [
+                self.account_type_checkbox,
+                account_field,
+            ],
+            spacing=10,
+        )
+
+    def get_dropdown_options(self, field_name, validation_rules):
+        """Get dropdown options from database or validation rules"""
+        options = validation_rules.get('options', [])
+
+        # Try to get from dropdown_options (loaded from system_config)
+        if field_name in self.dropdown_options:
+            options = self.dropdown_options[field_name]
+
+        return options
 
     def build_actions(self):
         """Build form action buttons"""
@@ -223,12 +380,6 @@ class AddReportModule:
                             bgcolor=ft.Colors.GREEN_700,
                             color=ft.Colors.WHITE,
                         ),
-                    ),
-                    ft.OutlinedButton(
-                        "Save as Draft",
-                        icon=ft.Icons.DRAFTS,
-                        on_click=lambda e: self.save_draft(),
-                        height=45,
                     ),
                     ft.TextButton(
                         "Cancel",
@@ -280,42 +431,61 @@ class AddReportModule:
             logger.error(f"Failed to load dropdown options: {e}")
             self.dropdown_options = {}
 
+    def generate_next_sn(self):
+        """Generate next serial number"""
+        try:
+            query = "SELECT MAX(sn) as max_sn FROM reports"
+            result = self.db_manager.execute_with_retry(query)
+            max_sn = result[0]['max_sn'] if result[0]['max_sn'] else 0
+            return max_sn + 1
+        except Exception as e:
+            logger.error(f"Failed to generate SN: {e}")
+            return 1
+
+    def generate_report_number(self):
+        """Generate unique report number in format YYYY/MM/NNN"""
+        try:
+            now = datetime.now()
+            year = now.strftime("%Y")
+            month = now.strftime("%m")
+
+            # Get count of reports this month
+            query = "SELECT COUNT(*) as count FROM reports WHERE report_number LIKE ?"
+            pattern = f"{year}/{month}/%"
+            result = self.db_manager.execute_with_retry(query, (pattern,))
+            count = result[0]['count'] + 1
+
+            return f"{year}/{month}/{count:03d}"
+        except Exception as e:
+            logger.error(f"Failed to generate report number: {e}")
+            return f"{datetime.now().strftime('%Y/%m')}/001"
+
     def validate_form(self):
         """Validate all form fields"""
         errors = []
 
         for column in self.column_settings:
+            # Skip auto-generated fields
+            if column['column_name'] in ['sn', 'report_number']:
+                continue
+
             field_name = column['column_name']
             control = self.field_controls.get(field_name)
 
             if not control:
                 continue
 
-            value = control.value
+            # Handle special fields
+            if isinstance(control, ft.Column):
+                # Get the text field from column (for ID/CR and Account/Membership)
+                text_control = control.controls[1] if len(control.controls) > 1 else None
+                value = text_control.value if text_control else None
+            else:
+                value = control.value
 
             # Check required fields
             if column['is_required'] and not value:
                 errors.append(f"{column['display_name_en']} is required")
-
-            # Validate based on rules
-            if value and column['validation_rules']:
-                try:
-                    rules = json.loads(column['validation_rules'])
-
-                    # Pattern validation
-                    if 'pattern' in rules:
-                        pattern = rules['pattern']
-                        if not re.match(pattern, value):
-                            example = rules.get('example', '')
-                            errors.append(f"{column['display_name_en']} format is invalid. Example: {example}")
-
-                    # Length validation
-                    if 'maxLength' in rules:
-                        if len(value) > rules['maxLength']:
-                            errors.append(f"{column['display_name_en']} is too long")
-
-                except:
-                    pass
 
         return errors
 
@@ -330,8 +500,25 @@ class AddReportModule:
         try:
             # Collect form data
             form_data = {}
+
+            # Add auto-generated fields
+            form_data['sn'] = self.generate_next_sn()
+            form_data['report_number'] = self.generate_report_number()
+
+            # Collect other fields
             for field_name, control in self.field_controls.items():
-                form_data[field_name] = control.value or None
+                if isinstance(control, ft.Column):
+                    # Handle special fields (ID/CR, Account/Membership)
+                    text_control = control.controls[1] if len(control.controls) > 1 else None
+                    form_data[field_name] = text_control.value if text_control else None
+                else:
+                    form_data[field_name] = control.value or None
+
+            # Add ID type
+            form_data['id_type'] = 'CR' if (self.id_type_checkbox and self.id_type_checkbox.value) else 'ID'
+
+            # Add account type
+            form_data['account_type'] = 'Membership' if (self.account_type_checkbox and self.account_type_checkbox.value) else 'Account'
 
             # Add metadata
             form_data['created_by'] = self.current_user['username']
@@ -347,8 +534,11 @@ class AddReportModule:
             # Execute
             self.db_manager.execute_with_retry(query, tuple(form_data.values()))
 
-            logger.info(f"Report saved: {form_data.get('report_number', 'N/A')}")
-            self.show_success_dialog("Success", "Report saved successfully!")
+            logger.info(f"Report saved: {form_data['report_number']}, SN: {form_data['sn']}")
+            self.show_success_dialog(
+                "Success",
+                f"Report saved successfully!\n\nReport Number: {form_data['report_number']}\nSerial Number: {form_data['sn']}"
+            )
 
             # Clear form
             self.clear_form()
@@ -357,14 +547,8 @@ class AddReportModule:
             logger.error(f"Failed to save report: {e}")
             self.show_error_dialog("Save Failed", f"Failed to save report: {str(e)}")
 
-    def save_draft(self):
-        """Save report as draft"""
-        # TODO: Implement draft functionality
-        self.show_snackbar("Draft saved")
-
     def cancel(self):
         """Cancel and return to reports list"""
-        # Load reports module
         from reports_module import ReportsModule
         module = ReportsModule(self.page, self.db_manager, self.current_user, self.content_area)
         module.show()
@@ -372,7 +556,18 @@ class AddReportModule:
     def clear_form(self):
         """Clear all form fields"""
         for control in self.field_controls.values():
-            control.value = ""
+            if isinstance(control, ft.Column):
+                # Clear special fields
+                if len(control.controls) > 1:
+                    control.controls[1].value = ""
+            else:
+                control.value = ""
+
+        if self.id_type_checkbox:
+            self.id_type_checkbox.value = False
+        if self.account_type_checkbox:
+            self.account_type_checkbox.value = False
+
         self.page.update()
         self.show_snackbar("Form cleared")
 
