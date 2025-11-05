@@ -62,7 +62,7 @@ class FIUApplication:
             self.page.window_min_height = 600
             self.page.theme_mode = ft.ThemeMode.LIGHT
             self.page.padding = 0
-            self.page.bgcolor = ft.Colors.BLUE_GREY_50
+            # bgcolor removed to use theme default
             logger.info("Page configured successfully")
         except Exception as e:
             logger.error(f"Page configuration error: {e}")
@@ -903,7 +903,7 @@ class FIUApplication:
             min_extended_width=200,
             destinations=destinations,
             on_change=self.handle_navigation,
-            bgcolor=ft.Colors.BLUE_GREY_50,
+            # bgcolor removed to use theme default
         )
         
         # Header
@@ -920,7 +920,6 @@ class FIUApplication:
                             ft.Text(
                                 f"Role: {self.current_user['role'].title()}",
                                 size=12,
-                                color=ft.Colors.GREY_700,
                             ),
                         ],
                         spacing=2,
@@ -948,7 +947,7 @@ class FIUApplication:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=15,
-            bgcolor=ft.Colors.BLUE_50,
+            # bgcolor removed to use theme default
         )
         
         # Content area
