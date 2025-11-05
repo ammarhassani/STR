@@ -49,6 +49,7 @@ class FIUApplication:
         self.setup_step = 0
         self.temp_db_path = None
         self.temp_backup_path = None
+        self.current_dialog = None
         
         logger.info("=== FIU Application Starting ===")
         
@@ -344,33 +345,30 @@ class FIUApplication:
     def show_database_found_dialog(self):
         """Step 3: Database exists - ask to use it"""
         logger.info("=== Showing Database Found Dialog ===")
-        
+
         def use_existing(e):
             logger.info("User chose to use existing database")
-            self.page.dialog.open = False
-            self.page.update()
-            
+            self.page.close(dialog)
+
             # Save configuration
             Config.DATABASE_PATH = self.temp_db_path
             Config.BACKUP_PATH = self.temp_backup_path
             Config.save()
-            
+
             # Initialize database
             if self.init_database():
                 self.show_login_screen()
             else:
                 self.show_error_dialog("Database Error", "Failed to initialize existing database")
-        
+
         def create_new(e):
             logger.info("User chose to create new database")
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_admin_credentials_prompt()
-        
+
         def cancel(e):
             logger.info("User cancelled")
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
@@ -442,23 +440,21 @@ class FIUApplication:
         def verify_and_create(e):
             username = username_field.value.strip()
             password = password_field.value
-            
+
             if username != "admin" or password != "admin123":
                 error_text.value = "⚠ Invalid credentials. Use: admin / admin123"
                 logger.warning("Invalid admin credentials entered")
                 self.page.update()
                 return
-            
+
             logger.info("Admin credentials verified")
-            self.page.dialog.open = False
-            self.page.update()
-            
+            self.page.close(dialog)
+
             # Create new database
             self.create_new_database()
-        
+
         def cancel(e):
-            self.page.dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_setup_wizard_step1()
         
         dialog = ft.AlertDialog(
@@ -1115,20 +1111,20 @@ class FIUApplication:
     # Helper methods
     def show_error_dialog(self, title, message):
         """Show error dialog"""
-        dialog = ft.AlertDialog(
+        self.current_dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text(title),
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
         )
-        self.page.open(dialog)
-    
+        self.page.open(self.current_dialog)
+
     def show_info_snackbar(self, message):
         """Show info snackbar"""
         self.page.snack_bar = ft.SnackBar(content=ft.Text(message))
         self.page.snack_bar.open = True
         self.page.update()
-    
+
     def show_error_snackbar(self, message):
         """Show error snackbar"""
         self.page.snack_bar = ft.SnackBar(
@@ -1137,12 +1133,12 @@ class FIUApplication:
         )
         self.page.snack_bar.open = True
         self.page.update()
-    
+
     def close_dialog(self):
         """Close dialog"""
-        if self.page.dialog:
-            self.page.dialog.open = False
-            self.page.update()
+        if self.current_dialog:
+            self.page.close(self.current_dialog)
+            self.current_dialog = None
     
     def show_error_screen(self, title, message):
         """Show error screen"""
