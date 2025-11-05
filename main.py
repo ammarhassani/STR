@@ -531,47 +531,57 @@ class FIUApplication:
         self.page.open(dialog)
         
         try:
-            # Create directories
+            # Validate and create directories
             db_path = Path(self.temp_db_path)
+
+            # Ensure the path ends with .db extension
+            if not str(db_path).lower().endswith('.db'):
+                db_path = Path(str(db_path) + '.db')
+                self.temp_db_path = str(db_path)
+                logger.info(f"Added .db extension to path: {self.temp_db_path}")
+
+            # Create parent directory
+            logger.info(f"Creating directory: {db_path.parent}")
             db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Create backup directory
+            logger.info(f"Creating backup directory: {self.temp_backup_path}")
             Path(self.temp_backup_path).mkdir(parents=True, exist_ok=True)
-            
+
             status_text.value = "Initializing database schema..."
             self.page.update()
-            
+
             # Initialize database
+            logger.info(f"Initializing database at: {self.temp_db_path}")
             success, message = initialize_database(self.temp_db_path)
             
             if not success:
                 logger.error(f"Database creation failed: {message}")
-                dialog.open = False
-                self.page.update()
+                self.page.close(dialog)
                 self.show_error_dialog("Database Creation Failed", message)
                 return
-            
+
             status_text.value = "Saving configuration..."
             self.page.update()
-            
+
             # Save configuration
             Config.DATABASE_PATH = self.temp_db_path
             Config.BACKUP_PATH = self.temp_backup_path
             if not Config.save():
                 logger.error("Failed to save configuration")
-                dialog.open = False
-                self.page.update()
+                self.page.close(dialog)
                 self.show_error_dialog("Setup Failed", "Failed to save configuration")
                 return
-            
+
             status_text.value = "Database created successfully!"
             self.page.update()
-            
+
             logger.info("Database created successfully")
-            
+
             # Close dialog and show auto-login
             import time
             time.sleep(1)
-            dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             
             # Initialize database connection
             if self.init_database():
@@ -581,8 +591,7 @@ class FIUApplication:
             
         except Exception as e:
             logger.error(f"Database creation error: {e}")
-            dialog.open = False
-            self.page.update()
+            self.page.close(dialog)
             self.show_error_dialog("Setup Error", f"Failed to create database: {str(e)}")
     
     def show_auto_login(self):
