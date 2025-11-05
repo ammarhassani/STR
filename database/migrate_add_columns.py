@@ -48,7 +48,7 @@ def migrate_database(db_path):
         if 'org_username' not in user_columns:
             migrations.append({
                 'name': 'Add org_username to users',
-                'sql': "ALTER TABLE users ADD COLUMN org_username TEXT UNIQUE"
+                'sql': "ALTER TABLE users ADD COLUMN org_username TEXT"
             })
 
         if 'theme_preference' not in user_columns:
@@ -61,6 +61,26 @@ def migrate_database(db_path):
         if not migrations:
             print("✅ Database is already up to date. No migrations needed.")
             logger.info("No migrations needed")
+
+            # Check if we need to create unique index on org_username
+            needs_index = False
+            try:
+                cursor.execute("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_users_org_username'")
+                if not cursor.fetchone():
+                    needs_index = True
+            except:
+                needs_index = False
+
+            if needs_index and 'org_username' in user_columns:
+                print("Creating unique index on org_username...")
+                try:
+                    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_org_username ON users(org_username) WHERE org_username IS NOT NULL")
+                    conn.commit()
+                    print("✅ Unique index created successfully!")
+                except Exception as e:
+                    print(f"Warning: Could not create unique index: {e}")
+
+            conn.close()
             return True
 
         print(f"\nFound {len(migrations)} migration(s) to apply:")
@@ -81,6 +101,18 @@ def migrate_database(db_path):
                 logger.error(f"Migration failed: {migration['name']} - {e}")
                 conn.rollback()
                 return False
+
+        # Create unique index on org_username if we just added the column
+        if any(m['name'] == 'Add org_username to users' for m in migrations):
+            print("\nCreating unique index on org_username...")
+            try:
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_org_username ON users(org_username) WHERE org_username IS NOT NULL")
+                conn.commit()
+                print("  ✓ Unique index created")
+                logger.info("Created unique index on org_username")
+            except Exception as e:
+                print(f"  ⚠ Warning: Could not create unique index: {e}")
+                logger.warning(f"Could not create unique index: {e}")
 
         conn.close()
         print("\n✅ All migrations applied successfully!")
