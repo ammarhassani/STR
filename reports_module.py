@@ -474,9 +474,24 @@ class ReportsModule:
         self.page.open(dialog)
 
     def edit_report(self, report):
-        """Edit report"""
+        """Edit report - open form with pre-filled data"""
         logger.info(f"Editing report: {report['report_number']}")
-        self.show_snackbar(f"Edit functionality for report {report['report_number']} - Coming in next update")
+
+        try:
+            # Load the add_report_module with edit mode
+            from add_report_module import AddReportModule
+            edit_module = AddReportModule(
+                self.page,
+                self.db_manager,
+                self.current_user,
+                self.content_area,
+                edit_mode=True,
+                report_data=report
+            )
+            edit_module.show()
+        except Exception as e:
+            logger.error(f"Failed to open edit form: {e}")
+            self.show_snackbar(f"Failed to open edit form: {str(e)}")
 
     def view_history(self, report):
         """View report change history"""

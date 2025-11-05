@@ -903,6 +903,32 @@ class AdminPanel:
             """
             dropdown_data = [dict(row) for row in self.db_manager.execute_with_retry(query)]
 
+            # Check if no data
+            if not dropdown_data:
+                return ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Text("Manage Dropdown Options", size=16, weight=ft.FontWeight.BOLD),
+                            ft.Divider(),
+                            ft.Container(
+                                content=ft.Column(
+                                    [
+                                        ft.Icon(ft.Icons.INFO_OUTLINE, size=64, color=ft.Colors.GREY_400),
+                                        ft.Text("No dropdown values configured yet", size=16, color=ft.Colors.GREY_600),
+                                        ft.Text("Dropdown values will appear here once configured in the database", size=12, color=ft.Colors.GREY_500),
+                                    ],
+                                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=10,
+                                ),
+                                padding=40,
+                                alignment=ft.alignment.center,
+                            ),
+                        ],
+                        spacing=10,
+                    ),
+                    padding=20,
+                )
+
             # Group by category
             categories = {}
             for item in dropdown_data:
@@ -979,7 +1005,7 @@ class AdminPanel:
                         ft.Container(
                             content=ft.Column(category_sections, spacing=15),
                             expand=True,
-                            scroll=ft.ScrollMode.AUTO,
+                            scroll=ft.ScrollMode.ALWAYS,
                         ),
                     ],
                     spacing=10,
@@ -990,7 +1016,18 @@ class AdminPanel:
             )
         except Exception as e:
             logger.error(f"Failed to load dropdown settings: {e}")
-            return ft.Container(content=ft.Text("Failed to load dropdown settings"))
+            import traceback
+            traceback.print_exc()
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Text("Failed to load dropdown settings", size=16, color=ft.Colors.RED_700, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"Error: {str(e)}", size=12, color=ft.Colors.RED_600),
+                    ],
+                    spacing=10,
+                ),
+                padding=20,
+            )
 
     def build_field_settings(self):
         """Build field configuration section"""
@@ -1040,11 +1077,17 @@ class AdminPanel:
                         ft.Text("Field Configuration", size=16, weight=ft.FontWeight.BOLD),
                         ft.Text("Toggle field visibility and required status", size=12, color=ft.Colors.GREY_600),
                         ft.Divider(),
-                        ft.Column(field_rows, spacing=10, scroll=ft.ScrollMode.AUTO),
+                        ft.Container(
+                            content=ft.Column(field_rows, spacing=10),
+                            expand=True,
+                            scroll=ft.ScrollMode.ALWAYS,
+                        ),
                     ],
                     spacing=10,
+                    expand=True,
                 ),
                 padding=20,
+                expand=True,
             )
         except Exception as e:
             logger.error(f"Failed to load field settings: {e}")

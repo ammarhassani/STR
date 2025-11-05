@@ -40,11 +40,15 @@ NATIONALITIES = [
 class AddReportModule:
     """Complete add report form with dynamic fields and validation"""
 
-    def __init__(self, page, db_manager, current_user, content_area):
+    def __init__(self, page, db_manager, current_user, content_area, edit_mode=False, report_data=None):
         self.page = page
         self.db_manager = db_manager
         self.current_user = current_user
         self.content_area = content_area
+
+        # Edit mode
+        self.edit_mode = edit_mode
+        self.report_data = report_data or {}
 
         # Form data
         self.form_fields = {}
@@ -83,16 +87,25 @@ class AddReportModule:
 
     def build_header(self):
         """Build form header"""
+        if self.edit_mode:
+            icon = ft.Icons.EDIT
+            title = f"Edit Report: {self.report_data.get('report_number', 'N/A')}"
+            subtitle = "Modify report details below"
+        else:
+            icon = ft.Icons.ADD_CIRCLE
+            title = "Add New Report"
+            subtitle = "Report number and serial number will be auto-generated"
+
         return ft.Container(
             content=ft.Row(
                 [
                     ft.Row(
                         [
-                            ft.Icon(ft.Icons.ADD_CIRCLE, size=32, color=ft.Colors.BLUE_700),
+                            ft.Icon(icon, size=32, color=ft.Colors.BLUE_700),
                             ft.Column(
                                 [
-                                    ft.Text("Add New Report", size=24, weight=ft.FontWeight.BOLD),
-                                    ft.Text("Report number and serial number will be auto-generated", size=12, color=ft.Colors.GREY_700),
+                                    ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
+                                    ft.Text(subtitle, size=12, color=ft.Colors.GREY_700),
                                 ],
                                 spacing=2,
                             ),
@@ -251,56 +264,66 @@ class AddReportModule:
 
         def open_date_picker(e):
             def on_date_change(e):
-                if date_picker.value:
-                    date_field.value = date_picker.value.strftime("%d/%m/%Y")
-                    self.page.close(date_dialog)
+                if e.control.value:
+                    date_field.value = e.control.value.strftime("%d/%m/%Y")
                     self.page.update()
 
             def set_today(e):
                 date_field.value = datetime.now().strftime("%d/%m/%Y")
-                self.page.close(date_dialog)
+                self.page.close(dialog)
                 self.page.update()
 
+            def open_calendar(e):
+                date_picker = ft.DatePicker(
+                    on_change=on_date_change,
+                    on_dismiss=lambda e: None,
+                    first_date=datetime(2000, 1, 1),
+                    last_date=datetime(2100, 12, 31),
+                )
+                self.page.overlay.append(date_picker)
+                self.page.update()
+                date_picker.pick_date()
+
             def close_dialog(e):
-                self.page.close(date_dialog)
+                self.page.close(dialog)
 
-            date_picker = ft.DatePicker(
-                on_change=on_date_change,
-                first_date=datetime(2000, 1, 1),
-                last_date=datetime(2100, 12, 31),
-            )
-
-            date_dialog = ft.AlertDialog(
+            dialog = ft.AlertDialog(
                 modal=True,
                 title=ft.Text(f"Select {label}"),
                 content=ft.Container(
                     content=ft.Column(
                         [
-                            date_picker,
-                            ft.Divider(),
-                            ft.Row(
-                                [
-                                    ft.ElevatedButton(
-                                        "TODAY",
-                                        icon=ft.Icons.TODAY,
-                                        on_click=set_today,
-                                        style=ft.ButtonStyle(
-                                            bgcolor=ft.Colors.GREEN_700,
-                                            color=ft.Colors.WHITE,
-                                        ),
-                                    ),
-                                    ft.TextButton("Cancel", on_click=close_dialog),
-                                ],
-                                alignment=ft.MainAxisAlignment.END,
+                            ft.Text("Choose an option:", size=14),
+                            ft.Container(height=10),
+                            ft.ElevatedButton(
+                                "Open Calendar Picker",
+                                icon=ft.Icons.CALENDAR_MONTH,
+                                on_click=open_calendar,
+                                width=200,
+                            ),
+                            ft.Container(height=10),
+                            ft.ElevatedButton(
+                                "Use TODAY",
+                                icon=ft.Icons.TODAY,
+                                on_click=set_today,
+                                width=200,
+                                style=ft.ButtonStyle(
+                                    bgcolor=ft.Colors.GREEN_700,
+                                    color=ft.Colors.WHITE,
+                                ),
                             ),
                         ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         tight=True,
                     ),
-                    width=400,
+                    width=300,
                 ),
+                actions=[
+                    ft.TextButton("Cancel", on_click=close_dialog),
+                ],
             )
 
-            self.page.open(date_dialog)
+            self.page.open(dialog)
 
         date_field.on_click = open_date_picker
 
