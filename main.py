@@ -416,9 +416,7 @@ class FIUApplication:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_admin_credentials_prompt(self):
         """Step 4: Admin Verification - Must enter admin/admin123"""
@@ -507,9 +505,7 @@ class FIUApplication:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def create_new_database(self):
         """Create new database with progress indicator"""
@@ -536,9 +532,7 @@ class FIUApplication:
             modal=True,
         )
         
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
         
         try:
             # Create directories
@@ -1127,9 +1121,7 @@ class FIUApplication:
             content=ft.Text(message),
             actions=[ft.TextButton("OK", on_click=lambda e: self.close_dialog())],
         )
-        self.page.dialog = dialog
-        dialog.open = True
-        self.page.update()
+        self.page.open(dialog)
     
     def show_info_snackbar(self, message):
         """Show info snackbar"""
