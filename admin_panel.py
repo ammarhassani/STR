@@ -267,7 +267,7 @@ class AdminPanel:
         """Load all users from database"""
         try:
             query = """
-                SELECT user_id, username, full_name, role, is_active, last_login, created_at
+                SELECT user_id, username, org_username, full_name, role, is_active, last_login, created_at
                 FROM users
                 ORDER BY user_id
             """
@@ -288,7 +288,13 @@ class AdminPanel:
             prefix_icon=ft.Icons.PERSON,
             autofocus=True,
         )
-        
+
+        org_username_field = ft.TextField(
+            label="Organization Username (Optional)",
+            hint_text="Enter organization username for alternative login",
+            prefix_icon=ft.Icons.BUSINESS,
+        )
+
         password_field = ft.TextField(
             label="Password",
             hint_text="Enter password",
@@ -296,7 +302,7 @@ class AdminPanel:
             password=True,
             can_reveal_password=True,
         )
-        
+
         full_name_field = ft.TextField(
             label="Full Name",
             hint_text="Enter full name",
@@ -349,17 +355,30 @@ class AdminPanel:
                 error_text.visible = True
                 self.page.update()
                 return
-            
+
+            # Check if org_username exists (if provided)
+            if org_username_field.value and org_username_field.value.strip():
+                check_org_query = "SELECT COUNT(*) as count FROM users WHERE org_username = ?"
+                result = self.db_manager.execute_with_retry(check_org_query, (org_username_field.value.strip(),))
+                if result[0]['count'] > 0:
+                    error_text.value = "Organization username already exists"
+                    error_text.visible = True
+                    self.page.update()
+                    return
+
             # Add user
             try:
+                org_username_value = org_username_field.value.strip() if org_username_field.value else None
+
                 insert_query = """
-                    INSERT INTO users (username, password, full_name, role, is_active, created_at, created_by)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'), ?)
+                    INSERT INTO users (username, org_username, password, full_name, role, is_active, created_at, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)
                 """
                 self.db_manager.execute_with_retry(
                     insert_query,
                     (
                         username_field.value.strip(),
+                        org_username_value,
                         password_field.value,
                         full_name_field.value.strip(),
                         role_dropdown.value,
@@ -392,6 +411,8 @@ class AdminPanel:
                     [
                         username_field,
                         ft.Container(height=10),
+                        org_username_field,
+                        ft.Container(height=10),
                         password_field,
                         ft.Container(height=10),
                         full_name_field,
@@ -406,7 +427,7 @@ class AdminPanel:
                     scroll=ft.ScrollMode.AUTO,
                 ),
                 width=400,
-                height=400,
+                height=450,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=cancel),
@@ -427,7 +448,14 @@ class AdminPanel:
             read_only=True,
             prefix_icon=ft.Icons.PERSON,
         )
-        
+
+        org_username_field = ft.TextField(
+            label="Organization Username (Optional)",
+            value=user.get('org_username', ''),
+            hint_text="Enter organization username for alternative login",
+            prefix_icon=ft.Icons.BUSINESS,
+        )
+
         password_field = ft.TextField(
             label="New Password (leave empty to keep current)",
             hint_text="Enter new password or leave empty",
@@ -435,7 +463,7 @@ class AdminPanel:
             password=True,
             can_reveal_password=True,
         )
-        
+
         full_name_field = ft.TextField(
             label="Full Name",
             value=user['full_name'],
@@ -466,25 +494,41 @@ class AdminPanel:
                 error_text.visible = True
                 self.page.update()
                 return
-            
+
             if password_field.value and len(password_field.value) < 3:
                 error_text.value = "Password must be at least 3 characters"
                 error_text.visible = True
                 self.page.update()
                 return
-            
+
+            # Check if org_username exists (if changed and provided)
+            if org_username_field.value and org_username_field.value.strip():
+                org_username_new = org_username_field.value.strip()
+                org_username_old = user.get('org_username', '')
+                if org_username_new != org_username_old:
+                    check_org_query = "SELECT COUNT(*) as count FROM users WHERE org_username = ? AND user_id != ?"
+                    result = self.db_manager.execute_with_retry(check_org_query, (org_username_new, user['user_id']))
+                    if result[0]['count'] > 0:
+                        error_text.value = "Organization username already exists"
+                        error_text.visible = True
+                        self.page.update()
+                        return
+
             # Update user
             try:
+                org_username_value = org_username_field.value.strip() if org_username_field.value else None
+
                 if password_field.value:
                     # Update with new password
                     update_query = """
-                        UPDATE users 
-                        SET password = ?, full_name = ?, role = ?, is_active = ?, 
+                        UPDATE users
+                        SET password = ?, org_username = ?, full_name = ?, role = ?, is_active = ?,
                             updated_at = datetime('now'), updated_by = ?
                         WHERE user_id = ?
                     """
                     params = (
                         password_field.value,
+                        org_username_value,
                         full_name_field.value.strip(),
                         role_dropdown.value,
                         1 if is_active_checkbox.value else 0,
@@ -494,19 +538,20 @@ class AdminPanel:
                 else:
                     # Update without password change
                     update_query = """
-                        UPDATE users 
-                        SET full_name = ?, role = ?, is_active = ?, 
+                        UPDATE users
+                        SET org_username = ?, full_name = ?, role = ?, is_active = ?,
                             updated_at = datetime('now'), updated_by = ?
                         WHERE user_id = ?
                     """
                     params = (
+                        org_username_value,
                         full_name_field.value.strip(),
                         role_dropdown.value,
                         1 if is_active_checkbox.value else 0,
                         self.current_user['username'],
                         user['user_id'],
                     )
-                
+
                 self.db_manager.execute_with_retry(update_query, params)
                 
                 logger.info(f"User updated: {user['username']}")
@@ -533,6 +578,8 @@ class AdminPanel:
                     [
                         username_field,
                         ft.Container(height=10),
+                        org_username_field,
+                        ft.Container(height=10),
                         password_field,
                         ft.Container(height=10),
                         full_name_field,
@@ -547,7 +594,7 @@ class AdminPanel:
                     scroll=ft.ScrollMode.AUTO,
                 ),
                 width=400,
-                height=400,
+                height=450,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=cancel),

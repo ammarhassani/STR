@@ -817,31 +817,52 @@ class FIUApplication:
             logger.error(f"Database initialization error: {e}")
             return False
     
-    def authenticate_user(self, username: str, password: str):
-        """Authenticate user"""
+    def authenticate_user(self, username: str, password: str, is_org_username: bool = False):
+        """Authenticate user with username or org_username"""
         try:
-            query = """
-                SELECT user_id, username, full_name, role, is_active
-                FROM users 
-                WHERE username = ? AND password = ? AND is_active = 1
-            """
+            # Try regular username first, then org_username if enabled
+            if is_org_username:
+                query = """
+                    SELECT user_id, username, full_name, role, is_active, theme_preference
+                    FROM users
+                    WHERE org_username = ? AND password = ? AND is_active = 1
+                """
+            else:
+                query = """
+                    SELECT user_id, username, full_name, role, is_active, theme_preference
+                    FROM users
+                    WHERE username = ? AND password = ? AND is_active = 1
+                """
+
             results = self.db_manager.execute_with_retry(query, (username, password))
-            
+
             if results:
                 user = dict(results[0])
-                
+
                 # Update last login
                 update_query = """
-                    UPDATE users 
+                    UPDATE users
                     SET last_login = datetime('now'), failed_login_attempts = 0
                     WHERE user_id = ?
                 """
                 self.db_manager.execute_with_retry(update_query, (user['user_id'],))
-                
+
+                # Apply user theme preference
+                theme_pref = user.get('theme_preference', 'light')
+                if theme_pref == 'dark':
+                    self.page.theme_mode = ft.ThemeMode.DARK
+                else:
+                    self.page.theme_mode = ft.ThemeMode.LIGHT
+                self.page.update()
+
                 return user
-            
+
+            # If regular username failed and we haven't tried org_username yet, try it
+            if not is_org_username:
+                return self.authenticate_user(username, password, is_org_username=True)
+
             return None
-            
+
         except Exception as e:
             logger.error(f"Authentication error: {e}")
             return None
@@ -906,6 +927,11 @@ class FIUApplication:
                     ),
                     ft.Row(
                         [
+                            ft.IconButton(
+                                icon=ft.Icons.DARK_MODE if self.page.theme_mode == ft.ThemeMode.LIGHT else ft.Icons.LIGHT_MODE,
+                                tooltip="Toggle Theme",
+                                on_click=lambda e: self.toggle_theme(),
+                            ),
                             ft.IconButton(
                                 icon=ft.Icons.REFRESH,
                                 tooltip="Refresh",
@@ -1116,10 +1142,37 @@ class FIUApplication:
         module = ExportModule(self.page, self.db_manager, self.current_user, self.content_area)
         module.show()
     
+    def toggle_theme(self):
+        """Toggle between light and dark theme"""
+        try:
+            # Toggle theme mode
+            if self.page.theme_mode == ft.ThemeMode.LIGHT:
+                self.page.theme_mode = ft.ThemeMode.DARK
+                new_theme = 'dark'
+            else:
+                self.page.theme_mode = ft.ThemeMode.LIGHT
+                new_theme = 'light'
+
+            # Save to database
+            update_query = "UPDATE users SET theme_preference = ? WHERE user_id = ?"
+            self.db_manager.execute_with_retry(update_query, (new_theme, self.current_user['user_id']))
+
+            # Update current user object
+            self.current_user['theme_preference'] = new_theme
+
+            # Update UI
+            self.page.update()
+            self.show_info_snackbar(f"Theme changed to {new_theme.title()} mode")
+            logger.info(f"Theme changed to {new_theme} for user {self.current_user['username']}")
+
+        except Exception as e:
+            logger.error(f"Theme toggle error: {e}")
+            self.show_error_snackbar("Failed to change theme")
+
     def refresh_current_view(self):
         """Refresh current view"""
         self.show_info_snackbar("Refreshed")
-    
+
     def logout(self):
         """Logout user"""
         logger.info(f"User logging out: {self.current_user['username']}")
