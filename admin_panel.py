@@ -40,6 +40,11 @@ class AdminPanel:
                     content=self.build_system_settings(),
                 ),
                 ft.Tab(
+                    text="Audit Trail",
+                    icon=ft.Icons.HISTORY,
+                    content=self.build_audit_trail(),
+                ),
+                ft.Tab(
                     text="Database",
                     icon=ft.Icons.STORAGE,
                     content=self.build_database_management(),
@@ -262,7 +267,165 @@ class AdminPanel:
             ),
             padding=20,
         )
-    
+
+    def build_audit_trail(self):
+        """Build audit trail viewer"""
+        try:
+            # Load recent changes from change_history
+            query = """
+                SELECT
+                    ch.*,
+                    u.username as user_name
+                FROM change_history ch
+                LEFT JOIN users u ON ch.changed_by = u.username
+                ORDER BY ch.changed_at DESC
+                LIMIT 200
+            """
+            history = [dict(row) for row in self.db_manager.execute_with_retry(query)]
+
+            # Build history cards
+            history_cards = []
+            for change in history:
+                # Determine icon and color based on change type
+                if change['change_type'] == 'INSERT':
+                    icon = ft.Icons.ADD_CIRCLE
+                    icon_color = ft.Colors.GREEN_700
+                elif change['change_type'] == 'UPDATE':
+                    icon = ft.Icons.EDIT
+                    icon_color = ft.Colors.BLUE_700
+                elif change['change_type'] == 'DELETE':
+                    icon = ft.Icons.DELETE
+                    icon_color = ft.Colors.RED_700
+                else:
+                    icon = ft.Icons.CHANGE_CIRCLE
+                    icon_color = ft.Colors.ORANGE_700
+
+                history_cards.append(
+                    ft.Card(
+                        content=ft.Container(
+                            content=ft.Row(
+                                [
+                                    ft.Icon(icon, size=24, color=icon_color),
+                                    ft.Column(
+                                        [
+                                            ft.Row(
+                                                [
+                                                    ft.Text(
+                                                        f"{change['change_type']}: {change['table_name']}",
+                                                        weight=ft.FontWeight.BOLD,
+                                                        size=14,
+                                                    ),
+                                                    ft.Container(width=10),
+                                                    ft.Text(
+                                                        f"Record #{change['record_id']}",
+                                                        size=12,
+                                                        color=ft.Colors.GREY_700,
+                                                    ),
+                                                ],
+                                            ),
+                                            ft.Text(
+                                                f"Field: {change['field_name']}",
+                                                size=12,
+                                                color=ft.Colors.GREY_700,
+                                            ),
+                                            ft.Row(
+                                                [
+                                                    ft.Text("From:", size=11, weight=ft.FontWeight.BOLD),
+                                                    ft.Text(
+                                                        str(change['old_value'])[:50] if change['old_value'] else "N/A",
+                                                        size=11,
+                                                        color=ft.Colors.RED_600,
+                                                    ),
+                                                    ft.Icon(ft.Icons.ARROW_FORWARD, size=12),
+                                                    ft.Text("To:", size=11, weight=ft.FontWeight.BOLD),
+                                                    ft.Text(
+                                                        str(change['new_value'])[:50] if change['new_value'] else "N/A",
+                                                        size=11,
+                                                        color=ft.Colors.GREEN_600,
+                                                    ),
+                                                ],
+                                                spacing=5,
+                                            ),
+                                            ft.Row(
+                                                [
+                                                    ft.Icon(ft.Icons.PERSON, size=12, color=ft.Colors.GREY_600),
+                                                    ft.Text(
+                                                        change['changed_by'],
+                                                        size=11,
+                                                        color=ft.Colors.GREY_600,
+                                                    ),
+                                                    ft.Container(width=10),
+                                                    ft.Icon(ft.Icons.ACCESS_TIME, size=12, color=ft.Colors.GREY_600),
+                                                    ft.Text(
+                                                        change['changed_at'],
+                                                        size=11,
+                                                        color=ft.Colors.GREY_600,
+                                                    ),
+                                                ],
+                                                spacing=3,
+                                            ),
+                                        ],
+                                        spacing=5,
+                                        expand=True,
+                                    ),
+                                ],
+                                spacing=15,
+                            ),
+                            padding=15,
+                        ),
+                        elevation=1,
+                    )
+                )
+
+            if not history_cards:
+                return ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Icon(ft.Icons.HISTORY, size=64, color=ft.Colors.GREY_400),
+                            ft.Text("No audit trail records", size=16, color=ft.Colors.GREY_600),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=10,
+                    ),
+                    padding=40,
+                    alignment=ft.alignment.center,
+                    expand=True,
+                )
+
+            return ft.Container(
+                content=ft.Column(
+                    [
+                        ft.Row(
+                            [
+                                ft.Text("Audit Trail", size=20, weight=ft.FontWeight.BOLD),
+                                ft.Text(f"({len(history)} records)", size=14, color=ft.Colors.GREY_600),
+                            ],
+                            spacing=10,
+                        ),
+                        ft.Text("Complete history of all changes in the system", size=12, color=ft.Colors.GREY_600),
+                        ft.Divider(),
+                        ft.Container(
+                            content=ft.Column(
+                                history_cards,
+                                spacing=10,
+                            ),
+                            expand=True,
+                            scroll=ft.ScrollMode.AUTO,
+                        ),
+                    ],
+                    spacing=10,
+                    expand=True,
+                ),
+                padding=20,
+                expand=True,
+            )
+        except Exception as e:
+            logger.error(f"Failed to load audit trail: {e}")
+            return ft.Container(
+                content=ft.Text(f"Failed to load audit trail: {str(e)}", color=ft.Colors.RED_700),
+                padding=20,
+            )
+
     def load_users(self):
         """Load all users from database"""
         try:
@@ -753,10 +916,22 @@ class AdminPanel:
             for category, items in categories.items():
                 item_widgets = []
                 for item in items:
+                    value_field = ft.TextField(
+                        value=item['config_value'],
+                        expand=2,
+                        on_submit=lambda e, key=item['config_key']: self.update_dropdown_value(key, e.control.value),
+                        on_blur=lambda e, key=item['config_key']: self.update_dropdown_value(key, e.control.value),
+                    )
                     item_widgets.append(
                         ft.Row(
                             [
-                                ft.TextField(value=item['config_value'], expand=2),
+                                value_field,
+                                ft.IconButton(
+                                    icon=ft.Icons.SAVE,
+                                    icon_color=ft.Colors.BLUE_700,
+                                    tooltip="Save changes",
+                                    on_click=lambda e, key=item['config_key'], field=value_field: self.update_dropdown_value(key, field.value),
+                                ),
                                 ft.IconButton(
                                     icon=ft.Icons.DELETE,
                                     icon_color=ft.Colors.RED_700,
@@ -801,11 +976,17 @@ class AdminPanel:
                     [
                         ft.Text("Manage Dropdown Options", size=16, weight=ft.FontWeight.BOLD),
                         ft.Divider(),
-                        ft.Column(category_sections, spacing=15, scroll=ft.ScrollMode.AUTO),
+                        ft.Container(
+                            content=ft.Column(category_sections, spacing=15),
+                            expand=True,
+                            scroll=ft.ScrollMode.AUTO,
+                        ),
                     ],
                     spacing=10,
+                    expand=True,
                 ),
                 padding=20,
+                expand=True,
             )
         except Exception as e:
             logger.error(f"Failed to load dropdown settings: {e}")
@@ -892,10 +1073,98 @@ class AdminPanel:
             logger.error(f"Failed to delete option: {e}")
             self.show_error(f"Failed to delete option: {str(e)}")
 
+    def update_dropdown_value(self, key, new_value):
+        """Update dropdown option value"""
+        try:
+            if not new_value or not new_value.strip():
+                self.show_error("Value cannot be empty")
+                return
+
+            query = "UPDATE system_config SET config_value = ? WHERE config_key = ?"
+            self.db_manager.execute_with_retry(query, (new_value.strip(), key))
+            logger.info(f"Dropdown value updated: {key} = {new_value}")
+            self.show_success("Value updated successfully")
+        except Exception as e:
+            logger.error(f"Failed to update dropdown value: {e}")
+            self.show_error(f"Failed to update: {str(e)}")
+
     def add_dropdown_option(self, category):
         """Add new dropdown option"""
-        # TODO: Implement add dropdown dialog
-        self.show_success(f"Add option for {category} - Coming soon")
+        value_field = ft.TextField(
+            label="New Option Value",
+            hint_text="Enter option value",
+            autofocus=True,
+        )
+
+        error_text = ft.Text("", color=ft.Colors.RED_700, visible=False)
+
+        def save_new_option(e):
+            value = value_field.value
+            if not value or not value.strip():
+                error_text.value = "Value is required"
+                error_text.visible = True
+                self.page.update()
+                return
+
+            try:
+                # Get max display_order for this category
+                query = """
+                    SELECT COALESCE(MAX(display_order), 0) as max_order
+                    FROM system_config
+                    WHERE config_category = ? AND config_type = 'dropdown'
+                """
+                result = self.db_manager.execute_with_retry(query, (category,))
+                next_order = result[0]['max_order'] + 1
+
+                # Generate unique config_key
+                config_key = f"{category}_{value.strip().lower().replace(' ', '_')}"
+
+                # Insert new option
+                insert_query = """
+                    INSERT INTO system_config (config_key, config_value, config_type, config_category, display_order)
+                    VALUES (?, ?, 'dropdown', ?, ?)
+                """
+                self.db_manager.execute_with_retry(
+                    insert_query,
+                    (config_key, value.strip(), category, next_order)
+                )
+
+                logger.info(f"Dropdown option added: {category} - {value}")
+                self.page.close(dialog)
+                self.show()  # Refresh view
+                self.show_success(f"Option '{value}' added successfully")
+
+            except Exception as ex:
+                logger.error(f"Failed to add dropdown option: {ex}")
+                error_text.value = f"Failed to add: {str(ex)}"
+                error_text.visible = True
+                self.page.update()
+
+        def cancel(e):
+            self.page.close(dialog)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"Add Option to {category.replace('_', ' ').title()}"),
+            content=ft.Container(
+                content=ft.Column(
+                    [
+                        value_field,
+                        ft.Container(height=10),
+                        error_text,
+                    ],
+                    tight=True,
+                ),
+                width=350,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel),
+                ft.ElevatedButton("Add Option", on_click=save_new_option),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.page.open(dialog)
 
     def toggle_field_visibility(self, column_id, visible):
         """Toggle field visibility"""

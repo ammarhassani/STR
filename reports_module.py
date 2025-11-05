@@ -163,79 +163,9 @@ class ReportsModule:
         )
 
     def build_reports_table(self):
-        """Build reports data table"""
-        # Define columns
-        columns = [
-            ft.DataColumn(ft.Text("SN", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Report Number", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Entity Name", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("CIC", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD)),
-            ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD)),
-        ]
-
-        # Build rows
-        rows = []
-        for report in self.reports:
-            rows.append(
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text(str(report['sn']))),
-                        ft.DataCell(ft.Text(report['report_number'])),
-                        ft.DataCell(ft.Text(report['report_date'] or '-')),
-                        ft.DataCell(ft.Text(
-                            (report['reported_entity_name'][:30] + "...")
-                            if report['reported_entity_name'] and len(report['reported_entity_name']) > 30
-                            else (report['reported_entity_name'] or '-')
-                        )),
-                        ft.DataCell(ft.Text(report['cic'] or '-')),
-                        ft.DataCell(
-                            ft.Container(
-                                content=ft.Text(
-                                    report['status'],
-                                    size=12,
-                                    color=ft.Colors.WHITE,
-                                ),
-                                padding=5,
-                                bgcolor=self.get_status_color(report['status']),
-                                border_radius=5,
-                            )
-                        ),
-                        ft.DataCell(
-                            ft.Row(
-                                [
-                                    ft.IconButton(
-                                        icon=ft.Icons.VISIBILITY,
-                                        tooltip="View Details",
-                                        icon_size=18,
-                                        icon_color=ft.Colors.BLUE_700,
-                                        on_click=lambda e, r=report: self.view_report_details(r),
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.Icons.EDIT,
-                                        tooltip="Edit",
-                                        icon_size=18,
-                                        icon_color=ft.Colors.GREEN_700,
-                                        on_click=lambda e, r=report: self.edit_report(r),
-                                    ) if self.can_edit() else ft.Container(width=0),
-                                    ft.IconButton(
-                                        icon=ft.Icons.HISTORY,
-                                        tooltip="View History",
-                                        icon_size=18,
-                                        icon_color=ft.Colors.ORANGE_700,
-                                        on_click=lambda e, r=report: self.view_history(r),
-                                    ),
-                                ],
-                                spacing=0,
-                            )
-                        ),
-                    ],
-                )
-            )
-
-        # Create data table
-        if not rows:
+        """Build reports card-based list (more clickable than DataTable)"""
+        # Check if no reports
+        if not self.reports:
             return ft.Container(
                 content=ft.Column(
                     [
@@ -251,21 +181,107 @@ class ReportsModule:
                 alignment=ft.alignment.center,
             )
 
-        data_table = ft.DataTable(
-            columns=columns,
-            rows=rows,
-            border=ft.border.all(1, ft.Colors.GREY_300),
-            border_radius=10,
-            vertical_lines=ft.border.BorderSide(1, ft.Colors.GREY_200),
-            horizontal_lines=ft.border.BorderSide(1, ft.Colors.GREY_200),
-            heading_row_color=ft.Colors.GREY_100,
-            heading_row_height=50,
-            data_row_max_height=60,
-        )
+        # Build card list
+        report_cards = []
+        for report in self.reports:
+            # Build action buttons
+            action_buttons = [
+                ft.IconButton(
+                    icon=ft.Icons.VISIBILITY,
+                    tooltip="View Details",
+                    icon_size=20,
+                    icon_color=ft.Colors.BLUE_700,
+                    on_click=lambda e, r=report: self.view_report_details(r),
+                ),
+                ft.IconButton(
+                    icon=ft.Icons.HISTORY,
+                    tooltip="View History",
+                    icon_size=20,
+                    icon_color=ft.Colors.ORANGE_700,
+                    on_click=lambda e, r=report: self.view_history(r),
+                ),
+            ]
+
+            if self.can_edit():
+                action_buttons.insert(1, ft.IconButton(
+                    icon=ft.Icons.EDIT,
+                    tooltip="Edit",
+                    icon_size=20,
+                    icon_color=ft.Colors.GREEN_700,
+                    on_click=lambda e, r=report: self.edit_report(r),
+                ))
+
+            report_cards.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Row(
+                            [
+                                # Left side - Report info
+                                ft.Column(
+                                    [
+                                        ft.Row(
+                                            [
+                                                ft.Text(f"#{report['sn']}", size=14, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_700),
+                                                ft.Container(width=10),
+                                                ft.Text(report['report_number'], size=14, weight=ft.FontWeight.BOLD),
+                                                ft.Container(width=10),
+                                                ft.Container(
+                                                    content=ft.Text(
+                                                        report['status'],
+                                                        size=11,
+                                                        color=ft.Colors.WHITE,
+                                                    ),
+                                                    padding=ft.padding.symmetric(horizontal=8, vertical=3),
+                                                    bgcolor=self.get_status_color(report['status']),
+                                                    border_radius=5,
+                                                ),
+                                            ],
+                                        ),
+                                        ft.Row(
+                                            [
+                                                ft.Icon(ft.Icons.BUSINESS, size=14, color=ft.Colors.GREY_600),
+                                                ft.Text(
+                                                    (report['reported_entity_name'][:50] + "...")
+                                                    if report['reported_entity_name'] and len(report['reported_entity_name']) > 50
+                                                    else (report['reported_entity_name'] or '-'),
+                                                    size=13,
+                                                    color=ft.Colors.GREY_700,
+                                                ),
+                                            ],
+                                            spacing=5,
+                                        ),
+                                        ft.Row(
+                                            [
+                                                ft.Icon(ft.Icons.CALENDAR_TODAY, size=14, color=ft.Colors.GREY_600),
+                                                ft.Text(report['report_date'] or '-', size=12, color=ft.Colors.GREY_600),
+                                                ft.Container(width=10),
+                                                ft.Icon(ft.Icons.TAG, size=14, color=ft.Colors.GREY_600),
+                                                ft.Text(f"CIC: {report['cic'] or '-'}", size=12, color=ft.Colors.GREY_600),
+                                            ],
+                                            spacing=5,
+                                        ),
+                                    ],
+                                    spacing=5,
+                                    expand=True,
+                                ),
+                                # Right side - Action buttons
+                                ft.Row(
+                                    action_buttons,
+                                    spacing=5,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        padding=15,
+                    ),
+                    elevation=1,
+                )
+            )
 
         return ft.Container(
             content=ft.Column(
-                [data_table],
+                report_cards,
+                spacing=10,
                 scroll=ft.ScrollMode.AUTO,
             ),
             padding=20,
@@ -525,26 +541,49 @@ class ReportsModule:
             self.show_snackbar(f"Failed to load history: {str(e)}")
 
     def show_advanced_filters(self):
-        """Show advanced filters dialog with column selection"""
+        """Show Excel-style advanced filters dialog with actual DB values"""
         filter_controls = []
 
         for col in self.available_columns:
             col_name = col['column_name']
             current_value = self.active_filters.get(col_name, "")
 
-            filter_field = ft.TextField(
-                label=col['display_name_en'],
-                value=current_value,
-                hint_text=f"Filter by {col['display_name_en'].lower()}",
-            )
+            # Get unique values from database for this column
+            try:
+                query = f"SELECT DISTINCT {col_name} FROM reports WHERE {col_name} IS NOT NULL AND {col_name} != '' AND is_deleted = 0 ORDER BY {col_name} LIMIT 100"
+                unique_values = [dict(row) for row in self.db_manager.execute_with_retry(query)]
+
+                # Create dropdown options
+                options = [ft.dropdown.Option("", "(All)")]
+                for val in unique_values:
+                    value = str(val[col_name]) if val[col_name] is not None else ""
+                    if value:
+                        options.append(ft.dropdown.Option(value, value))
+
+                filter_control = ft.Dropdown(
+                    label=col['display_name_en'],
+                    value=current_value,
+                    options=options,
+                    width=400,
+                )
+            except Exception as e:
+                # Fallback to text field if query fails
+                logger.warning(f"Failed to load values for {col_name}: {e}")
+                filter_control = ft.TextField(
+                    label=col['display_name_en'],
+                    value=current_value,
+                    hint_text=f"Filter by {col['display_name_en'].lower()}",
+                    width=400,
+                )
 
             filter_controls.append(
                 ft.Row(
                     [
-                        filter_field,
+                        filter_control,
                         ft.IconButton(
                             icon=ft.Icons.CLEAR,
-                            on_click=lambda e, f=filter_field: self.clear_single_filter(f),
+                            tooltip="Clear filter",
+                            on_click=lambda e, f=filter_control: self.clear_single_filter(f),
                         ),
                     ],
                     spacing=5,
@@ -564,19 +603,27 @@ class ReportsModule:
             self.page.close(dialog)
             self.show()
 
+        def clear_all_filters(e):
+            # Clear all filter values
+            for row in filter_controls:
+                field = row.controls[0]
+                field.value = ""
+            self.page.update()
+
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Advanced Filters"),
+            title=ft.Text("Advanced Filters - Select from Actual Values"),
             content=ft.Container(
                 content=ft.Column(
                     filter_controls,
                     spacing=10,
                     scroll=ft.ScrollMode.AUTO,
                 ),
-                width=500,
-                height=400,
+                width=550,
+                height=500,
             ),
             actions=[
+                ft.TextButton("Clear All", on_click=clear_all_filters),
                 ft.TextButton("Cancel", on_click=lambda e: self.page.close(dialog)),
                 ft.ElevatedButton("Apply Filters", on_click=apply_filters),
             ],
