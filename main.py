@@ -1180,10 +1180,7 @@ def main(page: ft.Page):
         logger.info("=" * 50)
         logger.info("FIU Report Management System Starting")
         logger.info("=" * 50)
-        
-        # Center window
-        page.window_center()
-        
+
         # Create application
         FIUApplication(page)
         
