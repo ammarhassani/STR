@@ -257,27 +257,61 @@ class AddReportModule:
             )
 
     def create_date_field(self, label, is_required, field_name):
-        """Create date field with date picker and TODAY button"""
+        """Create date field with 3 input methods: manual, calendar, TODAY"""
+
+        def validate_and_format_date(e):
+            """Validate and auto-format date as user types"""
+            value = e.control.value
+            if not value:
+                return
+
+            # Remove any non-digits
+            digits_only = ''.join(filter(str.isdigit, value))
+
+            # Auto-format as DD/MM/YYYY
+            if len(digits_only) >= 8:
+                formatted = f"{digits_only[0:2]}/{digits_only[2:4]}/{digits_only[4:8]}"
+                e.control.value = formatted
+                e.control.error_text = None
+            elif len(digits_only) > 0:
+                # Partial entry - show what's been entered
+                parts = []
+                if len(digits_only) >= 2:
+                    parts.append(digits_only[0:2])
+                if len(digits_only) >= 4:
+                    parts.append(digits_only[2:4])
+                if len(digits_only) > 4:
+                    parts.append(digits_only[4:8])
+                if len(parts) > 0:
+                    e.control.value = '/'.join(parts)
+
+            self.page.update()
+
         date_field = ft.TextField(
             label=label + (" *" if is_required else ""),
-            hint_text="DD/MM/YYYY",
-            prefix_icon=ft.Icons.CALENDAR_TODAY,
-            read_only=True,
+            hint_text="Type: DDMMYYYY or DD/MM/YYYY",
+            prefix_icon=ft.Icons.EDIT_CALENDAR,
             value="",
+            on_change=validate_and_format_date,
         )
 
-        def open_date_picker(e):
+        def show_picker_options(e):
+            """Show dialog with calendar and TODAY options"""
             def on_date_change(e):
                 if e.control.value:
                     date_field.value = e.control.value.strftime("%d/%m/%Y")
+                    date_field.error_text = None
+                    self.page.close(dialog)
                     self.page.update()
 
             def set_today(e):
                 date_field.value = datetime.now().strftime("%d/%m/%Y")
+                date_field.error_text = None
                 self.page.close(dialog)
                 self.page.update()
 
             def open_calendar(e):
+                self.page.close(dialog)
                 date_picker = ft.DatePicker(
                     on_change=on_date_change,
                     on_dismiss=lambda e: None,
@@ -297,25 +331,29 @@ class AddReportModule:
                 content=ft.Container(
                     content=ft.Column(
                         [
-                            ft.Text("Choose an option:", size=14),
+                            ft.Text("Choose date entry method:", size=14),
                             ft.Container(height=10),
                             ft.ElevatedButton(
-                                "Open Calendar Picker",
+                                "📅 Open Calendar Picker",
                                 icon=ft.Icons.CALENDAR_MONTH,
                                 on_click=open_calendar,
-                                width=200,
+                                width=220,
                             ),
-                            ft.Container(height=10),
+                            ft.Container(height=5),
                             ft.ElevatedButton(
-                                "Use TODAY",
+                                "📌 Use TODAY",
                                 icon=ft.Icons.TODAY,
                                 on_click=set_today,
-                                width=200,
+                                width=220,
                                 style=ft.ButtonStyle(
                                     bgcolor=ft.Colors.GREEN_700,
                                     color=ft.Colors.WHITE,
                                 ),
                             ),
+                            ft.Container(height=10),
+                            ft.Divider(),
+                            ft.Text("Or type directly in the field:", size=12, italic=True),
+                            ft.Text("Format: DDMMYYYY", size=11),
                         ],
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                         tight=True,
@@ -323,15 +361,23 @@ class AddReportModule:
                     width=300,
                 ),
                 actions=[
-                    ft.TextButton("Cancel", on_click=close_dialog),
+                    ft.TextButton("Close", on_click=close_dialog),
                 ],
             )
 
             self.page.open(dialog)
 
-        date_field.on_click = open_date_picker
+        # Add icon button next to field to open picker
+        picker_button = ft.IconButton(
+            icon=ft.Icons.CALENDAR_MONTH,
+            tooltip="Open date picker options",
+            on_click=show_picker_options,
+        )
 
-        return date_field
+        return ft.Row(
+            [date_field, picker_button],
+            spacing=0,
+        )
 
     def create_nationality_field(self, label, is_required):
         """Create searchable nationality dropdown"""
@@ -536,6 +582,10 @@ class AddReportModule:
                     # Handle special fields (ID/CR, Account/Membership)
                     text_control = control.controls[1] if len(control.controls) > 1 else None
                     form_data[field_name] = text_control.value if text_control else None
+                elif isinstance(control, ft.Row):
+                    # Handle date fields (Row with TextField + IconButton)
+                    text_field = control.controls[0] if len(control.controls) > 0 else None
+                    form_data[field_name] = text_field.value if text_field else None
                 else:
                     form_data[field_name] = control.value or None
 
@@ -755,8 +805,14 @@ class AddReportModule:
                         if len(control.controls) > 1 and isinstance(control.controls[1], ft.TextField):
                             control.controls[1].value = str(value)
 
+                elif isinstance(control, ft.Row):
+                    # Date fields (Row with TextField + IconButton)
+                    text_field = control.controls[0] if len(control.controls) > 0 else None
+                    if text_field and isinstance(text_field, ft.TextField):
+                        text_field.value = str(value)
+
                 elif isinstance(control, ft.TextField):
-                    # Regular text fields and date fields
+                    # Regular text fields
                     control.value = str(value)
 
                 elif isinstance(control, ft.Dropdown):
