@@ -1003,9 +1003,12 @@ class AdminPanel:
                         ft.Text("Manage Dropdown Options", size=16, weight=ft.FontWeight.BOLD),
                         ft.Divider(),
                         ft.Container(
-                            content=ft.Column(category_sections, spacing=15),
+                            content=ft.Column(
+                                category_sections,
+                                spacing=15,
+                                scroll=ft.ScrollMode.ALWAYS,
+                            ),
                             expand=True,
-                            scroll=ft.ScrollMode.ALWAYS,
                         ),
                     ],
                     spacing=10,
@@ -1078,9 +1081,12 @@ class AdminPanel:
                         ft.Text("Toggle field visibility and required status", size=12, color=ft.Colors.GREY_600),
                         ft.Divider(),
                         ft.Container(
-                            content=ft.Column(field_rows, spacing=10),
+                            content=ft.Column(
+                                field_rows,
+                                spacing=10,
+                                scroll=ft.ScrollMode.ALWAYS,
+                            ),
                             expand=True,
-                            scroll=ft.ScrollMode.ALWAYS,
                         ),
                     ],
                     spacing=10,
