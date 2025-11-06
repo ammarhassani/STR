@@ -551,6 +551,9 @@ class AddReportModule:
                 if not report_id:
                     raise ValueError("Cannot update report: missing report_id")
 
+                # Track changes for audit trail
+                self.log_changes(report_id, form_data)
+
                 # Add update metadata
                 form_data['updated_by'] = self.current_user['username']
                 form_data['updated_at'] = datetime.now().isoformat()
@@ -592,6 +595,14 @@ class AddReportModule:
                 # Execute
                 self.db_manager.execute_with_retry(query, tuple(form_data.values()))
 
+                # Get the inserted report_id
+                report_id_query = "SELECT report_id FROM reports WHERE report_number = ?"
+                result = self.db_manager.execute_with_retry(report_id_query, (form_data['report_number'],))
+                if result:
+                    new_report_id = result[0]['report_id']
+                    # Log creation in audit trail
+                    self.log_report_creation(new_report_id, form_data)
+
                 logger.info(f"Report saved: {form_data['report_number']}, SN: {form_data['sn']}")
                 self.show_success_dialog(
                     "Success",
@@ -604,6 +615,90 @@ class AddReportModule:
         except Exception as e:
             logger.error(f"Failed to save report: {e}")
             self.show_error_dialog("Save Failed", f"Failed to save report: {str(e)}")
+
+    def log_report_creation(self, report_id, report_data):
+        """Log report creation in audit trail"""
+        try:
+            timestamp = datetime.now().isoformat()
+
+            # Log single INSERT entry
+            insert_query = """
+                INSERT INTO change_history (
+                    table_name, record_id, field_name, old_value, new_value,
+                    change_type, changed_by, changed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            self.db_manager.execute_with_retry(
+                insert_query,
+                (
+                    'reports',
+                    report_id,
+                    'Report Created',
+                    None,
+                    f"Report {report_data.get('report_number')} created",
+                    'INSERT',
+                    self.current_user['username'],
+                    timestamp
+                )
+            )
+            logger.info(f"Report creation logged in audit trail: {report_data.get('report_number')}")
+
+        except Exception as e:
+            logger.error(f"Failed to log report creation: {e}")
+
+    def log_changes(self, report_id, new_data):
+        """Log all changes to change_history table for audit trail"""
+        try:
+            changes_logged = 0
+            timestamp = datetime.now().isoformat()
+
+            for field_name, new_value in new_data.items():
+                # Get old value from report_data
+                old_value = self.report_data.get(field_name)
+
+                # Convert to strings for comparison (handle None values)
+                old_value_str = str(old_value) if old_value is not None else ''
+                new_value_str = str(new_value) if new_value is not None else ''
+
+                # Skip if values are the same
+                if old_value_str == new_value_str:
+                    continue
+
+                # Get display name for field
+                display_name = field_name
+                for col in self.column_settings:
+                    if col['column_name'] == field_name:
+                        display_name = col['display_name_en']
+                        break
+
+                # Insert change record
+                insert_query = """
+                    INSERT INTO change_history (
+                        table_name, record_id, field_name, old_value, new_value,
+                        change_type, changed_by, changed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                self.db_manager.execute_with_retry(
+                    insert_query,
+                    (
+                        'reports',
+                        report_id,
+                        display_name,
+                        old_value_str[:500] if old_value_str else None,  # Limit length
+                        new_value_str[:500] if new_value_str else None,  # Limit length
+                        'UPDATE',
+                        self.current_user['username'],
+                        timestamp
+                    )
+                )
+                changes_logged += 1
+                logger.info(f"Change logged: {field_name} changed from '{old_value_str}' to '{new_value_str}'")
+
+            logger.info(f"Total changes logged: {changes_logged}")
+
+        except Exception as e:
+            logger.error(f"Failed to log changes: {e}")
+            # Don't fail the update if logging fails, just log the error
 
     def cancel(self):
         """Cancel and return to reports list"""

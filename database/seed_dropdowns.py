@@ -132,6 +132,31 @@ def seed_dropdown_values(db_path):
                 'Yemen',
                 'Other',
             ],
+            'gender': [
+                'Male',
+                'Female',
+                'Other',
+                'Not Specified',
+            ],
+            'reporting_method': [
+                'Paper',
+                'Automated',
+                'Electronic',
+                'Manual Entry',
+                'System Generated',
+            ],
+            'arb_staff': [
+                'FIU Director',
+                'Senior Analyst',
+                'Compliance Officer',
+                'Investigation Officer',
+                'Risk Manager',
+                'Legal Advisor',
+                'Operations Manager',
+                'Data Analyst',
+                'Quality Assurance',
+                'Admin Staff',
+            ],
         }
 
         # Insert dropdown values
