@@ -23,11 +23,12 @@ class AdminPanel:
     def show(self):
         """Show admin panel"""
         logger.info("Showing admin panel")
-        
+
         # Create tabs
         tabs = ft.Tabs(
             selected_index=self.selected_tab,
             animation_duration=300,
+            on_change=lambda e: self.on_tab_change(e.control.selected_index),
             tabs=[
                 ft.Tab(
                     text="User Management",
@@ -69,7 +70,12 @@ class AdminPanel:
         
         self.content_area.content = admin_content
         self.page.update()
-    
+
+    def on_tab_change(self, index):
+        """Track which tab is currently selected"""
+        self.selected_tab = index
+        logger.info(f"Admin panel tab changed to index: {index}")
+
     def build_user_management(self):
         """Build user management tab"""
         logger.info("Building user management interface")
@@ -779,23 +785,16 @@ class AdminPanel:
         
         def confirm_delete(e):
             try:
-                # Soft delete - set is_active to 0
-                delete_query = """
-                    UPDATE users 
-                    SET is_active = 0, updated_at = datetime('now'), updated_by = ?
-                    WHERE user_id = ?
-                """
-                self.db_manager.execute_with_retry(
-                    delete_query,
-                    (self.current_user['username'], user['user_id'])
-                )
-                
-                logger.info(f"User deleted: {user['username']}")
+                # Hard delete - actually remove from database
+                delete_query = "DELETE FROM users WHERE user_id = ?"
+                self.db_manager.execute_with_retry(delete_query, (user['user_id'],))
+
+                logger.info(f"User permanently deleted: {user['username']}")
                 self.page.close(dialog)
 
                 # Refresh user list
                 self.show()
-                self.show_success(f"User '{user['username']}' has been deactivated")
+                self.show_success(f"User '{user['username']}' has been permanently deleted")
 
             except Exception as ex:
                 logger.error(f"Failed to delete user: {ex}")
@@ -813,16 +812,25 @@ class AdminPanel:
                         ft.Icon(ft.Icons.WARNING, size=48, color=ft.Colors.ORANGE_700),
                         ft.Container(height=10),
                         ft.Text(
-                            f"Are you sure you want to delete user '{user['username']}'?",
+                            f"Are you sure you want to permanently delete user '{user['username']}'?",
                             size=14,
                             text_align=ft.TextAlign.CENTER,
+                            weight=ft.FontWeight.BOLD,
                         ),
                         ft.Container(height=10),
                         ft.Text(
-                            "This action will deactivate the user account.",
+                            "⚠️ This action CANNOT be undone! The user will be permanently removed from the database.",
                             size=12,
-                            color=ft.Colors.GREY_700,
+                            color=ft.Colors.RED_700,
                             text_align=ft.TextAlign.CENTER,
+                        ),
+                        ft.Container(height=5),
+                        ft.Text(
+                            "Tip: To temporarily disable a user, use Edit → uncheck 'Active'",
+                            size=11,
+                            color=ft.Colors.GREY_600,
+                            text_align=ft.TextAlign.CENTER,
+                            italic=True,
                         ),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
