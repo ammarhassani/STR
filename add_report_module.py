@@ -380,12 +380,47 @@ class AddReportModule:
         )
 
     def create_nationality_field(self, label, is_required):
-        """Create searchable nationality dropdown"""
-        return ft.Dropdown(
+        """Create searchable nationality dropdown with search bar"""
+
+        # Main dropdown
+        nationality_dropdown = ft.Dropdown(
             label=label + (" *" if is_required else ""),
-            hint_text="Select or search nationality",
+            hint_text="Select nationality",
             options=[ft.dropdown.Option(nat, nat) for nat in sorted(NATIONALITIES)],
         )
+
+        # Search field
+        search_field = ft.TextField(
+            hint_text="🔍 Type to search nationalities...",
+            prefix_icon=ft.Icons.SEARCH,
+            on_change=lambda e: self.filter_nationalities(e.control.value, nationality_dropdown),
+            dense=True,
+        )
+
+        # Return column with search + dropdown
+        return ft.Column(
+            [
+                search_field,
+                nationality_dropdown,
+            ],
+            spacing=5,
+        )
+
+    def filter_nationalities(self, search_text, dropdown):
+        """Filter nationality options based on search text"""
+        if not search_text:
+            # Show all if search is empty
+            dropdown.options = [ft.dropdown.Option(nat, nat) for nat in sorted(NATIONALITIES)]
+        else:
+            # Filter nationalities that contain the search text (case-insensitive)
+            filtered = [nat for nat in NATIONALITIES if search_text.lower() in nat.lower()]
+            dropdown.options = [ft.dropdown.Option(nat, nat) for nat in sorted(filtered)]
+
+            # If only one result, auto-select it
+            if len(filtered) == 1:
+                dropdown.value = filtered[0]
+
+        self.page.update()
 
     def create_id_cr_field(self, label, is_required):
         """Create ID/CR field with type selector"""
@@ -579,9 +614,14 @@ class AddReportModule:
             # Collect field values
             for field_name, control in self.field_controls.items():
                 if isinstance(control, ft.Column):
-                    # Handle special fields (ID/CR, Account/Membership)
-                    text_control = control.controls[1] if len(control.controls) > 1 else None
-                    form_data[field_name] = text_control.value if text_control else None
+                    # Handle special fields:
+                    # - ID/CR, Account/Membership: [Checkbox, TextField]
+                    # - Nationality: [TextField(search), Dropdown]
+                    if len(control.controls) > 1:
+                        value_control = control.controls[1]  # Get the second control
+                        form_data[field_name] = value_control.value if hasattr(value_control, 'value') else None
+                    else:
+                        form_data[field_name] = None
                 elif isinstance(control, ft.Row):
                     # Handle date fields (Row with TextField + IconButton)
                     text_field = control.controls[0] if len(control.controls) > 0 else None
@@ -788,13 +828,20 @@ class AddReportModule:
             try:
                 # Handle different control types
                 if isinstance(control, ft.Column):
-                    # Special fields (id_cr, account_membership)
+                    # Special fields:
+                    # - ID/CR: [Checkbox, TextField]
+                    # - Account/Membership: [Checkbox, TextField]
+                    # - Nationality: [TextField(search), Dropdown]
                     if field_name == 'id_cr':
                         # Set checkbox based on id_type
                         if self.id_type_checkbox and self.report_data.get('id_type') == 'CR':
                             self.id_type_checkbox.value = True
                         # Set the text field value
                         if len(control.controls) > 1 and isinstance(control.controls[1], ft.TextField):
+                            control.controls[1].value = str(value)
+                    elif field_name == 'nationality':
+                        # Set dropdown value (controls[1] is the Dropdown)
+                        if len(control.controls) > 1 and isinstance(control.controls[1], ft.Dropdown):
                             control.controls[1].value = str(value)
 
                     elif field_name == 'account_membership':
