@@ -55,7 +55,7 @@ Spacing (8px grid):
 }
 
 QMainWindow, QDialog {
-    background-color: #0f1419;
+    background-color: #0a0e12;
     color: #e8eaed;
 }
 
@@ -285,7 +285,7 @@ QComboBox::down-arrow:hover {
 }
 
 QComboBox QAbstractItemView {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 6px;
     padding: 4px;
@@ -311,14 +311,15 @@ QComboBox QAbstractItemView::item:selected {
 
 /* ==================== TABLES ==================== */
 QTableWidget, QTableView {
-    background-color: #1a1f26;
-    alternate-background-color: #1e2229;
+    background-color: #0f1419;
+    alternate-background-color: #151a1f;
     border: 1px solid #2d3339;
     border-radius: 8px;
     gridline-color: #2d3339;
     selection-background-color: #0d7377;
     selection-color: #ffffff;
     font-size: 10pt;
+    color: #e8eaed;
 }
 
 QTableWidget::item, QTableView::item {
@@ -336,8 +337,8 @@ QTableWidget::item:selected, QTableView::item:selected {
 }
 
 QHeaderView::section {
-    background-color: #252b34;
-    color: #9aa0a6;
+    background-color: #1a1f26;
+    color: #c5cad0;
     padding: 12px 8px;
     border: none;
     border-right: 1px solid #2d3339;
@@ -366,7 +367,7 @@ QHeaderView::section:last {
 QTabWidget::pane {
     border: 1px solid #2d3339;
     border-radius: 8px;
-    background-color: #1a1f26;
+    background-color: #0f1419;
     top: -1px;
 }
 
@@ -389,12 +390,12 @@ QTabBar::tab:hover {
 QTabBar::tab:selected {
     color: #32e0c4;
     border-bottom: 2px solid #32e0c4;
-    background-color: #1a1f26;
+    background-color: #0f1419;
 }
 
 /* ==================== GROUP BOX ==================== */
 QGroupBox {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 8px;
     margin-top: 16px;
@@ -409,7 +410,7 @@ QGroupBox::title {
     left: 16px;
     padding: 0 8px;
     color: #e8eaed;
-    background-color: #1a1f26;
+    background-color: #0f1419;
 }
 
 /* ==================== CHECKBOXES & RADIO BUTTONS ==================== */
@@ -493,7 +494,7 @@ QProgressBar[type="danger"]::chunk {
 
 /* ==================== MENU BAR ==================== */
 QMenuBar {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     color: #e8eaed;
     border-bottom: 1px solid #2d3339;
     padding: 4px 8px;
@@ -516,7 +517,7 @@ QMenuBar::item:pressed {
 
 /* ==================== MENUS ==================== */
 QMenu {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 8px;
     padding: 8px;
@@ -547,7 +548,7 @@ QMenu::icon {
 
 /* ==================== TOOL BAR ==================== */
 QToolBar {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: none;
     border-bottom: 1px solid #2d3339;
     spacing: 8px;
@@ -579,7 +580,7 @@ QToolButton:checked {
 
 /* ==================== STATUS BAR ==================== */
 QStatusBar {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     color: #9aa0a6;
     border-top: 1px solid #2d3339;
     font-size: 9pt;
@@ -649,14 +650,14 @@ QLabel#infoLabel {
 
 /* ==================== CARDS ==================== */
 QFrame#card {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 12px;
     padding: 20px;
 }
 
 QFrame#cardHover {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 12px;
     padding: 20px;
@@ -669,7 +670,7 @@ QFrame#cardHover:hover {
 }
 
 QFrame#cardElevated {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 2px solid #2d3339;
     border-radius: 12px;
     padding: 24px;
@@ -677,7 +678,7 @@ QFrame#cardElevated {
 
 /* KPI Cards */
 QFrame#kpiCard {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-left: 4px solid #0d7377;
     border-radius: 12px;
@@ -707,8 +708,8 @@ QFrame#kpiCard[type="info"] {
 
 /* ==================== SIDEBAR ==================== */
 QFrame#sidebar {
-    background-color: #141920;
-    border-right: 1px solid #2d3339;
+    background-color: #080b0f;
+    border-right: 1px solid #1a1f26;
 }
 
 QFrame#sidebar QLabel {
@@ -750,7 +751,7 @@ QFrame#sidebar QPushButton:checked::before {
 
 /* ==================== LOGIN WINDOW ==================== */
 QWidget#loginContainer {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 2px solid #2d3339;
     border-radius: 16px;
 }
@@ -791,7 +792,7 @@ QDateEdit::down-arrow {
 }
 
 QCalendarWidget {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 8px;
 }
@@ -804,11 +805,11 @@ QCalendarWidget QToolButton {
 }
 
 QCalendarWidget QToolButton:hover {
-    background-color: #252b34;
+    background-color: #1a1f26;
 }
 
 QCalendarWidget QMenu {
-    background-color: #1a1f26;
+    background-color: #0f1419;
 }
 
 QCalendarWidget QAbstractItemView {
@@ -840,7 +841,7 @@ QSplitter::handle:hover {
 
 /* ==================== LIST WIDGET ==================== */
 QListWidget {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 8px;
     outline: none;
@@ -864,7 +865,7 @@ QListWidget::item:selected {
 
 /* ==================== TREE WIDGET ==================== */
 QTreeWidget {
-    background-color: #1a1f26;
+    background-color: #0f1419;
     border: 1px solid #2d3339;
     border-radius: 8px;
     outline: none;
@@ -925,9 +926,9 @@ QScrollArea > QWidget > QWidget {
 .text-danger { color: #f44336; }
 .text-info { color: #2196f3; }
 
-.bg-primary { background-color: #0f1419; }
-.bg-secondary { background-color: #1a1f26; }
-.bg-tertiary { background-color: #252b34; }
+.bg-primary { background-color: #0a0e12; }
+.bg-secondary { background-color: #0f1419; }
+.bg-tertiary { background-color: #1a1f26; }
 
 /* ==================== ANIMATIONS (via property) ==================== */
 /* Note: QSS doesn't support animations directly, but Qt can animate properties */
