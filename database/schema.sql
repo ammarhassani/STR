@@ -272,6 +272,31 @@ CREATE INDEX idx_audit_log_date ON audit_log(created_at);
 CREATE INDEX idx_audit_log_action ON audit_log(action_type);
 
 -- ============================================================================
+-- SYSTEM LOGS (APPLICATION-LEVEL LOGGING)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS system_logs (
+    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT DEFAULT (datetime('now')),
+    log_level TEXT NOT NULL CHECK(log_level IN ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')),
+    module TEXT NOT NULL, -- Module/component that generated the log
+    function_name TEXT, -- Function/method name
+    message TEXT NOT NULL,
+    user_id INTEGER, -- NULL if system-generated
+    username TEXT, -- Username if user context available
+    exception_type TEXT, -- Exception class name if applicable
+    exception_message TEXT, -- Exception message if applicable
+    stack_trace TEXT, -- Full stack trace if applicable
+    extra_data TEXT, -- JSON string for additional context
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_system_logs_timestamp ON system_logs(timestamp);
+CREATE INDEX idx_system_logs_level ON system_logs(log_level);
+CREATE INDEX idx_system_logs_module ON system_logs(module);
+CREATE INDEX idx_system_logs_user ON system_logs(user_id);
+CREATE INDEX idx_system_logs_timestamp_level ON system_logs(timestamp, log_level);
+
+-- ============================================================================
 -- DEFAULT DATA INSERTION
 -- ============================================================================
 
