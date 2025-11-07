@@ -9,9 +9,9 @@ Technology: Python 3.9+ | PyQt6 | SQLite3
 import sys
 import logging
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSplashScreen
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QFont
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -22,21 +22,27 @@ from config import Config
 
 # Import database components
 from database.db_manager import DatabaseManager
-from database.init_db import initialize_database, validate_database
+from database.init_db import validate_database
+from database.migrations import migrate_database
 
 # Import services
 from services.logging_service import LoggingService
 from services.auth_service import AuthService
 from services.report_service import ReportService
 from services.dashboard_service import DashboardService
+from services.settings_service import SettingsService
 
 # Import UI windows
 from ui.windows.login_window import LoginWindow
 from ui.windows.main_window import MainWindow
+from ui.windows.setup_wizard import SetupWizard
 from ui.widgets.dashboard_view import DashboardView
 from ui.widgets.log_management_view import LogManagementView
 from ui.widgets.reports_view import ReportsView
+from ui.widgets.export_view import ExportView
+from ui.widgets.admin_panel import AdminPanel
 from ui.widgets.placeholder_view import PlaceholderView
+from ui.widgets.settings_view import SettingsView
 
 
 class FIUApplication:
@@ -48,13 +54,14 @@ class FIUApplication:
     def __init__(self):
         """Initialize the application."""
         self.app = None
-        self.config = None
         self.db_manager = None
         self.logging_service = None
         self.auth_service = None
         self.report_service = None
         self.dashboard_service = None
+        self.settings_service = None
 
+        self.setup_wizard = None
         self.login_window = None
         self.main_window = None
 
@@ -62,13 +69,75 @@ class FIUApplication:
         """Run the application."""
         # Create QApplication
         self.app = QApplication(sys.argv)
-        self.app.setApplicationName("FIU Report Management System")
+        self.app.setApplicationName("finan")
         self.app.setApplicationVersion("2.0.0")
         self.app.setOrganizationName("FIU")
+
+        # Store reference to this FIU app for theme changes
+        self.app._fiu_app = self
 
         # Set application font
         font = QFont("Segoe UI", 10)
         self.app.setFont(font)
+
+        # Load configuration
+        Config.load()
+
+        # Check if system is configured
+        if not Config.is_configured():
+            # First run - show setup wizard
+            self.show_setup_wizard()
+        else:
+            # System configured - initialize and show login
+            try:
+                if not self.initialize_application():
+                    QMessageBox.critical(
+                        None,
+                        "Initialization Error",
+                        "Failed to initialize application. Please check the logs."
+                    )
+                    return 1
+
+                # Load theme
+                self.load_theme()
+
+                # Show login window
+                self.show_login()
+
+            except Exception as e:
+                QMessageBox.critical(
+                    None,
+                    "Fatal Error",
+                    f"An unexpected error occurred:\n{str(e)}"
+                )
+                return 1
+
+        # Run event loop
+        return self.app.exec()
+
+    def show_setup_wizard(self):
+        """Show setup wizard for first-time configuration."""
+        self.setup_wizard = SetupWizard()
+        self.setup_wizard.setup_completed.connect(self.on_setup_completed)
+        self.setup_wizard.show()
+
+    def on_setup_completed(self, db_path, backup_path):
+        """
+        Handle setup wizard completion.
+
+        Args:
+            db_path: Database file path
+            backup_path: Backup directory path
+        """
+        # Save configuration
+        Config.DATABASE_PATH = db_path
+        Config.BACKUP_PATH = backup_path
+        Config.save()
+
+        # Close setup wizard
+        if self.setup_wizard:
+            self.setup_wizard.close()
+            self.setup_wizard = None
 
         # Initialize application
         try:
@@ -76,28 +145,23 @@ class FIUApplication:
                 QMessageBox.critical(
                     None,
                     "Initialization Error",
-                    "Failed to initialize application. Please check the logs."
+                    "Failed to initialize application after setup."
                 )
-                return 1
+                sys.exit(1)
 
-            # Load stylesheet
-            self.load_stylesheet()
+            # Load theme
+            self.load_theme()
 
             # Show login window
             self.show_login()
 
-            # Run event loop
-            return self.app.exec()
-
         except Exception as e:
             QMessageBox.critical(
                 None,
-                "Fatal Error",
-                f"An unexpected error occurred:\n{str(e)}"
+                "Initialization Error",
+                f"Failed to initialize application:\n{str(e)}"
             )
-            if self.logging_service:
-                self.logging_service.critical(f"Fatal application error: {str(e)}", exc_info=True)
-            return 1
+            sys.exit(1)
 
     def initialize_application(self):
         """
@@ -107,65 +171,44 @@ class FIUApplication:
             bool: True if initialization successful, False otherwise
         """
         try:
-            # Load configuration
-            self.config = Config.load()
-
-            if not self.config.is_configured():
-                # First run - setup required
-                QMessageBox.information(
+            # Validate paths
+            is_valid, message = Config.validate_paths()
+            if not is_valid:
+                QMessageBox.warning(
                     None,
-                    "First Run Setup",
-                    "Welcome to FIU Report Management System!\n\n"
-                    "This appears to be your first run. Please configure the system.\n\n"
-                    "For now, we'll use default settings:\n"
-                    "Database: ~/FIU_System/database/fiu_reports.db\n"
-                    "Backup: ~/FIU_System/backups/"
+                    "Configuration Error",
+                    f"Invalid configuration:\n{message}"
                 )
-
-                # Set default paths
-                default_base = Path.home() / "FIU_System"
-                default_base.mkdir(parents=True, exist_ok=True)
-
-                db_dir = default_base / "database"
-                db_dir.mkdir(parents=True, exist_ok=True)
-
-                backup_dir = default_base / "backups"
-                backup_dir.mkdir(parents=True, exist_ok=True)
-
-                self.config.database_path = str(db_dir / "fiu_reports.db")
-                self.config.backup_path = str(backup_dir)
-                self.config.save()
-
-            # Initialize database
-            db_path = Path(self.config.database_path)
-
-            # Ensure database directory exists
-            db_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Check if database needs initialization
-            if not db_path.exists():
-                print("Database not found. Creating new database...")
-                schema_path = project_root / "database" / "schema.sql"
-
-                if not schema_path.exists():
-                    raise FileNotFoundError(f"Database schema not found: {schema_path}")
-
-                initialize_database(str(db_path), str(schema_path))
-                print("Database created successfully")
+                return False
 
             # Initialize database manager
+            db_path = Path(Config.DATABASE_PATH)
             self.db_manager = DatabaseManager(str(db_path))
 
             # Validate database
-            is_valid, errors = validate_database(self.db_manager)
+            is_valid, message = validate_database(str(db_path))
             if not is_valid:
-                error_msg = "Database validation failed:\n" + "\n".join(errors)
-                QMessageBox.critical(None, "Database Error", error_msg)
+                QMessageBox.critical(
+                    None,
+                    "Database Error",
+                    f"Database validation failed:\n{message}"
+                )
                 return False
 
-            # Initialize logging service
+            # Initialize logging service first
             log_dir = Path.home() / '.fiu_system'
             self.logging_service = LoggingService(self.db_manager, log_dir)
+
+            # Run migrations
+            success, migration_msg = migrate_database(str(db_path))
+            if not success:
+                QMessageBox.warning(
+                    None,
+                    "Migration Warning",
+                    f"Database migration issue:\n{migration_msg}"
+                )
+            elif "No migrations needed" not in migration_msg:
+                self.logging_service.info(f"Database migration: {migration_msg}")
             self.logging_service.info("=" * 60)
             self.logging_service.info("FIU Report Management System Starting")
             self.logging_service.info("Version 2.0.0 - PyQt6 Edition")
@@ -173,6 +216,7 @@ class FIUApplication:
 
             # Initialize services
             self.auth_service = AuthService(self.db_manager, self.logging_service)
+            self.settings_service = SettingsService(self.db_manager, self.auth_service)
             self.report_service = ReportService(self.db_manager, self.logging_service, self.auth_service)
             self.dashboard_service = DashboardService(self.db_manager, self.logging_service)
 
@@ -186,19 +230,74 @@ class FIUApplication:
                 self.logging_service.error(error_msg, exc_info=True)
             return False
 
-    def load_stylesheet(self):
-        """Load and apply the QSS stylesheet."""
+    def load_theme(self):
+        """Load and apply the current theme."""
         try:
-            stylesheet_path = project_root / "resources" / "style.qss"
+            # Check for saved theme preference in user settings
+            current_user = self.auth_service.get_current_user() if self.auth_service else None
+            if current_user:
+                self.current_theme = current_user.get('theme_preference', 'light')
+            else:
+                self.current_theme = 'light'  # Default
+
+            self.apply_theme(self.current_theme)
+
+        except Exception as e:
+            if self.logging_service:
+                self.logging_service.error(f"Error loading theme: {str(e)}")
+            # Apply default theme
+            self.apply_theme('light')
+
+    def apply_theme(self, theme_name):
+        """
+        Apply a theme by name.
+
+        Args:
+            theme_name: 'light' or 'dark'
+        """
+        try:
+            if theme_name == 'dark':
+                stylesheet_path = project_root / "resources" / "style_dark.qss"
+            else:
+                stylesheet_path = project_root / "resources" / "style.qss"
+
             if stylesheet_path.exists():
                 with open(stylesheet_path, 'r', encoding='utf-8') as f:
                     stylesheet = f.read()
                     self.app.setStyleSheet(stylesheet)
-                    self.logging_service.info("Stylesheet loaded successfully")
+
+                self.current_theme = theme_name
+
+                if self.logging_service:
+                    self.logging_service.info(f"Theme applied: {theme_name}")
             else:
-                self.logging_service.warning(f"Stylesheet not found: {stylesheet_path}")
+                if self.logging_service:
+                    self.logging_service.warning(f"Theme file not found: {stylesheet_path}")
+
         except Exception as e:
-            self.logging_service.error(f"Error loading stylesheet: {str(e)}")
+            if self.logging_service:
+                self.logging_service.error(f"Error applying theme: {str(e)}")
+
+    def toggle_theme(self):
+        """Toggle between light and dark themes."""
+        new_theme = 'dark' if self.current_theme == 'light' else 'light'
+        self.apply_theme(new_theme)
+
+        # Save preference to database if user is logged in
+        try:
+            current_user = self.auth_service.get_current_user() if self.auth_service else None
+            if current_user:
+                update_query = "UPDATE users SET theme_preference = ? WHERE user_id = ?"
+                self.db_manager.execute_with_retry(
+                    update_query,
+                    (new_theme, current_user['user_id'])
+                )
+                if self.logging_service:
+                    self.logging_service.info(f"Theme preference saved: {new_theme}")
+
+        except Exception as e:
+            if self.logging_service:
+                self.logging_service.error(f"Error saving theme preference: {str(e)}")
 
     def show_login(self):
         """Show the login window."""
@@ -215,6 +314,10 @@ class FIUApplication:
         """
         self.logging_service.info(f"User logged in: {user['username']}")
 
+        # Apply user's theme preference
+        theme_pref = user.get('theme_preference', 'light')
+        self.apply_theme(theme_pref)
+
         # Create and show main window
         self.show_main_window()
 
@@ -224,8 +327,14 @@ class FIUApplication:
             self.auth_service,
             self.logging_service,
             self.report_service,
-            self.dashboard_service
+            self.dashboard_service,
+            self.db_manager
         )
+
+        # Add theme toggle button to toolbar
+        self.main_window.toolbar.addSeparator()
+        theme_action = self.main_window.toolbar.addAction("🌓 Toggle Theme")
+        theme_action.triggered.connect(self.toggle_theme)
 
         # Add views to main window
         self.setup_views()
@@ -252,28 +361,28 @@ class FIUApplication:
         )
         self.main_window.add_view('reports', reports_view)
 
-        # Add Report view (placeholder)
+        # Add Report view (placeholder - actual form is in dialog)
         if self.auth_service.has_permission('add_report'):
             add_report_view = PlaceholderView(
                 "Add Report",
-                "Comprehensive report entry form with validation and field management."
+                "Click the 'Add New Report' button in the Reports view to create a new report."
             )
             self.main_window.add_view('add_report', add_report_view)
 
-        # Export view (placeholder)
+        # Export view
         if self.auth_service.has_permission('export'):
-            export_view = PlaceholderView(
-                "Export Data",
-                "Export reports to CSV with filtering and customization options."
+            export_view = ExportView(
+                self.db_manager,
+                self.logging_service
             )
             self.main_window.add_view('export', export_view)
 
-        # Admin views
+        # Admin views (admin only)
         if self.auth_service.get_current_user()['role'] == 'admin':
-            # Users management (placeholder)
-            users_view = PlaceholderView(
-                "User Management",
-                "Create, edit, and manage user accounts with role-based permissions."
+            # Users management
+            users_view = AdminPanel(
+                self.db_manager,
+                self.logging_service
             )
             self.main_window.add_view('users', users_view)
 
@@ -281,10 +390,13 @@ class FIUApplication:
             log_view = LogManagementView(self.logging_service)
             self.main_window.add_view('logs', log_view)
 
-            # Settings view (placeholder)
-            settings_view = PlaceholderView(
-                "System Settings",
-                "Configure system parameters, backup schedules, and application preferences."
+            # Settings view
+            settings_view = SettingsView(
+                self.settings_service,
+                self.auth_service,
+                self,
+                self.db_manager,
+                self.logging_service
             )
             self.main_window.add_view('settings', settings_view)
 

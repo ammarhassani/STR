@@ -101,7 +101,8 @@ class ReportLoadWorker(QThread):
     progress = pyqtSignal(int, str)
 
     def __init__(self, report_service, status=None, search_term=None,
-                 created_by=None, limit=50, offset=0):
+                 date_from=None, date_to=None, created_by=None,
+                 limit=50, offset=0):
         """
         Initialize report load worker.
 
@@ -109,6 +110,8 @@ class ReportLoadWorker(QThread):
             report_service: ReportService instance
             status: Optional status filter
             search_term: Optional search term
+            date_from: Optional start date for filtering
+            date_to: Optional end date for filtering
             created_by: Optional creator filter
             limit: Number of records to load
             offset: Offset for pagination
@@ -117,6 +120,8 @@ class ReportLoadWorker(QThread):
         self.report_service = report_service
         self.status = status
         self.search_term = search_term
+        self.date_from = date_from
+        self.date_to = date_to
         self.created_by = created_by
         self.limit = limit
         self.offset = offset
@@ -129,6 +134,8 @@ class ReportLoadWorker(QThread):
             reports, total_count = self.report_service.get_reports(
                 status=self.status,
                 search_term=self.search_term,
+                date_from=self.date_from,
+                date_to=self.date_to,
                 created_by=self.created_by,
                 limit=self.limit,
                 offset=self.offset

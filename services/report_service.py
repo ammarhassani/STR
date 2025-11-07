@@ -237,8 +237,10 @@ class ReportService:
     def get_reports(self,
                     status: Optional[str] = None,
                     search_term: Optional[str] = None,
+                    date_from: Optional[str] = None,
+                    date_to: Optional[str] = None,
                     created_by: Optional[str] = None,
-                    limit: int = 50,
+                    limit: Optional[int] = 50,
                     offset: int = 0) -> Tuple[List[Dict], int]:
         """
         Get reports with optional filtering and pagination.
@@ -246,8 +248,10 @@ class ReportService:
         Args:
             status: Filter by status
             search_term: Search in report_number, reported_entity_name, cic
+            date_from: Filter by start date (YYYY-MM-DD)
+            date_to: Filter by end date (YYYY-MM-DD)
             created_by: Filter by creator
-            limit: Maximum number of records to return
+            limit: Maximum number of records to return (None for all)
             offset: Offset for pagination
 
         Returns:
@@ -278,6 +282,16 @@ class ReportService:
                 search_pattern = f"%{search_term}%"
                 params.extend([search_pattern, search_pattern, search_pattern])
 
+            if date_from:
+                query += " AND report_date >= ?"
+                count_query += " AND report_date >= ?"
+                params.append(date_from)
+
+            if date_to:
+                query += " AND report_date <= ?"
+                count_query += " AND report_date <= ?"
+                params.append(date_to)
+
             if created_by:
                 query += " AND created_by = ?"
                 count_query += " AND created_by = ?"
@@ -288,8 +302,10 @@ class ReportService:
             total_count = count_result[0][0] if count_result else 0
 
             # Add ordering and pagination
-            query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-            params.extend([limit, offset])
+            query += " ORDER BY created_at DESC"
+            if limit is not None:
+                query += " LIMIT ? OFFSET ?"
+                params.extend([limit, offset])
 
             # Execute query
             result = self.db_manager.execute_with_retry(query, params)

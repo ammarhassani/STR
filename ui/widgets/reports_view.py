@@ -1,14 +1,18 @@
 """
 Reports view widget for managing financial crime reports.
-Simplified placeholder implementation.
+Enhanced with advanced filtering, Excel export, and pagination.
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QTableWidgetItem,
-                             QLineEdit, QComboBox, QHeaderView, QMessageBox)
-from PyQt6.QtCore import Qt, pyqtSignal
+                             QLineEdit, QComboBox, QHeaderView, QMessageBox,
+                             QFrame, QDateEdit, QSpinBox, QCheckBox, QFileDialog)
+from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QFont
 from ui.workers import ReportLoadWorker
+from services.icon_service import get_icon
+from pathlib import Path
+from datetime import datetime
 
 
 class ReportsView(QWidget):
@@ -35,6 +39,14 @@ class ReportsView(QWidget):
         self.current_reports = []
         self.worker = None
 
+        # Pagination
+        self.current_page = 1
+        self.page_size = 50
+        self.total_count = 0
+
+        # Advanced filter state
+        self.advanced_filters_visible = False
+
         self.setup_ui()
         self.load_reports()
 
@@ -56,22 +68,30 @@ class ReportsView(QWidget):
 
         header_layout.addStretch()
 
+        # Export to Excel button
+        export_btn = QPushButton("Export to Excel")
+        export_btn.setIcon(get_icon('file-excel', color='#27ae60'))
+        export_btn.setObjectName("secondaryButton")
+        export_btn.clicked.connect(self.export_to_excel)
+        header_layout.addWidget(export_btn)
+
         # Add Report button
         add_btn = QPushButton("Add New Report")
+        add_btn.setIcon(get_icon('plus'))
         add_btn.setObjectName("primaryButton")
         add_btn.clicked.connect(self.add_report)
         header_layout.addWidget(add_btn)
 
         layout.addLayout(header_layout)
 
-        # Filters
+        # Basic Filters
         filters_layout = QHBoxLayout()
 
         # Search
         search_label = QLabel("Search:")
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search by report number, entity name, or CIC...")
-        self.search_input.textChanged.connect(self.on_search_changed)
+        self.search_input.returnPressed.connect(self.on_filter_changed)
         filters_layout.addWidget(search_label)
         filters_layout.addWidget(self.search_input, stretch=1)
 
@@ -86,17 +106,122 @@ class ReportsView(QWidget):
         filters_layout.addWidget(status_label)
         filters_layout.addWidget(self.status_combo)
 
-        # Refresh button
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.clicked.connect(self.load_reports)
-        filters_layout.addWidget(refresh_btn)
+        # Advanced filters toggle
+        self.advanced_btn = QPushButton("Advanced Filters")
+        self.advanced_btn.setIcon(get_icon('filter'))
+        self.advanced_btn.setCheckable(True)
+        self.advanced_btn.clicked.connect(self.toggle_advanced_filters)
+        filters_layout.addWidget(self.advanced_btn)
+
+        # Clear filters
+        clear_btn = QPushButton("Clear")
+        clear_btn.setIcon(get_icon('times'))
+        clear_btn.clicked.connect(self.clear_filters)
+        filters_layout.addWidget(clear_btn)
+
+        # Search/Refresh button
+        search_btn = QPushButton("Search")
+        search_btn.setIcon(get_icon('search'))
+        search_btn.clicked.connect(self.on_filter_changed)
+        filters_layout.addWidget(search_btn)
 
         layout.addLayout(filters_layout)
 
-        # Stats
+        # Advanced Filters Panel (collapsible)
+        self.advanced_panel = QFrame()
+        self.advanced_panel.setObjectName("card")
+        self.advanced_panel.setVisible(False)
+        advanced_layout = QVBoxLayout(self.advanced_panel)
+        advanced_layout.setContentsMargins(16, 16, 16, 16)
+        advanced_layout.setSpacing(12)
+
+        advanced_title = QLabel("Advanced Filters")
+        advanced_title.setStyleSheet("font-weight: 600; font-size: 11pt;")
+        advanced_layout.addWidget(advanced_title)
+
+        # Row 1: Date range
+        date_row = QHBoxLayout()
+
+        date_from_label = QLabel("Date From:")
+        self.date_from_edit = QDateEdit()
+        self.date_from_edit.setCalendarPopup(True)
+        self.date_from_edit.setDate(QDate.currentDate().addMonths(-6))
+        self.date_from_edit.setDisplayFormat("yyyy-MM-dd")
+        date_row.addWidget(date_from_label)
+        date_row.addWidget(self.date_from_edit)
+
+        date_to_label = QLabel("Date To:")
+        self.date_to_edit = QDateEdit()
+        self.date_to_edit.setCalendarPopup(True)
+        self.date_to_edit.setDate(QDate.currentDate())
+        self.date_to_edit.setDisplayFormat("yyyy-MM-dd")
+        date_row.addWidget(date_to_label)
+        date_row.addWidget(self.date_to_edit)
+
+        # Enable/disable date filter
+        self.date_filter_check = QCheckBox("Enable Date Filter")
+        date_row.addWidget(self.date_filter_check)
+        date_row.addStretch()
+
+        advanced_layout.addLayout(date_row)
+
+        # Row 2: Created by
+        creator_row = QHBoxLayout()
+
+        creator_label = QLabel("Created By:")
+        self.creator_combo = QComboBox()
+        self.creator_combo.setMinimumWidth(200)
+        creator_row.addWidget(creator_label)
+        creator_row.addWidget(self.creator_combo)
+        creator_row.addStretch()
+
+        advanced_layout.addLayout(creator_row)
+
+        layout.addWidget(self.advanced_panel)
+
+        # Load creators for filter
+        self.load_creators()
+
+        # Stats and pagination
+        stats_row = QHBoxLayout()
         self.stats_label = QLabel("0 reports")
         self.stats_label.setStyleSheet("color: #7f8c8d; font-weight: 500;")
-        layout.addWidget(self.stats_label)
+        stats_row.addWidget(self.stats_label)
+        stats_row.addStretch()
+
+        # Pagination controls
+        pagination_widget = QFrame()
+        pagination_layout = QHBoxLayout(pagination_widget)
+        pagination_layout.setContentsMargins(0, 0, 0, 0)
+        pagination_layout.setSpacing(8)
+
+        self.prev_btn = QPushButton("Previous")
+        self.prev_btn.setIcon(get_icon('chevron-left'))
+        self.prev_btn.clicked.connect(self.previous_page)
+        self.prev_btn.setEnabled(False)
+        pagination_layout.addWidget(self.prev_btn)
+
+        self.page_label = QLabel("Page 1")
+        self.page_label.setStyleSheet("font-weight: 500; padding: 0 12px;")
+        pagination_layout.addWidget(self.page_label)
+
+        self.next_btn = QPushButton("Next")
+        self.next_btn.setIcon(get_icon('chevron-right'))
+        self.next_btn.clicked.connect(self.next_page)
+        pagination_layout.addWidget(self.next_btn)
+
+        page_size_label = QLabel("Per Page:")
+        pagination_layout.addWidget(page_size_label)
+
+        self.page_size_spin = QSpinBox()
+        self.page_size_spin.setRange(10, 500)
+        self.page_size_spin.setSingleStep(10)
+        self.page_size_spin.setValue(self.page_size)
+        self.page_size_spin.valueChanged.connect(self.on_page_size_changed)
+        pagination_layout.addWidget(self.page_size_spin)
+
+        stats_row.addWidget(pagination_widget)
+        layout.addLayout(stats_row)
 
         # Reports table
         self.reports_table = QTableWidget()
@@ -129,29 +254,93 @@ class ReportsView(QWidget):
         self.status_label.setStyleSheet("color: #7f8c8d;")
         layout.addWidget(self.status_label)
 
-    def on_search_changed(self, text: str):
-        """Handle search text change."""
-        # Could implement debouncing here
-        pass
+    def toggle_advanced_filters(self):
+        """Toggle advanced filters panel visibility."""
+        self.advanced_filters_visible = not self.advanced_filters_visible
+        self.advanced_panel.setVisible(self.advanced_filters_visible)
+
+    def clear_filters(self):
+        """Clear all filters and reset to defaults."""
+        self.search_input.clear()
+        self.status_combo.setCurrentIndex(0)
+        self.date_filter_check.setChecked(False)
+        self.date_from_edit.setDate(QDate.currentDate().addMonths(-6))
+        self.date_to_edit.setDate(QDate.currentDate())
+        self.creator_combo.setCurrentIndex(0)
+        self.current_page = 1
+        self.on_filter_changed()
+
+    def load_creators(self):
+        """Load list of users for creator filter."""
+        try:
+            # Get all users from database
+            query = "SELECT user_id, username, full_name FROM users WHERE is_active = 1 ORDER BY full_name"
+            users = self.report_service.db_manager.execute_with_retry(query)
+
+            self.creator_combo.clear()
+            self.creator_combo.addItem("All Users", None)
+
+            for user in users:
+                user_id, username, full_name = user
+                display_name = f"{full_name} ({username})"
+                self.creator_combo.addItem(display_name, user_id)
+
+        except Exception as e:
+            self.logging_service.error(f"Error loading creators: {str(e)}")
+
+    def previous_page(self):
+        """Go to previous page."""
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_reports()
+
+    def next_page(self):
+        """Go to next page."""
+        if self.current_page * self.page_size < self.total_count:
+            self.current_page += 1
+            self.load_reports()
+
+    def on_page_size_changed(self, value: int):
+        """Handle page size change."""
+        self.page_size = value
+        self.current_page = 1
+        self.load_reports()
 
     def on_filter_changed(self):
         """Handle filter change."""
+        self.current_page = 1
         self.load_reports()
 
     def load_reports(self):
-        """Load reports from database."""
+        """Load reports from database with filters and pagination."""
         self.status_label.setText("Loading reports...")
 
         # Get filter values
         status = None if self.status_combo.currentText() == 'All' else self.status_combo.currentText()
         search_term = self.search_input.text().strip() or None
 
+        # Advanced filters
+        date_from = None
+        date_to = None
+        if self.date_filter_check.isChecked():
+            date_from = self.date_from_edit.date().toString("yyyy-MM-dd")
+            date_to = self.date_to_edit.date().toString("yyyy-MM-dd")
+
+        created_by = self.creator_combo.currentData()
+
+        # Calculate offset for pagination
+        offset = (self.current_page - 1) * self.page_size
+
         # Load in worker thread
         self.worker = ReportLoadWorker(
             self.report_service,
             status=status,
             search_term=search_term,
-            limit=100
+            date_from=date_from,
+            date_to=date_to,
+            created_by=created_by,
+            limit=self.page_size,
+            offset=offset
         )
         self.worker.finished.connect(self.on_reports_loaded)
         self.worker.error.connect(self.on_load_error)
@@ -167,6 +356,7 @@ class ReportsView(QWidget):
             total_count: Total number of reports matching filter
         """
         self.current_reports = reports
+        self.total_count = total_count
 
         # Update table
         self.reports_table.setRowCount(0)
@@ -205,8 +395,17 @@ class ReportsView(QWidget):
             self.reports_table.setItem(row, 6, created_at_item)
 
         # Update stats
-        self.stats_label.setText(f"{len(reports)} reports (Total: {total_count})")
+        start_record = (self.current_page - 1) * self.page_size + 1
+        end_record = min(start_record + len(reports) - 1, total_count)
+        self.stats_label.setText(f"Showing {start_record}-{end_record} of {total_count} reports")
         self.status_label.setText("Reports loaded")
+
+        # Update pagination controls
+        total_pages = (total_count + self.page_size - 1) // self.page_size
+        self.page_label.setText(f"Page {self.current_page} of {total_pages}")
+
+        self.prev_btn.setEnabled(self.current_page > 1)
+        self.next_btn.setEnabled(self.current_page < total_pages)
 
     def on_load_error(self, error_message: str):
         """
@@ -220,30 +419,195 @@ class ReportsView(QWidget):
 
     def view_report(self):
         """View selected report."""
-        selected_rows = self.reports_table.selectedRows()
+        selected_rows = self.reports_table.selectedIndexes()
         if not selected_rows:
             return
 
         row = selected_rows[0].row()
         if row < len(self.current_reports):
             report = self.current_reports[row]
-            QMessageBox.information(
-                self,
-                "Report Details",
-                f"Report Number: {report.get('report_number')}\n"
-                f"Entity: {report.get('reported_entity_name')}\n"
-                f"Status: {report.get('status')}\n\n"
-                f"Full report view/edit dialog to be implemented."
+
+            # Import here to avoid circular imports
+            from ui.dialogs.report_dialog import ReportDialog
+
+            dialog = ReportDialog(
+                self.report_service,
+                self.logging_service,
+                report_data=report,
+                parent=self
             )
+            dialog.report_saved.connect(self.load_reports)
+            dialog.exec()
 
     def add_report(self):
         """Add new report."""
-        QMessageBox.information(
-            self,
-            "Add Report",
-            "Add report dialog to be implemented.\n\n"
-            "This will open a comprehensive form for entering report details."
+        # Import here to avoid circular imports
+        from ui.dialogs.report_dialog import ReportDialog
+
+        dialog = ReportDialog(
+            self.report_service,
+            self.logging_service,
+            parent=self
         )
+        dialog.report_saved.connect(self.load_reports)
+        dialog.exec()
+
+    def export_to_excel(self):
+        """Export filtered reports to Excel."""
+        try:
+            # Check if there are reports to export
+            if not self.current_reports:
+                QMessageBox.warning(
+                    self,
+                    "No Data",
+                    "There are no reports to export. Please load some reports first."
+                )
+                return
+
+            # Get save file name
+            default_filename = f"FIU_Reports_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export to Excel",
+                str(Path.home() / "Downloads" / default_filename),
+                "Excel Files (*.xlsx);;All Files (*)"
+            )
+
+            if not file_path:
+                return  # User cancelled
+
+            # Import openpyxl
+            try:
+                from openpyxl import Workbook
+                from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+                from openpyxl.utils import get_column_letter
+            except ImportError:
+                QMessageBox.critical(
+                    self,
+                    "Missing Dependency",
+                    "The openpyxl library is required for Excel export.\n"
+                    "Please install it using: pip install openpyxl"
+                )
+                return
+
+            # Show progress
+            self.status_label.setText("Exporting to Excel...")
+
+            # Create workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "FIU Reports"
+
+            # Define styles
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            header_fill = PatternFill(start_color="0d7377", end_color="0d7377", fill_type="solid")
+            header_alignment = Alignment(horizontal="center", vertical="center")
+
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+
+            # Headers
+            headers = [
+                'SN', 'Report Number', 'Report Date', 'Entity Name', 'CIC Number',
+                'Transaction Amount', 'Status', 'Nature of Report', 'Action Taken',
+                'Created By', 'Created At', 'Updated At'
+            ]
+
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = border
+
+            # Fetch ALL matching reports (not just current page)
+            status = None if self.status_combo.currentText() == 'All' else self.status_combo.currentText()
+            search_term = self.search_input.text().strip() or None
+
+            date_from = None
+            date_to = None
+            if self.date_filter_check.isChecked():
+                date_from = self.date_from_edit.date().toString("yyyy-MM-dd")
+                date_to = self.date_to_edit.date().toString("yyyy-MM-dd")
+
+            created_by = self.creator_combo.currentData()
+
+            # Get all reports for export (without pagination limit)
+            all_reports, _ = self.report_service.get_reports(
+                status=status,
+                search_term=search_term,
+                date_from=date_from,
+                date_to=date_to,
+                created_by=created_by,
+                limit=None  # Get all
+            )
+
+            # Data rows
+            for row, report in enumerate(all_reports, 2):
+                ws.cell(row=row, column=1, value=report.get('sn', '')).border = border
+                ws.cell(row=row, column=2, value=report.get('report_number', '')).border = border
+                ws.cell(row=row, column=3, value=report.get('report_date', '')).border = border
+                ws.cell(row=row, column=4, value=report.get('reported_entity_name', '')).border = border
+                ws.cell(row=row, column=5, value=report.get('cic_number', '')).border = border
+                ws.cell(row=row, column=6, value=report.get('transaction_amount', '')).border = border
+                ws.cell(row=row, column=7, value=report.get('status', '')).border = border
+                ws.cell(row=row, column=8, value=report.get('nature_of_report', '')).border = border
+                ws.cell(row=row, column=9, value=report.get('action_taken', '')).border = border
+                ws.cell(row=row, column=10, value=report.get('created_by', '')).border = border
+
+                created_at = report.get('created_at', '')
+                if created_at:
+                    created_at = created_at[:19]
+                ws.cell(row=row, column=11, value=created_at).border = border
+
+                updated_at = report.get('updated_at', '')
+                if updated_at:
+                    updated_at = updated_at[:19]
+                ws.cell(row=row, column=12, value=updated_at).border = border
+
+            # Auto-adjust column widths
+            for col in range(1, len(headers) + 1):
+                column_letter = get_column_letter(col)
+                max_length = len(headers[col - 1])
+
+                for cell in ws[column_letter]:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column_letter].width = adjusted_width
+
+            # Freeze header row
+            ws.freeze_panes = "A2"
+
+            # Save workbook
+            wb.save(file_path)
+
+            self.status_label.setText(f"Exported {len(all_reports)} reports to Excel")
+            self.logging_service.info(f"Exported {len(all_reports)} reports to {file_path}")
+
+            # Show success message
+            reply = QMessageBox.question(
+                self,
+                "Export Successful",
+                f"Successfully exported {len(all_reports)} reports to:\n{file_path}\n\n"
+                "Would you like to open the file?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.Yes:
+                import os
+                os.startfile(file_path)  # Windows-specific
+
+        except Exception as e:
+            error_msg = f"Failed to export to Excel: {str(e)}"
+            self.status_label.setText("Export failed")
+            self.logging_service.error(error_msg)
+            QMessageBox.critical(self, "Export Error", error_msg)
 
     def refresh(self):
         """Refresh the view (called from main window)."""

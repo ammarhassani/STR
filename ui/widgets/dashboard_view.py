@@ -3,10 +3,13 @@ Dashboard view widget showing summary statistics and charts.
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QFrame, QGridLayout, QPushButton)
+                             QFrame, QGridLayout, QPushButton, QTabWidget, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from ui.workers import DashboardDataWorker
+from services.icon_service import get_icon, IconService
+from ui.widgets.chart_widget import (PieChartWidget, BarChartWidget,
+                                     LineChartWidget, HorizontalBarChartWidget)
 
 
 class KPICard(QFrame):
@@ -14,7 +17,7 @@ class KPICard(QFrame):
     KPI Card widget for displaying key metrics.
     """
 
-    def __init__(self, title: str, value: str, card_type: str = "info"):
+    def __init__(self, title: str, value: str, card_type: str = "info", icon_name: str = None):
         """
         Initialize KPI card.
 
@@ -22,6 +25,7 @@ class KPICard(QFrame):
             title: Card title
             value: Metric value
             card_type: Card type (info, success, warning, danger)
+            icon_name: Icon name for the card
         """
         super().__init__()
         self.setObjectName("kpiCard")
@@ -31,10 +35,25 @@ class KPICard(QFrame):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
+        # Header with icon and title
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
+
+        # Icon
+        if icon_name:
+            icon_label = QLabel()
+            icon_color = {'info': '#3498db', 'success': '#27ae60', 'warning': '#f39c12', 'danger': '#e74c3c'}.get(card_type, '#3498db')
+            icon = get_icon(icon_name, color=icon_color, size=IconService.LARGE)
+            icon_label.setPixmap(icon.pixmap(32, 32))
+            header_layout.addWidget(icon_label)
+
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet("color: #7f8c8d; font-size: 10pt; font-weight: 500;")
-        layout.addWidget(title_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+
+        layout.addLayout(header_layout)
 
         # Value
         self.value_label = QLabel(value)
@@ -98,37 +117,65 @@ class DashboardView(QWidget):
         self.kpi_cards = {}
 
         # Total Reports
-        self.kpi_cards['total'] = KPICard("Total Reports", "0", "info")
+        self.kpi_cards['total'] = KPICard("Total Reports", "0", "info", "clipboard-list")
         kpi_grid.addWidget(self.kpi_cards['total'], 0, 0)
 
         # Open Reports
-        self.kpi_cards['open'] = KPICard("Open Reports", "0", "success")
+        self.kpi_cards['open'] = KPICard("Open Reports", "0", "success", "file-alt")
         kpi_grid.addWidget(self.kpi_cards['open'], 0, 1)
 
         # Under Investigation
-        self.kpi_cards['investigation'] = KPICard("Under Investigation", "0", "warning")
+        self.kpi_cards['investigation'] = KPICard("Under Investigation", "0", "warning", "search")
         kpi_grid.addWidget(self.kpi_cards['investigation'], 0, 2)
 
         # Closed Cases
-        self.kpi_cards['closed'] = KPICard("Closed Cases", "0", "danger")
+        self.kpi_cards['closed'] = KPICard("Closed Cases", "0", "danger", "check-circle")
         kpi_grid.addWidget(self.kpi_cards['closed'], 0, 3)
 
         layout.addLayout(kpi_grid)
 
-        # Charts section
+        # Charts section with tabs
         charts_frame = QFrame()
         charts_frame.setObjectName("card")
         charts_layout = QVBoxLayout(charts_frame)
         charts_layout.setContentsMargins(16, 16, 16, 16)
 
-        charts_title = QLabel("Reports Distribution")
+        charts_title = QLabel("Data Visualization")
         charts_title_font = QFont()
         charts_title_font.setPointSize(12)
         charts_title_font.setWeight(QFont.Weight.Bold)
         charts_title.setFont(charts_title_font)
         charts_layout.addWidget(charts_title)
 
-        self.status_label = QLabel("Loading data...")
+        # Create tabs for different charts
+        self.chart_tabs = QTabWidget()
+        self.chart_tabs.setMinimumHeight(400)
+
+        # Determine theme for charts
+        # Try to detect current theme from application stylesheet
+        try:
+            app = QApplication.instance()
+            app_stylesheet = app.styleSheet() if app else ""
+            current_theme = 'dark' if '#1a1f26' in str(app_stylesheet) else 'light'
+        except:
+            current_theme = 'light'  # Default to light theme
+
+        # Pie chart tab
+        self.pie_chart = PieChartWidget(theme=current_theme)
+        self.chart_tabs.addTab(self.pie_chart, "Status Distribution")
+
+        # Line chart tab
+        self.line_chart = LineChartWidget(theme=current_theme)
+        self.chart_tabs.addTab(self.line_chart, "Trend Over Time")
+
+        # Bar chart tab
+        self.bar_chart = HorizontalBarChartWidget(theme=current_theme)
+        self.chart_tabs.addTab(self.bar_chart, "Top Contributors")
+
+        charts_layout.addWidget(self.chart_tabs)
+
+        # Status label for chart loading
+        self.status_label = QLabel("Loading charts...")
         self.status_label.setStyleSheet("color: #7f8c8d;")
         charts_layout.addWidget(self.status_label)
 
@@ -136,6 +183,7 @@ class DashboardView(QWidget):
 
         # Refresh button
         refresh_btn = QPushButton("Refresh Dashboard")
+        refresh_btn.setIcon(get_icon('refresh'))
         refresh_btn.clicked.connect(self.load_data)
         refresh_btn.setMaximumWidth(200)
         layout.addWidget(refresh_btn)
@@ -174,15 +222,74 @@ class DashboardView(QWidget):
         self.kpi_cards['investigation'].update_value(str(summary.get('under_investigation', 0)))
         self.kpi_cards['closed'].update_value(str(summary.get('closed_cases', 0)))
 
-        # Update status
-        by_status = data.get('by_status', [])
-        status_text = "Reports by Status:\n"
-        for item in by_status:
-            status_text += f"  • {item['status']}: {item['count']}\n"
+        # Update charts
+        self.update_charts(data)
 
-        self.status_label.setText(status_text if by_status else "No data available")
+        # Update status
+        self.status_label.setText("Charts updated successfully")
 
         self.logging_service.info("Dashboard data loaded successfully")
+
+    def update_charts(self, data: dict):
+        """
+        Update all dashboard charts with data.
+
+        Args:
+            data: Dashboard data dictionary
+        """
+        try:
+            # Pie Chart - Status Distribution
+            by_status = data.get('by_status', [])
+            if by_status:
+                labels = [item['status'] for item in by_status]
+                values = [item['count'] for item in by_status]
+                self.pie_chart.plot_data(values, labels, "Reports by Status")
+            else:
+                self.pie_chart.plot_data([], [], "Reports by Status")
+
+            # Line Chart - Trend Over Time
+            by_month = data.get('by_month', [])
+            if by_month:
+                months = [item['month'] for item in by_month]
+                counts = [item['count'] for item in by_month]
+
+                # Format month labels for better display
+                formatted_months = []
+                for month in months:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.strptime(month, '%Y-%m')
+                        formatted_months.append(dt.strftime('%b %Y'))
+                    except:
+                        formatted_months.append(month)
+
+                self.line_chart.plot_data(
+                    formatted_months,
+                    {'Reports': counts},
+                    "Reports Trend (Last 12 Months)",
+                    "Month",
+                    "Number of Reports"
+                )
+            else:
+                self.line_chart.plot_data([], {}, "Reports Trend (Last 12 Months)")
+
+            # Bar Chart - Top Contributors
+            top_reporters = data.get('top_reporters', [])
+            if top_reporters:
+                usernames = [item['username'] for item in top_reporters]
+                counts = [item['count'] for item in top_reporters]
+                self.bar_chart.plot_data(
+                    usernames,
+                    counts,
+                    "Top 5 Report Contributors",
+                    "Number of Reports"
+                )
+            else:
+                self.bar_chart.plot_data([], [], "Top 5 Report Contributors")
+
+        except Exception as e:
+            self.logging_service.error(f"Error updating charts: {str(e)}")
+            self.status_label.setText(f"Error updating charts: {str(e)}")
 
     def on_data_error(self, error_message: str):
         """

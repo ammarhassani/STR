@@ -37,7 +37,7 @@ class LoginWindow(QWidget):
 
     def setup_ui(self):
         """Setup the user interface."""
-        self.setWindowTitle("FIU Report Management System - Login")
+        self.setWindowTitle("Financial Crime Investigation - Login")
         self.setFixedSize(450, 550)
 
         # Center window on screen

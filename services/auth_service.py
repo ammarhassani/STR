@@ -6,6 +6,7 @@ Handles user authentication, session management, and user CRUD operations.
 import bcrypt
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
+from services.security_service import SecurityService
 
 
 class AuthService:
@@ -62,10 +63,29 @@ class AuthService:
                 self.logger.warning(f"Login attempt for locked account: {username}")
                 return False, None, "Account is locked due to too many failed attempts. Contact administrator."
 
-            # Verify password
-            # Note: Current system uses plain text passwords
-            # TODO: Migrate to bcrypt hashed passwords
-            if password != db_password:
+            # Verify password (supports both bcrypt and legacy plain text)
+            password_valid = False
+
+            if SecurityService.is_bcrypt_hash(db_password):
+                # Use bcrypt verification
+                password_valid = SecurityService.verify_password(password, db_password)
+            else:
+                # Legacy plain text password (backward compatibility)
+                password_valid = (password == db_password)
+
+                # Auto-migrate to bcrypt on successful login
+                if password_valid:
+                    try:
+                        hashed_password = SecurityService.hash_password(password)
+                        self.db_manager.execute_with_retry(
+                            "UPDATE users SET password = ? WHERE user_id = ?",
+                            (hashed_password, user_id)
+                        )
+                        self.logger.info(f"Auto-migrated password to bcrypt for user: {username}")
+                    except Exception as e:
+                        self.logger.error(f"Error auto-migrating password: {str(e)}")
+
+            if not password_valid:
                 # Increment failed attempts
                 self.db_manager.execute_with_retry(
                     "UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE user_id = ?",
@@ -364,6 +384,70 @@ class AuthService:
         except Exception as e:
             self.logger.error(f"Error resetting password: {str(e)}", exc_info=True)
             return False, f"Error resetting password: {str(e)}"
+
+    def verify_password(self, username: str, password: str) -> bool:
+        """
+        Verify a user's password without logging in.
+
+        Args:
+            username: Username
+            password: Password to verify
+
+        Returns:
+            True if password is correct
+        """
+        try:
+            query = "SELECT password FROM users WHERE username = ? COLLATE NOCASE"
+            result = self.db_manager.execute_with_retry(query, (username,))
+
+            if not result:
+                return False
+
+            db_password = result[0][0]
+
+            # Support both bcrypt and legacy plain text passwords
+            if SecurityService.is_bcrypt_hash(db_password):
+                return SecurityService.verify_password(password, db_password)
+            else:
+                # Legacy plain text comparison
+                return password == db_password
+
+        except Exception as e:
+            self.logger.error(f"Error verifying password: {str(e)}", exc_info=True)
+            return False
+
+    def change_password(self, user_id: int, new_password: str) -> bool:
+        """
+        Change a user's password (user-initiated).
+
+        Args:
+            user_id: User ID
+            new_password: New password (plain text, will be hashed)
+
+        Returns:
+            True if successful
+        """
+        try:
+            # Hash the new password with bcrypt
+            hashed_password = SecurityService.hash_password(new_password)
+
+            query = "UPDATE users SET password = ?, updated_by = ?, updated_at = ? WHERE user_id = ?"
+            self.db_manager.execute_with_retry(
+                query,
+                (hashed_password,
+                 self.current_user['username'] if self.current_user else 'SYSTEM',
+                 datetime.now().isoformat(),
+                 user_id)
+            )
+
+            self.logger.log_user_action("PASSWORD_CHANGED", {'user_id': user_id})
+            self.logger.info(f"Password changed successfully for user_id: {user_id}")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error changing password: {str(e)}", exc_info=True)
+            return False
 
     def unlock_account(self, user_id: int) -> Tuple[bool, str]:
         """

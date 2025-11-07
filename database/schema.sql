@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_active INTEGER DEFAULT 1,
     failed_login_attempts INTEGER DEFAULT 0,
     last_login TEXT,
+    theme_preference TEXT DEFAULT 'light' CHECK(theme_preference IN ('light', 'dark')),
     created_at TEXT DEFAULT (datetime('now')),
     created_by TEXT,
     updated_at TEXT,
