@@ -606,7 +606,7 @@ class ReportService:
                 return False, "User not authenticated"
 
             # Check if user is admin
-            if current_user.get('role') != 'Admin':
+            if current_user.get('role') != 'admin':
                 return False, "Only administrators can restore versions"
 
             # Get version snapshot
@@ -804,7 +804,7 @@ class ReportService:
                 return False, "User not authenticated"
 
             # Check if user is admin
-            if current_user.get('role') != 'Admin':
+            if current_user.get('role') != 'admin':
                 return False, "Only administrators can approve reports"
 
             # Get approval request
@@ -890,7 +890,7 @@ class ReportService:
                 return False, "User not authenticated"
 
             # Check if user is admin
-            if current_user.get('role') != 'Admin':
+            if current_user.get('role') != 'admin':
                 return False, "Only administrators can reject reports"
 
             # Get approval request

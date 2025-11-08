@@ -72,7 +72,7 @@ class ReportsView(QWidget):
         header_layout.addStretch()
 
         # My Reports quick filter (for agents)
-        if self.current_user.get('role') != 'Admin':
+        if self.current_user.get('role') != 'admin':
             my_reports_btn = QPushButton("My Reports")
             my_reports_btn.setIcon(get_icon('user'))
             my_reports_btn.setObjectName("secondaryButton")
