@@ -801,13 +801,11 @@ class ReportsView(QWidget):
             column_widths.append(self.reports_table.columnWidth(i))
         settings.setValue('reports_view/column_widths', column_widths)
 
-        # Save row heights (only save if user has customized)
-        row_heights = {}
-        for i in range(self.reports_table.rowCount()):
-            height = self.reports_table.rowHeight(i)
-            if height != 45:  # Only save if different from default
-                row_heights[i] = height
-        settings.setValue('reports_view/row_heights', row_heights)
+        # Save default row height (when user resizes any row, apply to all)
+        if self.reports_table.rowCount() > 0:
+            # Get the height of the first row as the default for all rows
+            default_height = self.reports_table.rowHeight(0)
+            settings.setValue('reports_view/default_row_height', default_height)
 
     def restore_table_geometry(self):
         """Restore column widths and row heights from settings."""
@@ -821,4 +819,7 @@ class ReportsView(QWidget):
                 if i < self.reports_table.columnCount():
                     self.reports_table.setColumnWidth(i, int(width))
 
-        # Note: Row heights will be restored when rows are loaded in on_reports_loaded()
+        # Restore default row height
+        default_height = settings.value('reports_view/default_row_height', None)
+        if default_height:
+            self.reports_table.verticalHeader().setDefaultSectionSize(int(default_height))

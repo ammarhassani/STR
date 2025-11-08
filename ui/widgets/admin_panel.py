@@ -478,13 +478,11 @@ class AdminPanel(QWidget):
             column_widths.append(self.users_table.columnWidth(i))
         settings.setValue('admin_panel/column_widths', column_widths)
 
-        # Save row heights (only save if user has customized)
-        row_heights = {}
-        for i in range(self.users_table.rowCount()):
-            height = self.users_table.rowHeight(i)
-            if height != 52:  # Only save if different from default
-                row_heights[i] = height
-        settings.setValue('admin_panel/row_heights', row_heights)
+        # Save default row height (when user resizes any row, apply to all)
+        if self.users_table.rowCount() > 0:
+            # Get the height of the first row as the default for all rows
+            default_height = self.users_table.rowHeight(0)
+            settings.setValue('admin_panel/default_row_height', default_height)
 
     def restore_table_geometry(self):
         """Restore column widths and row heights from settings."""
@@ -498,4 +496,7 @@ class AdminPanel(QWidget):
                 if i < self.users_table.columnCount():
                     self.users_table.setColumnWidth(i, int(width))
 
-        # Note: Row heights will be restored when rows are loaded in load_users()
+        # Restore default row height
+        default_height = settings.value('admin_panel/default_row_height', None)
+        if default_height:
+            self.users_table.verticalHeader().setDefaultSectionSize(int(default_height))

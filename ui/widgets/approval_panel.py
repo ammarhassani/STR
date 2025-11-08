@@ -6,7 +6,8 @@ Admin-only view for approving, rejecting, or requesting rework on reports.
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QHeaderView, QFrame, QDialog, QTextEdit,
-                             QMessageBox, QRadioButton, QButtonGroup, QLineEdit)
+                             QMessageBox, QRadioButton, QButtonGroup, QLineEdit,
+                             QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 from datetime import datetime
@@ -307,7 +308,6 @@ class ApprovalPanel(QWidget):
                 actions_layout.addWidget(review_button)
 
                 # Make container fill the cell completely
-                from PyQt6.QtWidgets import QSizePolicy
                 actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
                 self.approvals_table.setCellWidget(row, 6, actions_widget)
@@ -379,13 +379,11 @@ class ApprovalPanel(QWidget):
             column_widths.append(self.approvals_table.columnWidth(i))
         settings.setValue('approval_panel/column_widths', column_widths)
 
-        # Save row heights (only save if user has customized)
-        row_heights = {}
-        for i in range(self.approvals_table.rowCount()):
-            height = self.approvals_table.rowHeight(i)
-            if height != 52:  # Only save if different from default
-                row_heights[i] = height
-        settings.setValue('approval_panel/row_heights', row_heights)
+        # Save default row height (when user resizes any row, apply to all)
+        if self.approvals_table.rowCount() > 0:
+            # Get the height of the first row as the default for all rows
+            default_height = self.approvals_table.rowHeight(0)
+            settings.setValue('approval_panel/default_row_height', default_height)
 
     def restore_table_geometry(self):
         """Restore column widths and row heights from settings."""
@@ -399,4 +397,7 @@ class ApprovalPanel(QWidget):
                 if i < self.approvals_table.columnCount():
                     self.approvals_table.setColumnWidth(i, int(width))
 
-        # Note: Row heights will be restored when rows are loaded in load_pending_approvals()
+        # Restore default row height
+        default_height = settings.value('approval_panel/default_row_height', None)
+        if default_height:
+            self.approvals_table.verticalHeader().setDefaultSectionSize(int(default_height))
