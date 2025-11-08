@@ -303,6 +303,7 @@ class AdminPanel(QWidget):
 
         # Allow rows to automatically resize to fit content (buttons/widgets)
         self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.users_table.verticalHeader().setMinimumSectionSize(52)  # Minimum height: 36px button + 16px padding
 
         layout.addWidget(self.users_table)
 
@@ -383,7 +384,7 @@ class AdminPanel(QWidget):
                 # Actions (create widget with buttons)
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(4, 2, 4, 2)
+                actions_layout.setContentsMargins(8, 8, 8, 8)  # Increased padding
                 actions_layout.setSpacing(4)
 
                 edit_btn = QPushButton("Edit")
@@ -402,6 +403,10 @@ class AdminPanel(QWidget):
                     actions_layout.addWidget(delete_btn)
 
                 actions_layout.addStretch()
+
+                # Set size policy to ensure widget expands properly
+                from PyQt6.QtWidgets import QSizePolicy
+                actions_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
                 self.users_table.setCellWidget(row, 6, actions_widget)
 

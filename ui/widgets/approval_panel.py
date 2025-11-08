@@ -226,6 +226,7 @@ class ApprovalPanel(QWidget):
 
         # Allow rows to automatically resize to fit content (buttons/widgets)
         self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.approvals_table.verticalHeader().setMinimumSectionSize(52)  # Minimum height: 36px button + 16px padding
 
         layout.addWidget(self.approvals_table)
 
@@ -289,16 +290,20 @@ class ApprovalPanel(QWidget):
                 # Actions - Review button
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 5, 8, 5)  # Better spacing
+                actions_layout.setContentsMargins(8, 8, 8, 8)  # Increased padding
 
                 review_button = QPushButton("Review")
                 review_button.setObjectName("primaryButton")
-                review_button.setMinimumHeight(32)  # Ensure button is clickable
+                review_button.setMinimumHeight(36)  # Ensure button is clickable
                 review_button.setMaximumWidth(90)
                 review_button.clicked.connect(lambda checked, r=row: self.review_approval(r))
                 actions_layout.addWidget(review_button)
 
                 actions_layout.addStretch()
+
+                # Set size policy to ensure widget expands properly
+                from PyQt6.QtWidgets import QSizePolicy
+                actions_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
 
                 self.approvals_table.setCellWidget(row, 6, actions_widget)
 

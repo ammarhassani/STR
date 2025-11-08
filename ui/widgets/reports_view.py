@@ -276,6 +276,7 @@ class ReportsView(QWidget):
 
         # Allow rows to automatically resize to fit content
         self.reports_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.reports_table.verticalHeader().setMinimumSectionSize(36)  # Minimum height for readability
 
         layout.addWidget(self.reports_table)
 
