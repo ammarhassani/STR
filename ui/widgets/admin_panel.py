@@ -301,9 +301,10 @@ class AdminPanel(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Last Login
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Actions
 
-        # Allow rows to automatically resize to fit content (buttons/widgets)
-        self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.users_table.verticalHeader().setMinimumSectionSize(52)  # Minimum height: 36px button + 16px padding
+        # Enable manual row resizing like Excel (drag row borders to resize)
+        self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.users_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
+        self.users_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
 
         layout.addWidget(self.users_table)
 

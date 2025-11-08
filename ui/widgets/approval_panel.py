@@ -224,9 +224,10 @@ class ApprovalPanel(QWidget):
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         header.resizeSection(6, 150)
 
-        # Allow rows to automatically resize to fit content (buttons/widgets)
-        self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.approvals_table.verticalHeader().setMinimumSectionSize(52)  # Minimum height: 36px button + 16px padding
+        # Enable manual row resizing like Excel (drag row borders to resize)
+        self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.approvals_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
+        self.approvals_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
 
         layout.addWidget(self.approvals_table)
 
