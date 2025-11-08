@@ -41,6 +41,7 @@ from ui.widgets.log_management_view import LogManagementView
 from ui.widgets.reports_view import ReportsView
 from ui.widgets.export_view import ExportView
 from ui.widgets.admin_panel import AdminPanel
+from ui.widgets.approval_panel import ApprovalPanel
 from ui.widgets.placeholder_view import PlaceholderView
 from ui.widgets.settings_view import SettingsView
 
@@ -231,45 +232,25 @@ class FIUApplication:
             return False
 
     def load_theme(self):
-        """Load and apply the current theme."""
+        """Load and apply the dark theme."""
         try:
-            # Check for saved theme preference in user settings
-            current_user = self.auth_service.get_current_user() if self.auth_service else None
-            if current_user:
-                self.current_theme = current_user.get('theme_preference', 'light')
-            else:
-                self.current_theme = 'light'  # Default
-
-            self.apply_theme(self.current_theme)
-
+            self.apply_theme()
         except Exception as e:
             if self.logging_service:
                 self.logging_service.error(f"Error loading theme: {str(e)}")
-            # Apply default theme
-            self.apply_theme('light')
 
-    def apply_theme(self, theme_name):
-        """
-        Apply a theme by name.
-
-        Args:
-            theme_name: 'light' or 'dark'
-        """
+    def apply_theme(self):
+        """Apply the dark theme."""
         try:
-            if theme_name == 'dark':
-                stylesheet_path = project_root / "resources" / "style_dark.qss"
-            else:
-                stylesheet_path = project_root / "resources" / "style.qss"
+            stylesheet_path = project_root / "resources" / "style_dark.qss"
 
             if stylesheet_path.exists():
                 with open(stylesheet_path, 'r', encoding='utf-8') as f:
                     stylesheet = f.read()
                     self.app.setStyleSheet(stylesheet)
 
-                self.current_theme = theme_name
-
                 if self.logging_service:
-                    self.logging_service.info(f"Theme applied: {theme_name}")
+                    self.logging_service.info("Dark theme applied")
             else:
                 if self.logging_service:
                     self.logging_service.warning(f"Theme file not found: {stylesheet_path}")
@@ -277,27 +258,6 @@ class FIUApplication:
         except Exception as e:
             if self.logging_service:
                 self.logging_service.error(f"Error applying theme: {str(e)}")
-
-    def toggle_theme(self):
-        """Toggle between light and dark themes."""
-        new_theme = 'dark' if self.current_theme == 'light' else 'light'
-        self.apply_theme(new_theme)
-
-        # Save preference to database if user is logged in
-        try:
-            current_user = self.auth_service.get_current_user() if self.auth_service else None
-            if current_user:
-                update_query = "UPDATE users SET theme_preference = ? WHERE user_id = ?"
-                self.db_manager.execute_with_retry(
-                    update_query,
-                    (new_theme, current_user['user_id'])
-                )
-                if self.logging_service:
-                    self.logging_service.info(f"Theme preference saved: {new_theme}")
-
-        except Exception as e:
-            if self.logging_service:
-                self.logging_service.error(f"Error saving theme preference: {str(e)}")
 
     def show_login(self):
         """Show the login window."""
@@ -314,10 +274,6 @@ class FIUApplication:
         """
         self.logging_service.info(f"User logged in: {user['username']}")
 
-        # Apply user's theme preference
-        theme_pref = user.get('theme_preference', 'light')
-        self.apply_theme(theme_pref)
-
         # Create and show main window
         self.show_main_window()
 
@@ -330,11 +286,6 @@ class FIUApplication:
             self.dashboard_service,
             self.db_manager
         )
-
-        # Add theme toggle button to toolbar
-        self.main_window.toolbar.addSeparator()
-        theme_action = self.main_window.toolbar.addAction("🌓 Toggle Theme")
-        theme_action.triggered.connect(self.toggle_theme)
 
         # Add views to main window
         self.setup_views()
@@ -357,17 +308,10 @@ class FIUApplication:
         # Reports view
         reports_view = ReportsView(
             self.report_service,
-            self.logging_service
+            self.logging_service,
+            self.auth_service
         )
         self.main_window.add_view('reports', reports_view)
-
-        # Add Report view (placeholder - actual form is in dialog)
-        if self.auth_service.has_permission('add_report'):
-            add_report_view = PlaceholderView(
-                "Add Report",
-                "Click the 'Add New Report' button in the Reports view to create a new report."
-            )
-            self.main_window.add_view('add_report', add_report_view)
 
         # Export view
         if self.auth_service.has_permission('export'):
@@ -379,6 +323,14 @@ class FIUApplication:
 
         # Admin views (admin only)
         if self.auth_service.get_current_user()['role'] == 'admin':
+            # Approval management
+            current_user = self.auth_service.get_current_user()
+            approvals_view = ApprovalPanel(
+                self.report_service,
+                current_user
+            )
+            self.main_window.add_view('approvals', approvals_view)
+
             # Users management
             users_view = AdminPanel(
                 self.db_manager,

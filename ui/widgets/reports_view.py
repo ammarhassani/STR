@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QComboBox, QHeaderView, QMessageBox,
                              QFrame, QDateEdit, QSpinBox, QCheckBox, QFileDialog)
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 from ui.workers import ReportLoadWorker
 from services.icon_service import get_icon
 from pathlib import Path
@@ -25,17 +25,20 @@ class ReportsView(QWidget):
     - View/Edit reports
     """
 
-    def __init__(self, report_service, logging_service):
+    def __init__(self, report_service, logging_service, auth_service):
         """
         Initialize reports view.
 
         Args:
             report_service: ReportService instance
             logging_service: LoggingService instance
+            auth_service: AuthService instance
         """
         super().__init__()
         self.report_service = report_service
         self.logging_service = logging_service
+        self.auth_service = auth_service
+        self.current_user = auth_service.get_current_user()
         self.current_reports = []
         self.worker = None
 
@@ -185,7 +188,7 @@ class ReportsView(QWidget):
         # Stats and pagination
         stats_row = QHBoxLayout()
         self.stats_label = QLabel("0 reports")
-        self.stats_label.setStyleSheet("color: #7f8c8d; font-weight: 500;")
+        self.stats_label.setObjectName("subtitleLabel")
         stats_row.addWidget(self.stats_label)
         stats_row.addStretch()
 
@@ -225,10 +228,10 @@ class ReportsView(QWidget):
 
         # Reports table
         self.reports_table = QTableWidget()
-        self.reports_table.setColumnCount(7)
+        self.reports_table.setColumnCount(9)
         self.reports_table.setHorizontalHeaderLabels([
             'SN', 'Report Number', 'Date', 'Entity Name',
-            'Status', 'Created By', 'Created At'
+            'Status', 'Version', 'Approval', 'Created By', 'Created At'
         ])
 
         # Configure table
@@ -239,19 +242,26 @@ class ReportsView(QWidget):
 
         # Set column widths
         header = self.reports_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # SN
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # SN
+        header.resizeSection(0, 80)  # Fixed width for SN column to prevent dots
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Report Number
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Date
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Entity Name
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Created By
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Created At
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # Version
+        header.resizeSection(5, 70)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Approval
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Created By
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Created At
+
+        # Set row height to accommodate content
+        self.reports_table.verticalHeader().setDefaultSectionSize(40)
 
         layout.addWidget(self.reports_table)
 
         # Status label
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #7f8c8d;")
+        self.status_label.setObjectName("hintLabel")
         layout.addWidget(self.status_label)
 
     def toggle_advanced_filters(self):
@@ -383,16 +393,48 @@ class ReportsView(QWidget):
             status_item = QTableWidgetItem(report.get('status', ''))
             self.reports_table.setItem(row, 4, status_item)
 
+            # Version
+            version = report.get('current_version', 1)
+            version_item = QTableWidgetItem(f"v{version}")
+            version_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.reports_table.setItem(row, 5, version_item)
+
+            # Approval Status
+            approval_status = report.get('approval_status', 'draft')
+            approval_labels = {
+                'draft': 'Draft',
+                'pending_approval': 'Pending',
+                'approved': 'Approved',
+                'rejected': 'Rejected',
+                'rework': 'Rework'
+            }
+            approval_colors = {
+                'draft': '#6e7681',
+                'pending_approval': '#d29922',
+                'approved': '#2ea043',
+                'rejected': '#f85149',
+                'rework': '#d29922'
+            }
+            approval_label = approval_labels.get(approval_status, approval_status)
+            approval_item = QTableWidgetItem(approval_label)
+            approval_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            # Color-code approval status
+            approval_color = approval_colors.get(approval_status, '#6e7681')
+            approval_item.setForeground(QColor(approval_color))
+
+            self.reports_table.setItem(row, 6, approval_item)
+
             # Created By
             created_by_item = QTableWidgetItem(report.get('created_by', ''))
-            self.reports_table.setItem(row, 5, created_by_item)
+            self.reports_table.setItem(row, 7, created_by_item)
 
             # Created At
             created_at = report.get('created_at', '')
             if created_at:
                 created_at = created_at[:19]  # Remove microseconds
             created_at_item = QTableWidgetItem(created_at)
-            self.reports_table.setItem(row, 6, created_at_item)
+            self.reports_table.setItem(row, 8, created_at_item)
 
         # Update stats
         start_record = (self.current_page - 1) * self.page_size + 1
@@ -433,6 +475,7 @@ class ReportsView(QWidget):
             dialog = ReportDialog(
                 self.report_service,
                 self.logging_service,
+                self.current_user,
                 report_data=report,
                 parent=self
             )
@@ -447,6 +490,7 @@ class ReportsView(QWidget):
         dialog = ReportDialog(
             self.report_service,
             self.logging_service,
+            self.current_user,
             parent=self
         )
         dialog.report_saved.connect(self.load_reports)

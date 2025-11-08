@@ -74,7 +74,6 @@ class MainWindow(QMainWindow):
 
         # Content area
         content_frame = QFrame()
-        content_frame.setStyleSheet("background-color: #f5f7fa;")
         content_layout = QVBoxLayout(content_frame)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(0)
@@ -101,7 +100,8 @@ class MainWindow(QMainWindow):
         """
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setMinimumWidth(200)
+        sidebar.setMaximumWidth(280)
         sidebar.setStyleSheet("""
             QFrame#sidebar {
                 background-color: #34495e;
@@ -153,10 +153,14 @@ class MainWindow(QMainWindow):
         self.nav_buttons['reports'] = self.create_nav_button("Reports", "reports", "clipboard-list")
         layout.addWidget(self.nav_buttons['reports'])
 
-        # Add Report (if has permission)
+        # Add Report (if has permission) - Opens dialog directly
         if self.auth_service.has_permission('add_report'):
-            self.nav_buttons['add_report'] = self.create_nav_button("Add Report", "add_report", "plus")
-            layout.addWidget(self.nav_buttons['add_report'])
+            add_report_btn = QPushButton("Add Report")
+            add_report_btn.setCheckable(False)
+            add_report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            add_report_btn.clicked.connect(self.quick_add_report)
+            add_report_btn.setIcon(get_icon('plus', color='#ffffff'))
+            layout.addWidget(add_report_btn)
 
         # Export
         if self.auth_service.has_permission('export'):
@@ -175,6 +179,9 @@ class MainWindow(QMainWindow):
                 padding: 8px 16px;
             """)
             layout.addWidget(admin_label)
+
+            self.nav_buttons['approvals'] = self.create_nav_button("Approvals", "approvals", "check-circle")
+            layout.addWidget(self.nav_buttons['approvals'])
 
             self.nav_buttons['users'] = self.create_nav_button("Users", "users", "users")
             layout.addWidget(self.nav_buttons['users'])
@@ -285,11 +292,12 @@ class MainWindow(QMainWindow):
             QFrame: Header widget
         """
         header = QFrame()
-        header.setFixedHeight(60)
+        header.setMinimumHeight(60)
+        header.setMaximumHeight(80)
         header.setStyleSheet("""
             QFrame {
-                background-color: white;
-                border-bottom: 1px solid #d0d7de;
+                background-color: #0d1117;
+                border-bottom: 1px solid #30363d;
             }
         """)
 
@@ -307,7 +315,18 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.page_title)
         layout.addStretch()
 
-        # Quick actions could go here
+        # Notification widget
+        try:
+            from ui.widgets.notification_widget import NotificationWidget
+            self.notification_widget = NotificationWidget(
+                self.report_service,
+                self.current_user,
+                self
+            )
+            self.notification_widget.notification_clicked.connect(self.handle_notification_clicked)
+            layout.addWidget(self.notification_widget)
+        except Exception as e:
+            self.logging_service.error(f"Error creating notification widget: {str(e)}")
 
         return header
 
@@ -383,7 +402,7 @@ class MainWindow(QMainWindow):
         # Add common actions
         if self.auth_service.has_permission('add_report'):
             add_report_action = QAction(get_icon('plus'), "New Report", self)
-            add_report_action.triggered.connect(lambda: self.switch_view('add_report'))
+            add_report_action.triggered.connect(self.quick_add_report)
             self.toolbar.addAction(add_report_action)
 
         self.toolbar.addSeparator()
@@ -455,6 +474,7 @@ class MainWindow(QMainWindow):
             dialog = ReportDialog(
                 self.report_service,
                 self.logging_service,
+                self.current_user,
                 parent=self
             )
 
@@ -504,8 +524,8 @@ class MainWindow(QMainWindow):
             titles = {
                 'dashboard': 'Dashboard',
                 'reports': 'Reports',
-                'add_report': 'Add Report',
                 'export': 'Export Data',
+                'approvals': 'Approval Management',
                 'users': 'User Management',
                 'logs': 'System Logs',
                 'settings': 'Settings'
@@ -586,6 +606,24 @@ class MainWindow(QMainWindow):
             "<p>Financial Intelligence Unit Report Management</p>"
             "<p>Built with PyQt6 and modern architecture</p>"
         )
+
+    def handle_notification_clicked(self, notification):
+        """
+        Handle notification click.
+
+        Args:
+            notification: Notification dictionary
+        """
+        # Navigate to reports view if there's a related report
+        related_report_id = notification.get('related_report_id')
+        notification_type = notification.get('notification_type')
+
+        if notification_type == 'approval_request' and self.current_user.get('role') == 'admin':
+            # Navigate to approvals view
+            self.switch_view('approvals')
+        elif related_report_id:
+            # Navigate to reports view
+            self.switch_view('reports')
 
     def closeEvent(self, event):
         """Handle window close event."""

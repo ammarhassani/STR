@@ -38,7 +38,8 @@ class LoginWindow(QWidget):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("Financial Crime Investigation - Login")
-        self.setFixedSize(450, 550)
+        self.setMinimumSize(400, 500)
+        self.resize(450, 550)  # Default size, but resizable
 
         # Center window on screen
         self.center_window()
@@ -144,12 +145,12 @@ class LoginWindow(QWidget):
         """Apply custom styles to the window."""
         self.setStyleSheet("""
             QWidget {
-                background-color: #f5f7fa;
+                background-color: #0d1117;
             }
             QFrame#loginContainer {
-                background-color: white;
+                background-color: #161b22;
                 border-radius: 12px;
-                border: 1px solid #d0d7de;
+                border: 1px solid #30363d;
             }
         """)
 

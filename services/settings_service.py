@@ -158,7 +158,7 @@ class SettingsService:
             current_user = self.auth_service.get_current_user()
             if not current_user:
                 return False
-            user_id = current_user['id']
+            user_id = current_user['user_id']
 
         # Get existing settings and merge
         existing = self.get_all_settings(user_id)

@@ -49,7 +49,7 @@ class KPICard(QFrame):
 
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #7f8c8d; font-size: 10pt; font-weight: 500;")
+        title_label.setObjectName("subtitleLabel")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
@@ -61,7 +61,6 @@ class KPICard(QFrame):
         value_font.setPointSize(24)
         value_font.setWeight(QFont.Weight.Bold)
         self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet("color: #2c3e50;")
         layout.addWidget(self.value_label)
 
         layout.addStretch()
@@ -153,12 +152,8 @@ class DashboardView(QWidget):
 
         # Determine theme for charts
         # Try to detect current theme from application stylesheet
-        try:
-            app = QApplication.instance()
-            app_stylesheet = app.styleSheet() if app else ""
-            current_theme = 'dark' if '#1a1f26' in str(app_stylesheet) else 'light'
-        except:
-            current_theme = 'light'  # Default to light theme
+        # Always use dark theme
+        current_theme = 'dark'
 
         # Pie chart tab
         self.pie_chart = PieChartWidget(theme=current_theme)
@@ -176,7 +171,7 @@ class DashboardView(QWidget):
 
         # Status label for chart loading
         self.status_label = QLabel("Loading charts...")
-        self.status_label.setStyleSheet("color: #7f8c8d;")
+        self.status_label.setObjectName("hintLabel")
         charts_layout.addWidget(self.status_label)
 
         layout.addWidget(charts_frame)

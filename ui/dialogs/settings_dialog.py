@@ -18,7 +18,7 @@ class SettingsDialog(QDialog):
     Settings dialog with comprehensive preferences.
 
     Tabs:
-    1. General - Theme, language, startup options
+    1. General - Language, startup options
     2. Appearance - Font sizes, colors, layout
     3. Notifications - Toast settings, alerts
     4. Security - Password, session timeout, audit
@@ -26,11 +26,9 @@ class SettingsDialog(QDialog):
 
     Signals:
         settings_changed: Emitted when settings are saved
-        theme_changed: Emitted when theme is changed
     """
 
     settings_changed = pyqtSignal(dict)
-    theme_changed = pyqtSignal(str)
 
     def __init__(self, settings_service, auth_service, db_manager=None, logging_service=None, parent=None):
         """
@@ -116,21 +114,6 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
-
-        # Theme settings
-        theme_group = QGroupBox("Theme & Appearance")
-        theme_layout = QFormLayout()
-        theme_layout.setSpacing(12)
-
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["Dark Theme", "Light Theme", "System Default"])
-        theme_layout.addRow("Application Theme:", self.theme_combo)
-
-        self.auto_theme_check = QCheckBox("Automatically switch based on system theme")
-        theme_layout.addRow("", self.auto_theme_check)
-
-        theme_group.setLayout(theme_layout)
-        layout.addWidget(theme_group)
 
         # Language settings
         language_group = QGroupBox("Language & Localization")
@@ -392,9 +375,10 @@ class SettingsDialog(QDialog):
 
         change_password_btn = QPushButton("Change Password")
         change_password_btn.setIcon(get_icon('key'))
-        change_password_btn.setMaximumWidth(200)
+        change_password_btn.setMinimumWidth(180)
+        change_password_btn.setMinimumHeight(36)
         change_password_btn.clicked.connect(self.change_password)
-        password_layout.addWidget(change_password_btn)
+        password_layout.addWidget(change_password_btn, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.require_strong_password_check = QCheckBox("Require strong passwords (admin only)")
         self.require_strong_password_check.setChecked(True)
@@ -592,11 +576,6 @@ class SettingsDialog(QDialog):
     def load_settings(self):
         """Load current settings into UI."""
         # General tab
-        theme = self.current_settings.get('theme', 'dark')
-        theme_index = {'dark': 0, 'light': 1, 'system': 2}.get(theme, 0)
-        self.theme_combo.setCurrentIndex(theme_index)
-
-        self.auto_theme_check.setChecked(self.current_settings.get('auto_theme', False))
         self.remember_window_check.setChecked(self.current_settings.get('remember_window', True))
         self.start_maximized_check.setChecked(self.current_settings.get('start_maximized', True))
         self.show_dashboard_check.setChecked(self.current_settings.get('show_dashboard', True))
@@ -640,8 +619,6 @@ class SettingsDialog(QDialog):
         """Save settings to database."""
         settings = {
             # General
-            'theme': ['dark', 'light', 'system'][self.theme_combo.currentIndex()],
-            'auto_theme': self.auto_theme_check.isChecked(),
             'language': self.language_combo.currentText().lower(),
             'date_format': self.date_format_combo.currentText(),
             'time_format': self.time_format_combo.currentText(),
@@ -697,12 +674,6 @@ class SettingsDialog(QDialog):
         try:
             # Save settings
             self.settings_service.save_settings(settings)
-
-            # Check if theme changed
-            old_theme = self.current_settings.get('theme', 'dark')
-            new_theme = settings['theme']
-            if old_theme != new_theme:
-                self.theme_changed.emit(new_theme)
 
             self.settings_changed.emit(settings)
 
