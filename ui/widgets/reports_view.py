@@ -71,6 +71,26 @@ class ReportsView(QWidget):
 
         header_layout.addStretch()
 
+        # My Reports quick filter (for agents)
+        if self.current_user.get('role') != 'Admin':
+            my_reports_btn = QPushButton("My Reports")
+            my_reports_btn.setIcon(get_icon('user'))
+            my_reports_btn.setObjectName("secondaryButton")
+            my_reports_btn.setCheckable(True)
+            my_reports_btn.clicked.connect(self.toggle_my_reports)
+            my_reports_btn.setToolTip("Show only reports created by me")
+            header_layout.addWidget(my_reports_btn)
+            self.my_reports_btn = my_reports_btn
+
+            # Send All to Approval button
+            send_all_btn = QPushButton("Send All to Approval")
+            send_all_btn.setIcon(get_icon('check-circle'))
+            send_all_btn.setObjectName("primaryButton")
+            send_all_btn.clicked.connect(self.send_all_to_approval)
+            send_all_btn.setToolTip("Send all my draft reports for approval")
+            header_layout.addWidget(send_all_btn)
+            self.send_all_btn = send_all_btn
+
         # Export to Excel button
         export_btn = QPushButton("Export to Excel")
         export_btn.setIcon(get_icon('file-excel', color='#27ae60'))
@@ -653,6 +673,107 @@ class ReportsView(QWidget):
             self.status_label.setText("Export failed")
             self.logging_service.error(error_msg)
             QMessageBox.critical(self, "Export Error", error_msg)
+
+    def toggle_my_reports(self):
+        """Toggle filter to show only current user's reports."""
+        if hasattr(self, 'my_reports_btn') and self.my_reports_btn.isChecked():
+            # Set creator filter to current user
+            for i in range(self.creator_combo.count()):
+                if self.creator_combo.itemData(i) == self.current_user['username']:
+                    self.creator_combo.setCurrentIndex(i)
+                    break
+            self.my_reports_btn.setText("All Reports")
+            self.my_reports_btn.setToolTip("Show all reports")
+        else:
+            # Clear creator filter
+            self.creator_combo.setCurrentIndex(0)  # "All Users"
+            if hasattr(self, 'my_reports_btn'):
+                self.my_reports_btn.setText("My Reports")
+                self.my_reports_btn.setToolTip("Show only reports created by me")
+
+        # Reload reports with new filter
+        self.on_filter_changed()
+
+    def send_all_to_approval(self):
+        """Send all draft reports created by current user to approval."""
+        try:
+            # Get all draft reports by current user
+            draft_reports, _ = self.report_service.get_reports(
+                status=None,
+                search_term=None,
+                created_by=self.current_user['username'],
+                limit=None  # Get all
+            )
+
+            # Filter for draft approval status
+            draft_approval_reports = [
+                r for r in draft_reports
+                if r.get('approval_status', 'draft') == 'draft'
+            ]
+
+            if not draft_approval_reports:
+                QMessageBox.information(
+                    self,
+                    "No Draft Reports",
+                    "You have no draft reports to send for approval."
+                )
+                return
+
+            # Confirm action
+            reply = QMessageBox.question(
+                self,
+                "Confirm Send All",
+                f"Send {len(draft_approval_reports)} draft report(s) for approval?\n\n"
+                "This will submit all your draft reports for admin review.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+            # Send each report for approval
+            success_count = 0
+            failed_reports = []
+
+            for report in draft_approval_reports:
+                success, approval_id, message = self.report_service.request_approval(
+                    report['report_id'],
+                    comment="Bulk submission via Send All"
+                )
+
+                if success:
+                    success_count += 1
+                else:
+                    failed_reports.append(f"Report {report.get('report_number', report['report_id'])}: {message}")
+
+            # Show results
+            if success_count == len(draft_approval_reports):
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Successfully sent {success_count} report(s) for approval!"
+                )
+            elif success_count > 0:
+                QMessageBox.warning(
+                    self,
+                    "Partial Success",
+                    f"Sent {success_count} of {len(draft_approval_reports)} reports for approval.\n\n"
+                    f"Failed reports:\n" + "\n".join(failed_reports[:5])
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Failed",
+                    f"Failed to send reports for approval:\n" + "\n".join(failed_reports[:5])
+                )
+
+            # Reload reports to show updated approval status
+            self.load_reports()
+
+        except Exception as e:
+            error_msg = f"Error sending reports for approval: {str(e)}"
+            self.logging_service.error(error_msg, exc_info=True)
+            QMessageBox.critical(self, "Error", error_msg)
 
     def refresh(self):
         """Refresh the view (called from main window)."""

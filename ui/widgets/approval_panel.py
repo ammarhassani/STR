@@ -224,8 +224,9 @@ class ApprovalPanel(QWidget):
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         header.resizeSection(6, 150)
 
-        # Set row height to accommodate buttons
-        self.approvals_table.verticalHeader().setDefaultSectionSize(45)
+        # Set row height to accommodate buttons properly
+        self.approvals_table.verticalHeader().setDefaultSectionSize(50)
+        self.approvals_table.verticalHeader().setMinimumSectionSize(50)
 
         layout.addWidget(self.approvals_table)
 
@@ -254,6 +255,8 @@ class ApprovalPanel(QWidget):
             self.approvals_table.setRowCount(len(self.pending_approvals))
 
             for row, approval in enumerate(self.pending_approvals):
+                # Set row height to ensure buttons are visible
+                self.approvals_table.setRowHeight(row, 50)
                 # Report number
                 report_num_item = QTableWidgetItem(str(approval['report_number']))
                 self.approvals_table.setItem(row, 0, report_num_item)
