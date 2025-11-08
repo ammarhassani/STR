@@ -294,23 +294,21 @@ class ApprovalPanel(QWidget):
                 comment_item.setToolTip(comment)
                 self.approvals_table.setItem(row, 5, comment_item)
 
-                # Actions - Review button
+                # Actions - Review button - fully responsive to cell size
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 8, 8, 8)  # Increased padding
+                actions_layout.setContentsMargins(4, 4, 4, 4)  # Minimal padding
 
                 review_button = QPushButton("Review")
                 review_button.setObjectName("primaryButton")
-                review_button.setMinimumHeight(36)  # Ensure button is clickable
-                review_button.setMaximumWidth(90)
+                # No size constraints - button adapts to cell size
+                review_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 review_button.clicked.connect(lambda checked, r=row: self.review_approval(r))
                 actions_layout.addWidget(review_button)
 
-                actions_layout.addStretch()
-
-                # Set size policy to ensure widget expands properly
+                # Make container fill the cell completely
                 from PyQt6.QtWidgets import QSizePolicy
-                actions_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+                actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
                 self.approvals_table.setCellWidget(row, 6, actions_widget)
 

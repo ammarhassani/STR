@@ -6,7 +6,7 @@ Modern interface for creating, editing, and managing users.
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QLineEdit, QComboBox, QHeaderView, QMessageBox,
-                             QDialog, QFormLayout, QDialogButtonBox, QFrame)
+                             QDialog, QFormLayout, QDialogButtonBox, QFrame, QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from datetime import datetime
@@ -393,15 +393,15 @@ class AdminPanel(QWidget):
                 last_login_item = QTableWidgetItem(last_login if last_login else 'Never')
                 self.users_table.setItem(row, 5, last_login_item)
 
-                # Actions (create widget with buttons)
+                # Actions (create widget with buttons) - fully responsive to cell size
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 8, 8, 8)  # Increased padding
+                actions_layout.setContentsMargins(4, 4, 4, 4)  # Minimal padding
                 actions_layout.setSpacing(4)
 
                 edit_btn = QPushButton("Edit")
-                edit_btn.setMaximumWidth(60)
-                edit_btn.setMinimumHeight(36)  # Ensure button is tall enough to see
+                # No size constraints - button adapts to cell size
+                edit_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 edit_btn.clicked.connect(lambda checked, u=user: self.edit_user(u))
                 actions_layout.addWidget(edit_btn)
 
@@ -409,16 +409,13 @@ class AdminPanel(QWidget):
                 if user['user_id'] != 1:
                     delete_btn = QPushButton("Delete")
                     delete_btn.setObjectName("dangerButton")
-                    delete_btn.setMaximumWidth(60)
-                    delete_btn.setMinimumHeight(36)  # Ensure button is tall enough to see
+                    # No size constraints - button adapts to cell size
+                    delete_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                     delete_btn.clicked.connect(lambda checked, u=user: self.delete_user(u))
                     actions_layout.addWidget(delete_btn)
 
-                actions_layout.addStretch()
-
-                # Set size policy to ensure widget expands properly
-                from PyQt6.QtWidgets import QSizePolicy
-                actions_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+                # Make container fill the cell completely
+                actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
                 self.users_table.setCellWidget(row, 6, actions_widget)
 
