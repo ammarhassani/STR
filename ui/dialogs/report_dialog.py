@@ -24,19 +24,21 @@ class ReportDialog(QDialog):
 
     report_saved = pyqtSignal()
 
-    def __init__(self, report_service, logging_service, report_data=None, parent=None):
+    def __init__(self, report_service, logging_service, current_user, report_data=None, parent=None):
         """
         Initialize report dialog.
 
         Args:
             report_service: ReportService instance
             logging_service: LoggingService instance
+            current_user: Current user dictionary
             report_data: Existing report data for editing (None for new report)
             parent: Parent widget
         """
         super().__init__(parent)
         self.report_service = report_service
         self.logging_service = logging_service
+        self.current_user = current_user
         self.report_data = report_data
         self.is_edit_mode = report_data is not None
 
@@ -52,13 +54,68 @@ class ReportDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
 
-        # Header
+        # Header with version and approval info
+        header_layout = QHBoxLayout()
+
         header = QLabel(title)
         header_font = QFont()
         header_font.setPointSize(16)
         header_font.setWeight(QFont.Weight.Bold)
         header.setFont(header_font)
-        layout.addWidget(header)
+        header_layout.addWidget(header)
+
+        # Version and approval status badges (only in edit mode)
+        if self.is_edit_mode and self.report_data:
+            current_version = self.report_data.get('current_version', 1)
+            approval_status = self.report_data.get('approval_status', 'draft')
+
+            # Version badge
+            version_badge = QLabel(f"v{current_version}")
+            version_badge.setObjectName("versionBadge")
+            version_badge.setStyleSheet("""
+                QLabel#versionBadge {
+                    background-color: #0d7377;
+                    color: #ffffff;
+                    border-radius: 10px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }
+            """)
+            header_layout.addWidget(version_badge)
+
+            # Approval status badge
+            status_colors = {
+                'draft': '#6e7681',
+                'pending_approval': '#d29922',
+                'approved': '#2ea043',
+                'rejected': '#f85149',
+                'rework': '#d29922'
+            }
+            status_labels = {
+                'draft': 'Draft',
+                'pending_approval': 'Pending Approval',
+                'approved': 'Approved',
+                'rejected': 'Rejected',
+                'rework': 'Needs Rework'
+            }
+
+            approval_badge = QLabel(status_labels.get(approval_status, approval_status))
+            approval_badge.setObjectName("approvalBadge")
+            approval_badge.setStyleSheet(f"""
+                QLabel#approvalBadge {{
+                    background-color: {status_colors.get(approval_status, '#6e7681')};
+                    color: #ffffff;
+                    border-radius: 10px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                }}
+            """)
+            header_layout.addWidget(approval_badge)
+
+        header_layout.addStretch()
+        layout.addLayout(header_layout)
 
         # Tabs for organizing fields
         tabs = QTabWidget()
@@ -71,8 +128,19 @@ class ReportDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
+
+        # Left side buttons (version history)
+        if self.is_edit_mode and self.report_data:
+            history_btn = QPushButton("View History")
+            history_btn.setIcon(get_icon('history'))
+            history_btn.setObjectName("secondaryButton")
+            history_btn.setMinimumWidth(120)
+            history_btn.clicked.connect(self.view_history)
+            button_layout.addWidget(history_btn)
+
         button_layout.addStretch()
 
+        # Right side buttons (actions)
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setIcon(get_icon('times'))
         cancel_btn.setObjectName("secondaryButton")
@@ -86,6 +154,17 @@ class ReportDialog(QDialog):
         save_btn.setMinimumWidth(120)
         save_btn.clicked.connect(self.save_report)
         button_layout.addWidget(save_btn)
+
+        # Submit for approval button (only if editing and not already approved)
+        if self.is_edit_mode and self.report_data:
+            approval_status = self.report_data.get('approval_status', 'draft')
+            if approval_status not in ['pending_approval', 'approved']:
+                submit_approval_btn = QPushButton("Submit for Approval")
+                submit_approval_btn.setIcon(get_icon('check'))
+                submit_approval_btn.setObjectName("successButton")
+                submit_approval_btn.setMinimumWidth(150)
+                submit_approval_btn.clicked.connect(self.submit_for_approval)
+                button_layout.addWidget(submit_approval_btn)
 
         layout.addLayout(button_layout)
 
@@ -362,8 +441,25 @@ class ReportDialog(QDialog):
         return tab
 
     def load_data(self):
-        """Load existing report data if in edit mode."""
-        if not self.is_edit_mode or not self.report_data:
+        """Load existing report data if in edit mode or auto-generate SN for new reports."""
+        # Auto-generate serial number for new reports
+        if not self.is_edit_mode:
+            try:
+                # Get next available SN
+                query = "SELECT MAX(sn) FROM reports"
+                result = self.report_service.db_manager.execute_with_retry(query)
+                max_sn = result[0][0] if result and result[0][0] else 0
+                next_sn = max_sn + 1
+
+                self.sn_input.setText(str(next_sn))
+                self.sn_input.setReadOnly(True)  # Prevent manual editing
+            except Exception as e:
+                self.logging_service.error(f"Error auto-generating SN: {str(e)}")
+                # If error, leave it editable and show placeholder
+                self.sn_input.setPlaceholderText("Auto-generated (1 if first report)")
+            return
+
+        if not self.report_data:
             return
 
         # Basic Info
@@ -548,7 +644,16 @@ class ReportDialog(QDialog):
         try:
             if self.is_edit_mode:
                 # Update existing report
-                report_id = self.report_data['report_id']
+                report_id = self.report_data.get('report_id') or self.report_data.get('id')
+                if not report_id:
+                    raise ValueError("Report ID not found in report data")
+
+                # Create version snapshot before updating
+                snapshot_success, version_id, snapshot_msg = self.report_service.create_version_snapshot(
+                    report_id,
+                    f"Modified by {self.current_user['username']}"
+                )
+
                 success, message = self.report_service.update_report(report_id, form_data)
             else:
                 # Create new report
@@ -576,3 +681,89 @@ class ReportDialog(QDialog):
                 f"Failed to save report: {str(e)}"
             )
             self.logging_service.error(f"Report save error: {str(e)}", exc_info=True)
+
+    def view_history(self):
+        """View version history for this report."""
+        if not self.is_edit_mode or not self.report_data:
+            return
+
+        report_id = self.report_data.get('report_id') or self.report_data.get('id')
+        if not report_id:
+            QMessageBox.warning(self, "Error", "Report ID not found")
+            return
+
+        try:
+            from ui.dialogs.version_history_dialog import VersionHistoryDialog
+
+            dialog = VersionHistoryDialog(
+                self.report_service,
+                report_id,
+                self.current_user,
+                self
+            )
+            dialog.version_restored.connect(self.on_version_restored)
+            dialog.exec()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open version history: {str(e)}")
+
+    def on_version_restored(self, version_id):
+        """
+        Handle version restoration.
+
+        Args:
+            version_id: Version ID that was restored
+        """
+        # Reload the report data
+        try:
+            report_id = self.report_data.get('report_id') or self.report_data.get('id')
+            refreshed_report = self.report_service.get_report(report_id)
+            if refreshed_report:
+                self.report_data = refreshed_report
+                self.load_data()
+                QMessageBox.information(
+                    self,
+                    "Version Restored",
+                    "The report has been restored to the selected version. Please review the changes."
+                )
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to reload report data: {str(e)}")
+
+    def submit_for_approval(self):
+        """Submit the report for admin approval."""
+        if not self.is_edit_mode or not self.report_data:
+            return
+
+        report_id = self.report_data.get('report_id') or self.report_data.get('id')
+        if not report_id:
+            QMessageBox.warning(self, "Error", "Report ID not found")
+            return
+
+        # Confirm submission
+        reply = QMessageBox.question(
+            self,
+            "Submit for Approval",
+            "Are you sure you want to submit this report for admin approval?\n\n"
+            "Once submitted, you won't be able to edit it until an admin reviews it.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            success, approval_id, message = self.report_service.request_approval(
+                report_id,
+                f"Submitted by {self.current_user['username']}"
+            )
+
+            if success:
+                QMessageBox.information(self, "Success", message)
+                self.report_saved.emit()
+                self.accept()
+            else:
+                QMessageBox.warning(self, "Error", message)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to submit for approval: {str(e)}")

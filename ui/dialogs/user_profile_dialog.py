@@ -155,12 +155,12 @@ class UserProfileDialog(QDialog):
 
         self.username_input = QLineEdit()
         self.username_input.setReadOnly(True)
-        self.username_input.setStyleSheet("background-color: #f0f0f0;")
+        self.username_input.setStyleSheet("background-color: #161b22; color: #8b949e;")
         basic_layout.addRow("Username:", self.username_input)
 
         self.role_input = QLineEdit()
         self.role_input.setReadOnly(True)
-        self.role_input.setStyleSheet("background-color: #f0f0f0;")
+        self.role_input.setStyleSheet("background-color: #161b22; color: #8b949e;")
         basic_layout.addRow("Role:", self.role_input)
 
         basic_group.setLayout(basic_layout)
@@ -367,7 +367,7 @@ class UserProfileDialog(QDialog):
     def load_activity_stats(self):
         """Load user activity statistics."""
         try:
-            user_id = self.current_user['id']
+            user_id = self.current_user['user_id']
 
             # Get account created date
             created_at = self.current_user.get('created_at', 'Unknown')
@@ -393,14 +393,14 @@ class UserProfileDialog(QDialog):
 
             # Get login count from session log
             login_count_query = "SELECT COUNT(*) FROM session_log WHERE user_id = ?"
-            login_result = self.db_manager.fetch_one(login_count_query, (user_id,))
-            login_count = login_result[0] if login_result else 0
+            login_results = self.db_manager.execute_with_retry(login_count_query, (user_id,))
+            login_count = login_results[0][0] if login_results else 0
             self.login_count_label.setText(str(login_count))
 
             # Get reports created
             reports_query = "SELECT COUNT(*) FROM reports WHERE created_by = ? AND is_deleted = 0"
-            reports_result = self.db_manager.fetch_one(reports_query, (self.current_user['username'],))
-            reports_count = reports_result[0] if reports_result else 0
+            reports_results = self.db_manager.execute_with_retry(reports_query, (self.current_user['username'],))
+            reports_count = reports_results[0][0] if reports_results else 0
             self.reports_created_label.setText(str(reports_count))
 
             # Get reports edited
@@ -408,19 +408,19 @@ class UserProfileDialog(QDialog):
                 SELECT COUNT(DISTINCT report_id) FROM reports
                 WHERE updated_by = ? AND updated_by != created_by AND is_deleted = 0
             """
-            edits_result = self.db_manager.fetch_one(edits_query, (self.current_user['username'],))
-            edits_count = edits_result[0] if edits_result else 0
+            edits_results = self.db_manager.execute_with_retry(edits_query, (self.current_user['username'],))
+            edits_count = edits_results[0][0] if edits_results else 0
             self.reports_edited_label.setText(str(edits_count))
 
             # Get recent activity from action_log
             recent_query = """
-                SELECT action, timestamp, details
-                FROM action_log
+                SELECT action_type, created_at, action_details
+                FROM audit_log
                 WHERE user_id = ?
-                ORDER BY timestamp DESC
+                ORDER BY created_at DESC
                 LIMIT 10
             """
-            recent_results = self.db_manager.fetch_all(recent_query, (user_id,))
+            recent_results = self.db_manager.execute_with_retry(recent_query, (user_id,))
 
             if recent_results:
                 activity_text = ""
@@ -489,17 +489,17 @@ class UserProfileDialog(QDialog):
                 WHERE user_id = ?
             """
 
-            self.db_manager.execute_query(
+            self.db_manager.execute_with_retry(
                 update_query,
                 (new_full_name, datetime.now().isoformat(),
-                 self.current_user['username'], self.current_user['id'])
+                 self.current_user['username'], self.current_user['user_id'])
             )
 
             # Update current user object
             self.current_user['full_name'] = new_full_name
 
             # Log action
-            self.logging_service.log_user_action("PROFILE_UPDATED", {'user_id': self.current_user['id']})
+            self.logging_service.log_user_action("PROFILE_UPDATED", {'user_id': self.current_user['user_id']})
 
             QMessageBox.information(
                 self,
@@ -543,4 +543,4 @@ class UserProfileDialog(QDialog):
                 "Sessions Cleared",
                 "All other sessions have been logged out."
             )
-            self.logging_service.log_user_action("SESSIONS_CLEARED", {'user_id': self.current_user['id']})
+            self.logging_service.log_user_action("SESSIONS_CLEARED", {'user_id': self.current_user['user_id']})

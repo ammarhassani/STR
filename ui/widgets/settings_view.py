@@ -57,7 +57,7 @@ class SettingsView(QWidget):
             "Configure application settings, appearance, notifications, security, and advanced options."
         )
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("color: #7f8c8d; font-size: 11pt;")
+        desc_label.setObjectName("subtitleLabel")
         layout.addWidget(desc_label)
 
         layout.addSpacing(20)
@@ -82,14 +82,14 @@ class SettingsView(QWidget):
         # Description
         settings_desc = QLabel(
             "Click the button below to open the comprehensive settings dialog where you can:\n\n"
-            "• Change theme and appearance\n"
+            "• Configure appearance and layout\n"
             "• Configure notifications\n"
             "• Manage security settings\n"
             "• Adjust advanced options\n"
             "• Set user preferences"
         )
         settings_desc.setWordWrap(True)
-        settings_desc.setStyleSheet("color: #7f8c8d;")
+        settings_desc.setObjectName("subtitleLabel")
         card_layout.addWidget(settings_desc)
 
         card_layout.addSpacing(10)
@@ -116,28 +116,9 @@ class SettingsView(QWidget):
         )
 
         # Connect signals
-        dialog.theme_changed.connect(self.on_theme_changed)
         dialog.settings_changed.connect(self.on_settings_changed)
 
         dialog.exec()
-
-    def on_theme_changed(self, theme_name: str):
-        """
-        Handle theme change.
-
-        Args:
-            theme_name: New theme name
-        """
-        # Find the FIU application instance and apply theme
-        app = self.window()
-        while app.parent():
-            app = app.parent()
-
-        # Access the main FIU application
-        from PyQt6.QtWidgets import QApplication
-        qapp = QApplication.instance()
-        if hasattr(qapp, '_fiu_app'):
-            qapp._fiu_app.apply_theme(theme_name)
 
     def on_settings_changed(self, settings: dict):
         """

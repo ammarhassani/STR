@@ -98,7 +98,7 @@ class ExportView(QWidget):
             "Apply filters to export only specific reports."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #7f8c8d; font-size: 10pt;")
+        desc.setObjectName("subtitleLabel")
         layout.addWidget(desc)
 
         # Filters section
@@ -193,7 +193,7 @@ class ExportView(QWidget):
         filename_info = QLabel(
             "File will be automatically named: fiu_reports_YYYYMMDD_HHMMSS.csv"
         )
-        filename_info.setStyleSheet("color: #7f8c8d; font-size: 9pt; font-style: italic;")
+        filename_info.setObjectName("hintLabel")
         output_layout.addWidget(filename_info)
 
         layout.addWidget(output_group)
@@ -217,7 +217,7 @@ class ExportView(QWidget):
 
         # Stats
         self.stats_label = QLabel("")
-        self.stats_label.setStyleSheet("color: #7f8c8d; font-size: 10pt;")
+        self.stats_label.setObjectName("subtitleLabel")
         self.stats_label.setVisible(False)
         layout.addWidget(self.stats_label)
 

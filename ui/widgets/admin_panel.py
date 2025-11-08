@@ -98,7 +98,7 @@ class UserDialog(QDialog):
 
         # Info text
         info_label = QLabel("* Required fields")
-        info_label.setStyleSheet("color: #7f8c8d; font-size: 9pt; font-style: italic;")
+        info_label.setObjectName("hintLabel")
         layout.addWidget(info_label)
 
         # Buttons
@@ -276,7 +276,7 @@ class AdminPanel(QWidget):
 
         # Stats
         self.stats_label = QLabel("0 users")
-        self.stats_label.setStyleSheet("color: #7f8c8d; font-weight: 500;")
+        self.stats_label.setObjectName("subtitleLabel")
         layout.addWidget(self.stats_label)
 
         # Users table

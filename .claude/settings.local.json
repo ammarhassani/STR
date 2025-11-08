@@ -3,7 +3,10 @@
     "allow": [
       "Bash(dir /S /B)",
       "Bash(pip install:*)",
-      "Bash($null)"
+      "Bash($null)",
+      "Bash(del \"C:\\Users\\A\\Desktop\\STR\\V2\\resources\\style.qss\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(dir /S /B \"C:\\Users\\A\\Desktop\\STR\\V2\\issues\")"
     ],
     "deny": [],
     "ask": []
