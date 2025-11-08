@@ -819,6 +819,6 @@ class ReportsView(QWidget):
         if column_widths:
             for i, width in enumerate(column_widths):
                 if i < self.reports_table.columnCount():
-                    self.reports_table.setColumnWidth(i, width)
+                    self.reports_table.setColumnWidth(i, int(width))
 
         # Note: Row heights will be restored when rows are loaded in on_reports_loaded()

@@ -397,6 +397,6 @@ class ApprovalPanel(QWidget):
         if column_widths:
             for i, width in enumerate(column_widths):
                 if i < self.approvals_table.columnCount():
-                    self.approvals_table.setColumnWidth(i, width)
+                    self.approvals_table.setColumnWidth(i, int(width))
 
         # Note: Row heights will be restored when rows are loaded in load_pending_approvals()

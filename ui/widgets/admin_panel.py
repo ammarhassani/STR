@@ -496,6 +496,6 @@ class AdminPanel(QWidget):
         if column_widths:
             for i, width in enumerate(column_widths):
                 if i < self.users_table.columnCount():
-                    self.users_table.setColumnWidth(i, width)
+                    self.users_table.setColumnWidth(i, int(width))
 
         # Note: Row heights will be restored when rows are loaded in load_users()
