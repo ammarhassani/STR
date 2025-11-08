@@ -274,8 +274,8 @@ class ReportsView(QWidget):
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Created By
         header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Created At
 
-        # Set row height to accommodate content
-        self.reports_table.verticalHeader().setDefaultSectionSize(40)
+        # Allow rows to automatically resize to fit content
+        self.reports_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.reports_table)
 
@@ -394,9 +394,6 @@ class ReportsView(QWidget):
         self.reports_table.setRowCount(len(reports))
 
         for row, report in enumerate(reports):
-            # Ensure row height is sufficient to display content
-            self.reports_table.setRowHeight(row, 45)
-
             # SN
             sn_item = QTableWidgetItem(str(report.get('sn', '')))
             self.reports_table.setItem(row, 0, sn_item)

@@ -301,9 +301,8 @@ class AdminPanel(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Last Login
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Actions
 
-        # Set row height to accommodate action buttons properly
-        self.users_table.verticalHeader().setDefaultSectionSize(50)
-        self.users_table.verticalHeader().setMinimumSectionSize(50)
+        # Allow rows to automatically resize to fit content (buttons/widgets)
+        self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.users_table)
 
@@ -349,9 +348,6 @@ class AdminPanel(QWidget):
             self.users_table.setRowCount(len(self.current_users))
 
             for row, user in enumerate(self.current_users):
-                # Set row height to ensure buttons are visible
-                self.users_table.setRowHeight(row, 50)
-
                 # ID
                 id_item = QTableWidgetItem(str(user['user_id']))
                 self.users_table.setItem(row, 0, id_item)
