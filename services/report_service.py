@@ -222,13 +222,9 @@ class ReportService:
             if not result:
                 return None
 
-            # Get column names
-            columns_query = "PRAGMA table_info(reports)"
-            columns_result = self.db_manager.execute_with_retry(columns_query)
-            column_names = [col[1] for col in columns_result]
-
-            # Build dictionary
-            report = dict(zip(column_names, result[0]))
+            # Convert sqlite3.Row to dictionary using keys() method
+            row = result[0]
+            report = {key: row[key] for key in row.keys()}
             return report
 
         except Exception as e:
