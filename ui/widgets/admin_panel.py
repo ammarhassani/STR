@@ -392,6 +392,7 @@ class AdminPanel(QWidget):
 
                 edit_btn = QPushButton("Edit")
                 edit_btn.setMaximumWidth(60)
+                edit_btn.setMinimumHeight(36)  # Ensure button is tall enough to see
                 edit_btn.clicked.connect(lambda checked, u=user: self.edit_user(u))
                 actions_layout.addWidget(edit_btn)
 
@@ -400,6 +401,7 @@ class AdminPanel(QWidget):
                     delete_btn = QPushButton("Delete")
                     delete_btn.setObjectName("dangerButton")
                     delete_btn.setMaximumWidth(60)
+                    delete_btn.setMinimumHeight(36)  # Ensure button is tall enough to see
                     delete_btn.clicked.connect(lambda checked, u=user: self.delete_user(u))
                     actions_layout.addWidget(delete_btn)
 

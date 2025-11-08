@@ -280,23 +280,12 @@ class LoggingService:
 
         result = self.db_manager.execute_with_retry(query, params)
 
-        # Convert to list of dictionaries
+        # Convert sqlite3.Row objects to dictionaries
         logs = []
         for row in result:
-            logs.append({
-                'log_id': row[0],
-                'timestamp': row[1],
-                'log_level': row[2],
-                'module': row[3],
-                'function_name': row[4],
-                'message': row[5],
-                'user_id': row[6],
-                'username': row[7],
-                'exception_type': row[8],
-                'exception_message': row[9],
-                'stack_trace': row[10],
-                'extra_data': row[11]
-            })
+            # Use row.keys() to get actual column names from query result
+            log_dict = {key: row[key] for key in row.keys()}
+            logs.append(log_dict)
 
         return logs
 

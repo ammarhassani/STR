@@ -394,6 +394,9 @@ class ReportsView(QWidget):
         self.reports_table.setRowCount(len(reports))
 
         for row, report in enumerate(reports):
+            # Ensure row height is sufficient to display content
+            self.reports_table.setRowHeight(row, 45)
+
             # SN
             sn_item = QTableWidgetItem(str(report.get('sn', '')))
             self.reports_table.setItem(row, 0, sn_item)
