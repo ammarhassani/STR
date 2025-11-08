@@ -155,12 +155,12 @@ class UserProfileDialog(QDialog):
 
         self.username_input = QLineEdit()
         self.username_input.setReadOnly(True)
-        self.username_input.setStyleSheet("background-color: #161b22; color: #8b949e;")
+        self.username_input.setObjectName("readOnlyField")
         basic_layout.addRow("Username:", self.username_input)
 
         self.role_input = QLineEdit()
         self.role_input.setReadOnly(True)
-        self.role_input.setStyleSheet("background-color: #161b22; color: #8b949e;")
+        self.role_input.setObjectName("readOnlyField")
         basic_layout.addRow("Role:", self.role_input)
 
         basic_group.setLayout(basic_layout)
@@ -285,6 +285,7 @@ class UserProfileDialog(QDialog):
         # Password section
         password_group = QGroupBox("Password & Authentication")
         password_layout = QVBoxLayout()
+        password_layout.setContentsMargins(16, 20, 16, 16)  # Add padding inside group box
         password_layout.setSpacing(12)
 
         password_info = QLabel(
@@ -310,6 +311,7 @@ class UserProfileDialog(QDialog):
         # Session info
         session_group = QGroupBox("Active Sessions")
         session_layout = QVBoxLayout()
+        session_layout.setContentsMargins(16, 20, 16, 16)  # Add padding inside group box
         session_layout.setSpacing(12)
 
         session_info = QLabel(
@@ -335,6 +337,7 @@ class UserProfileDialog(QDialog):
         # Security settings
         security_group = QGroupBox("Security Settings")
         security_layout = QVBoxLayout()
+        security_layout.setContentsMargins(16, 20, 16, 16)  # Add padding inside group box
         security_layout.setSpacing(12)
 
         security_info = QLabel(

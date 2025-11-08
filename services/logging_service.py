@@ -202,16 +202,40 @@ class LoggingService:
     def log_user_action(self, action: str, details: Optional[Dict[str, Any]] = None):
         """
         Log a user action for audit trail.
+        Writes to both system_logs (for general logging) and audit_log (for permanent audit trail).
 
         Args:
             action: Description of the action
             details: Optional dictionary with additional details
         """
+        # Log to system_logs via logger
         message = f"User action: {action}"
         extra = {'action': action}
         if details:
             extra['details'] = details
         self.logger.info(message, extra=extra)
+
+        # Also log to audit_log table for permanent audit trail
+        try:
+            user_id = self.db_handler.user_context.get('user_id')
+            username = self.db_handler.user_context.get('username')
+
+            if user_id and username:
+                query = """
+                    INSERT INTO audit_log (user_id, username, action_type, action_details, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """
+                params = (
+                    user_id,
+                    username,
+                    action,
+                    json.dumps(details) if details else None,
+                    datetime.now().isoformat()
+                )
+                self.db_manager.execute_with_retry(query, params)
+        except Exception as e:
+            # Don't fail if audit logging fails, just log to stderr
+            print(f"Failed to log to audit_log: {e}", file=sys.stderr)
 
     def get_logs(self,
                  level: Optional[str] = None,

@@ -293,7 +293,8 @@ class ReportsView(QWidget):
             for user in users:
                 user_id, username, full_name = user
                 display_name = f"{full_name} ({username})"
-                self.creator_combo.addItem(display_name, user_id)
+                # Store username (not user_id) because reports.created_by contains username
+                self.creator_combo.addItem(display_name, username)
 
         except Exception as e:
             self.logging_service.error(f"Error loading creators: {str(e)}")
