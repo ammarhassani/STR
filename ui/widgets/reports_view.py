@@ -260,26 +260,35 @@ class ReportsView(QWidget):
         self.reports_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.reports_table.doubleClicked.connect(self.view_report)
 
-        # Set column widths
+        # Enable manual column resizing (drag column borders to resize)
         header = self.reports_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # SN
-        header.resizeSection(0, 80)  # Fixed width for SN column to prevent dots
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Report Number
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Date
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Entity Name
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # Version
-        header.resizeSection(5, 70)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Approval
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Created By
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Created At
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+        header.setStretchLastSection(False)
+
+        # Set default column widths
+        header.resizeSection(0, 80)   # SN
+        header.resizeSection(1, 150)  # Report Number
+        header.resizeSection(2, 120)  # Date
+        header.resizeSection(3, 250)  # Entity Name
+        header.resizeSection(4, 150)  # Status
+        header.resizeSection(5, 80)   # Version
+        header.resizeSection(6, 120)  # Approval
+        header.resizeSection(7, 130)  # Created By
+        header.resizeSection(8, 170)  # Created At
 
         # Enable manual row resizing like Excel (drag row borders to resize)
         self.reports_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.reports_table.verticalHeader().setDefaultSectionSize(45)  # Default height for readability
         self.reports_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
 
+        # Connect signals to save geometry when user resizes
+        header.sectionResized.connect(self.save_table_geometry)
+        self.reports_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
+
         layout.addWidget(self.reports_table)
+
+        # Restore saved column widths and row heights
+        self.restore_table_geometry()
 
         # Status label
         self.status_label = QLabel("")
@@ -780,3 +789,36 @@ class ReportsView(QWidget):
     def refresh(self):
         """Refresh the view (called from main window)."""
         self.load_reports()
+
+    def save_table_geometry(self):
+        """Save column widths and row heights to settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Save column widths
+        column_widths = []
+        for i in range(self.reports_table.columnCount()):
+            column_widths.append(self.reports_table.columnWidth(i))
+        settings.setValue('reports_view/column_widths', column_widths)
+
+        # Save row heights (only save if user has customized)
+        row_heights = {}
+        for i in range(self.reports_table.rowCount()):
+            height = self.reports_table.rowHeight(i)
+            if height != 45:  # Only save if different from default
+                row_heights[i] = height
+        settings.setValue('reports_view/row_heights', row_heights)
+
+    def restore_table_geometry(self):
+        """Restore column widths and row heights from settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Restore column widths
+        column_widths = settings.value('reports_view/column_widths', None)
+        if column_widths:
+            for i, width in enumerate(column_widths):
+                if i < self.reports_table.columnCount():
+                    self.reports_table.setColumnWidth(i, width)
+
+        # Note: Row heights will be restored when rows are loaded in on_reports_loaded()

@@ -209,27 +209,33 @@ class ApprovalPanel(QWidget):
         self.approvals_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.approvals_table.verticalHeader().setVisible(False)
 
-        # Set column widths
+        # Enable manual column resizing (drag column borders to resize)
         header = self.approvals_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(0, 100)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 120)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(3, 150)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(4, 100)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(6, 150)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+        header.setStretchLastSection(False)
+
+        # Set default column widths
+        header.resizeSection(0, 120)  # Report #
+        header.resizeSection(1, 250)  # Entity Name
+        header.resizeSection(2, 120)  # Requested By
+        header.resizeSection(3, 150)  # Requested At
+        header.resizeSection(4, 100)  # Status
+        header.resizeSection(5, 200)  # Comment
+        header.resizeSection(6, 150)  # Actions
 
         # Enable manual row resizing like Excel (drag row borders to resize)
         self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.approvals_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
         self.approvals_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
 
+        # Connect signals to save geometry when user resizes
+        header.sectionResized.connect(self.save_table_geometry)
+        self.approvals_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
+
         layout.addWidget(self.approvals_table)
+
+        # Restore saved column widths and row heights
+        self.restore_table_geometry()
 
         # Empty state label
         self.empty_label = QLabel("No pending approval requests")
@@ -363,3 +369,36 @@ class ApprovalPanel(QWidget):
     def refresh(self):
         """Refresh the pending approvals list."""
         self.load_pending_approvals()
+
+    def save_table_geometry(self):
+        """Save column widths and row heights to settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Save column widths
+        column_widths = []
+        for i in range(self.approvals_table.columnCount()):
+            column_widths.append(self.approvals_table.columnWidth(i))
+        settings.setValue('approval_panel/column_widths', column_widths)
+
+        # Save row heights (only save if user has customized)
+        row_heights = {}
+        for i in range(self.approvals_table.rowCount()):
+            height = self.approvals_table.rowHeight(i)
+            if height != 52:  # Only save if different from default
+                row_heights[i] = height
+        settings.setValue('approval_panel/row_heights', row_heights)
+
+    def restore_table_geometry(self):
+        """Restore column widths and row heights from settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Restore column widths
+        column_widths = settings.value('approval_panel/column_widths', None)
+        if column_widths:
+            for i, width in enumerate(column_widths):
+                if i < self.approvals_table.columnCount():
+                    self.approvals_table.setColumnWidth(i, width)
+
+        # Note: Row heights will be restored when rows are loaded in load_pending_approvals()

@@ -291,22 +291,33 @@ class AdminPanel(QWidget):
         self.users_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.users_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
 
-        # Set column widths
+        # Enable manual column resizing (drag column borders to resize)
         header = self.users_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # ID
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Username
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Full Name
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Role
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Last Login
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Actions
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+        header.setStretchLastSection(False)
+
+        # Set default column widths
+        header.resizeSection(0, 60)   # ID
+        header.resizeSection(1, 120)  # Username
+        header.resizeSection(2, 200)  # Full Name
+        header.resizeSection(3, 100)  # Role
+        header.resizeSection(4, 100)  # Status
+        header.resizeSection(5, 180)  # Last Login
+        header.resizeSection(6, 150)  # Actions
 
         # Enable manual row resizing like Excel (drag row borders to resize)
         self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.users_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
         self.users_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
 
+        # Connect signals to save geometry when user resizes
+        header.sectionResized.connect(self.save_table_geometry)
+        self.users_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
+
         layout.addWidget(self.users_table)
+
+        # Restore saved column widths and row heights
+        self.restore_table_geometry()
 
     def load_users(self):
         """Load users from database."""
@@ -458,3 +469,36 @@ class AdminPanel(QWidget):
     def refresh(self):
         """Refresh the view (called from main window)."""
         self.load_users()
+
+    def save_table_geometry(self):
+        """Save column widths and row heights to settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Save column widths
+        column_widths = []
+        for i in range(self.users_table.columnCount()):
+            column_widths.append(self.users_table.columnWidth(i))
+        settings.setValue('admin_panel/column_widths', column_widths)
+
+        # Save row heights (only save if user has customized)
+        row_heights = {}
+        for i in range(self.users_table.rowCount()):
+            height = self.users_table.rowHeight(i)
+            if height != 52:  # Only save if different from default
+                row_heights[i] = height
+        settings.setValue('admin_panel/row_heights', row_heights)
+
+    def restore_table_geometry(self):
+        """Restore column widths and row heights from settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Restore column widths
+        column_widths = settings.value('admin_panel/column_widths', None)
+        if column_widths:
+            for i, width in enumerate(column_widths):
+                if i < self.users_table.columnCount():
+                    self.users_table.setColumnWidth(i, width)
+
+        # Note: Row heights will be restored when rows are loaded in load_users()
