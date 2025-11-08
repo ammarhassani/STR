@@ -311,15 +311,13 @@ class ReportService:
             # Execute query
             result = self.db_manager.execute_with_retry(query, params)
 
-            # Get column names
-            columns_query = "PRAGMA table_info(reports)"
-            columns_result = self.db_manager.execute_with_retry(columns_query)
-            column_names = [col[1] for col in columns_result]
-
-            # Build list of dictionaries
+            # Convert sqlite3.Row objects to dictionaries
+            # sqlite3.Row objects have keys() method that returns actual column names
             reports = []
             for row in result:
-                reports.append(dict(zip(column_names, row)))
+                # Create dict from sqlite3.Row using keys() - this preserves all column names correctly
+                report_dict = {key: row[key] for key in row.keys()}
+                reports.append(report_dict)
 
             return reports, total_count
 
