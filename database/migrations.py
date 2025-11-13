@@ -28,10 +28,11 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             cursor.execute("SELECT theme_preference FROM users LIMIT 1")
         except sqlite3.OperationalError:
             # Column doesn't exist, add it
+            # CHECK constraints in ALTER TABLE ADD COLUMN require SQLite 3.25.0+
+            # Validation is handled at application level
             cursor.execute("""
                 ALTER TABLE users
                 ADD COLUMN theme_preference TEXT DEFAULT 'light'
-                CHECK(theme_preference IN ('light', 'dark'))
             """)
             conn.commit()
             messages.append("Added theme_preference column to users table")
@@ -119,13 +120,41 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         try:
             cursor.execute("SELECT approval_status FROM reports LIMIT 1")
         except sqlite3.OperationalError:
+            # Add approval_status column without CHECK constraint
+            # (CHECK constraints in ALTER TABLE ADD COLUMN require SQLite 3.25.0+)
+            # Validation is handled at application level
             cursor.execute("""
                 ALTER TABLE reports
                 ADD COLUMN approval_status TEXT DEFAULT 'draft'
-                CHECK(approval_status IN ('draft', 'pending_approval', 'approved', 'rejected', 'rework'))
             """)
             conn.commit()
             messages.append("Added approval_status column to reports table")
+
+        # Migration 6: Ensure system_logs table exists
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='system_logs'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE TABLE system_logs (
+                    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT DEFAULT (datetime('now')),
+                    log_level TEXT NOT NULL,
+                    module TEXT NOT NULL,
+                    function_name TEXT,
+                    message TEXT NOT NULL,
+                    user_id INTEGER,
+                    username TEXT,
+                    exception_type TEXT,
+                    exception_message TEXT,
+                    stack_trace TEXT,
+                    extra_data TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+                )
+            """)
+            conn.commit()
+            messages.append("Created system_logs table")
 
         conn.close()
 

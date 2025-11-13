@@ -239,7 +239,7 @@ class ChangePasswordDialog(QDialog):
 
             # Change password
             success = self.auth_service.change_password(
-                self.current_user['id'],
+                self.current_user['user_id'],
                 new_password
             )
 

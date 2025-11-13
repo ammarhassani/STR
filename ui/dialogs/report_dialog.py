@@ -646,7 +646,11 @@ class ReportDialog(QDialog):
                 # Update existing report
                 report_id = self.report_data.get('report_id') or self.report_data.get('id')
                 if not report_id:
-                    raise ValueError("Report ID not found in report data")
+                    # Log available keys for debugging
+                    available_keys = ', '.join(self.report_data.keys()) if self.report_data else 'None'
+                    error_msg = f"Report ID not found in report data. Available keys: {available_keys}"
+                    self.logging_service.error(error_msg)
+                    raise ValueError(error_msg)
 
                 # Create version snapshot before updating
                 snapshot_success, version_id, snapshot_msg = self.report_service.create_version_snapshot(

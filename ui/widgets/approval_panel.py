@@ -6,7 +6,8 @@ Admin-only view for approving, rejecting, or requesting rework on reports.
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QHeaderView, QFrame, QDialog, QTextEdit,
-                             QMessageBox, QRadioButton, QButtonGroup, QLineEdit)
+                             QMessageBox, QRadioButton, QButtonGroup, QLineEdit,
+                             QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 from datetime import datetime
@@ -209,25 +210,33 @@ class ApprovalPanel(QWidget):
         self.approvals_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.approvals_table.verticalHeader().setVisible(False)
 
-        # Set column widths
+        # Enable manual column resizing (drag column borders to resize)
         header = self.approvals_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(0, 100)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 120)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(3, 150)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(4, 100)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(6, 150)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+        header.setStretchLastSection(False)
 
-        # Set row height to accommodate buttons
-        self.approvals_table.verticalHeader().setDefaultSectionSize(45)
+        # Set default column widths
+        header.resizeSection(0, 120)  # Report #
+        header.resizeSection(1, 250)  # Entity Name
+        header.resizeSection(2, 120)  # Requested By
+        header.resizeSection(3, 150)  # Requested At
+        header.resizeSection(4, 100)  # Status
+        header.resizeSection(5, 200)  # Comment
+        header.resizeSection(6, 150)  # Actions
+
+        # Enable manual row resizing like Excel (drag row borders to resize)
+        self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.approvals_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
+        self.approvals_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
+
+        # Connect signals to save geometry when user resizes
+        header.sectionResized.connect(self.save_table_geometry)
+        self.approvals_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
 
         layout.addWidget(self.approvals_table)
+
+        # Restore saved column widths and row heights
+        self.restore_table_geometry()
 
         # Empty state label
         self.empty_label = QLabel("No pending approval requests")
@@ -286,19 +295,20 @@ class ApprovalPanel(QWidget):
                 comment_item.setToolTip(comment)
                 self.approvals_table.setItem(row, 5, comment_item)
 
-                # Actions - Review button
+                # Actions - Review button - fully responsive to cell size
                 actions_widget = QWidget()
                 actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(8, 5, 8, 5)  # Better spacing
+                actions_layout.setContentsMargins(4, 4, 4, 4)  # Minimal padding
 
                 review_button = QPushButton("Review")
                 review_button.setObjectName("primaryButton")
-                review_button.setMinimumHeight(32)  # Ensure button is clickable
-                review_button.setMaximumWidth(90)
+                # No size constraints - button adapts to cell size
+                review_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
                 review_button.clicked.connect(lambda checked, r=row: self.review_approval(r))
                 actions_layout.addWidget(review_button)
 
-                actions_layout.addStretch()
+                # Make container fill the cell completely
+                actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
                 self.approvals_table.setCellWidget(row, 6, actions_widget)
 
@@ -357,3 +367,37 @@ class ApprovalPanel(QWidget):
     def refresh(self):
         """Refresh the pending approvals list."""
         self.load_pending_approvals()
+
+    def save_table_geometry(self):
+        """Save column widths and row heights to settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Save column widths
+        column_widths = []
+        for i in range(self.approvals_table.columnCount()):
+            column_widths.append(self.approvals_table.columnWidth(i))
+        settings.setValue('approval_panel/column_widths', column_widths)
+
+        # Save default row height (when user resizes any row, apply to all)
+        if self.approvals_table.rowCount() > 0:
+            # Get the height of the first row as the default for all rows
+            default_height = self.approvals_table.rowHeight(0)
+            settings.setValue('approval_panel/default_row_height', default_height)
+
+    def restore_table_geometry(self):
+        """Restore column widths and row heights from settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Restore column widths
+        column_widths = settings.value('approval_panel/column_widths', None)
+        if column_widths:
+            for i, width in enumerate(column_widths):
+                if i < self.approvals_table.columnCount():
+                    self.approvals_table.setColumnWidth(i, int(width))
+
+        # Restore default row height
+        default_height = settings.value('approval_panel/default_row_height', None)
+        if default_height:
+            self.approvals_table.verticalHeader().setDefaultSectionSize(int(default_height))

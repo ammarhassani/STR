@@ -85,7 +85,7 @@ class LoginWindow(QWidget):
 
         # Username field
         username_label = QLabel("Username")
-        username_label.setStyleSheet("font-weight: 600; color: #2c3e50;")
+        username_label.setStyleSheet("font-weight: 600; color: #8b949e;")
 
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Enter your username")
@@ -97,7 +97,7 @@ class LoginWindow(QWidget):
 
         # Password field
         password_label = QLabel("Password")
-        password_label.setStyleSheet("font-weight: 600; color: #2c3e50;")
+        password_label.setStyleSheet("font-weight: 600; color: #8b949e;")
 
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Enter your password")

@@ -135,7 +135,7 @@ class VersionHistoryDialog(QDialog):
         self.restore_button.setEnabled(False)
         self.restore_button.clicked.connect(self.restore_version)
         # Only admins can restore
-        if self.current_user.get('role') != 'Admin':
+        if self.current_user.get('role') != 'admin':
             self.restore_button.setVisible(False)
         action_layout.addWidget(self.restore_button)
 
@@ -220,7 +220,7 @@ class VersionHistoryDialog(QDialog):
                 self.display_version_details(version, snapshot)
 
             self.compare_button.setEnabled(True)
-            if self.current_user.get('role') == 'Admin':
+            if self.current_user.get('role') == 'admin':
                 self.restore_button.setEnabled(True)
 
     def display_version_details(self, version, snapshot):
@@ -311,7 +311,7 @@ class VersionHistoryDialog(QDialog):
         if not self.selected_version_id:
             return
 
-        if self.current_user.get('role') != 'Admin':
+        if self.current_user.get('role') != 'admin':
             QMessageBox.warning(self, "Permission Denied",
                               "Only administrators can restore previous versions.")
             return

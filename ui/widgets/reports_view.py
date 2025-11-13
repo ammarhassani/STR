@@ -71,6 +71,26 @@ class ReportsView(QWidget):
 
         header_layout.addStretch()
 
+        # My Reports quick filter (for agents)
+        if self.current_user.get('role') != 'admin':
+            my_reports_btn = QPushButton("My Reports")
+            my_reports_btn.setIcon(get_icon('user'))
+            my_reports_btn.setObjectName("secondaryButton")
+            my_reports_btn.setCheckable(True)
+            my_reports_btn.clicked.connect(self.toggle_my_reports)
+            my_reports_btn.setToolTip("Show only reports created by me")
+            header_layout.addWidget(my_reports_btn)
+            self.my_reports_btn = my_reports_btn
+
+            # Send All to Approval button
+            send_all_btn = QPushButton("Send All to Approval")
+            send_all_btn.setIcon(get_icon('check-circle'))
+            send_all_btn.setObjectName("primaryButton")
+            send_all_btn.clicked.connect(self.send_all_to_approval)
+            send_all_btn.setToolTip("Send all my draft reports for approval")
+            header_layout.addWidget(send_all_btn)
+            self.send_all_btn = send_all_btn
+
         # Export to Excel button
         export_btn = QPushButton("Export to Excel")
         export_btn.setIcon(get_icon('file-excel', color='#27ae60'))
@@ -240,24 +260,35 @@ class ReportsView(QWidget):
         self.reports_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.reports_table.doubleClicked.connect(self.view_report)
 
-        # Set column widths
+        # Enable manual column resizing (drag column borders to resize)
         header = self.reports_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # SN
-        header.resizeSection(0, 80)  # Fixed width for SN column to prevent dots
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Report Number
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Date
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Entity Name
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # Version
-        header.resizeSection(5, 70)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Approval
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Created By
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Created At
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+        header.setStretchLastSection(False)
 
-        # Set row height to accommodate content
-        self.reports_table.verticalHeader().setDefaultSectionSize(40)
+        # Set default column widths
+        header.resizeSection(0, 80)   # SN
+        header.resizeSection(1, 150)  # Report Number
+        header.resizeSection(2, 120)  # Date
+        header.resizeSection(3, 250)  # Entity Name
+        header.resizeSection(4, 150)  # Status
+        header.resizeSection(5, 80)   # Version
+        header.resizeSection(6, 120)  # Approval
+        header.resizeSection(7, 130)  # Created By
+        header.resizeSection(8, 170)  # Created At
+
+        # Enable manual row resizing like Excel (drag row borders to resize)
+        self.reports_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.reports_table.verticalHeader().setDefaultSectionSize(45)  # Default height for readability
+        self.reports_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
+
+        # Connect signals to save geometry when user resizes
+        header.sectionResized.connect(self.save_table_geometry)
+        self.reports_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
 
         layout.addWidget(self.reports_table)
+
+        # Restore saved column widths and row heights
+        self.restore_table_geometry()
 
         # Status label
         self.status_label = QLabel("")
@@ -293,7 +324,8 @@ class ReportsView(QWidget):
             for user in users:
                 user_id, username, full_name = user
                 display_name = f"{full_name} ({username})"
-                self.creator_combo.addItem(display_name, user_id)
+                # Store username (not user_id) because reports.created_by contains username
+                self.creator_combo.addItem(display_name, username)
 
         except Exception as e:
             self.logging_service.error(f"Error loading creators: {str(e)}")
@@ -653,6 +685,141 @@ class ReportsView(QWidget):
             self.logging_service.error(error_msg)
             QMessageBox.critical(self, "Export Error", error_msg)
 
+    def toggle_my_reports(self):
+        """Toggle filter to show only current user's reports."""
+        if hasattr(self, 'my_reports_btn') and self.my_reports_btn.isChecked():
+            # Set creator filter to current user
+            for i in range(self.creator_combo.count()):
+                if self.creator_combo.itemData(i) == self.current_user['username']:
+                    self.creator_combo.setCurrentIndex(i)
+                    break
+            self.my_reports_btn.setText("All Reports")
+            self.my_reports_btn.setToolTip("Show all reports")
+        else:
+            # Clear creator filter
+            self.creator_combo.setCurrentIndex(0)  # "All Users"
+            if hasattr(self, 'my_reports_btn'):
+                self.my_reports_btn.setText("My Reports")
+                self.my_reports_btn.setToolTip("Show only reports created by me")
+
+        # Reload reports with new filter
+        self.on_filter_changed()
+
+    def send_all_to_approval(self):
+        """Send all draft reports created by current user to approval."""
+        try:
+            # Get all draft reports by current user
+            draft_reports, _ = self.report_service.get_reports(
+                status=None,
+                search_term=None,
+                created_by=self.current_user['username'],
+                limit=None  # Get all
+            )
+
+            # Filter for draft approval status
+            draft_approval_reports = [
+                r for r in draft_reports
+                if r.get('approval_status', 'draft') == 'draft'
+            ]
+
+            if not draft_approval_reports:
+                QMessageBox.information(
+                    self,
+                    "No Draft Reports",
+                    "You have no draft reports to send for approval."
+                )
+                return
+
+            # Confirm action
+            reply = QMessageBox.question(
+                self,
+                "Confirm Send All",
+                f"Send {len(draft_approval_reports)} draft report(s) for approval?\n\n"
+                "This will submit all your draft reports for admin review.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+            # Send each report for approval
+            success_count = 0
+            failed_reports = []
+
+            for report in draft_approval_reports:
+                success, approval_id, message = self.report_service.request_approval(
+                    report['report_id'],
+                    comment="Bulk submission via Send All"
+                )
+
+                if success:
+                    success_count += 1
+                else:
+                    failed_reports.append(f"Report {report.get('report_number', report['report_id'])}: {message}")
+
+            # Show results
+            if success_count == len(draft_approval_reports):
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Successfully sent {success_count} report(s) for approval!"
+                )
+            elif success_count > 0:
+                QMessageBox.warning(
+                    self,
+                    "Partial Success",
+                    f"Sent {success_count} of {len(draft_approval_reports)} reports for approval.\n\n"
+                    f"Failed reports:\n" + "\n".join(failed_reports[:5])
+                )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Failed",
+                    f"Failed to send reports for approval:\n" + "\n".join(failed_reports[:5])
+                )
+
+            # Reload reports to show updated approval status
+            self.load_reports()
+
+        except Exception as e:
+            error_msg = f"Error sending reports for approval: {str(e)}"
+            self.logging_service.error(error_msg, exc_info=True)
+            QMessageBox.critical(self, "Error", error_msg)
+
     def refresh(self):
         """Refresh the view (called from main window)."""
         self.load_reports()
+
+    def save_table_geometry(self):
+        """Save column widths and row heights to settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Save column widths
+        column_widths = []
+        for i in range(self.reports_table.columnCount()):
+            column_widths.append(self.reports_table.columnWidth(i))
+        settings.setValue('reports_view/column_widths', column_widths)
+
+        # Save default row height (when user resizes any row, apply to all)
+        if self.reports_table.rowCount() > 0:
+            # Get the height of the first row as the default for all rows
+            default_height = self.reports_table.rowHeight(0)
+            settings.setValue('reports_view/default_row_height', default_height)
+
+    def restore_table_geometry(self):
+        """Restore column widths and row heights from settings."""
+        from PyQt6.QtCore import QSettings
+        settings = QSettings('FIU', 'ReportManagement')
+
+        # Restore column widths
+        column_widths = settings.value('reports_view/column_widths', None)
+        if column_widths:
+            for i, width in enumerate(column_widths):
+                if i < self.reports_table.columnCount():
+                    self.reports_table.setColumnWidth(i, int(width))
+
+        # Restore default row height
+        default_height = settings.value('reports_view/default_row_height', None)
+        if default_height:
+            self.reports_table.verticalHeader().setDefaultSectionSize(int(default_height))
