@@ -1,12 +1,18 @@
 {
   "permissions": {
     "allow": [
+<<<<<<< HEAD
       "Bash(dir /S /B)",
       "Bash(pip install:*)",
       "Bash($null)",
       "Bash(del \"C:\\Users\\A\\Desktop\\STR\\V2\\resources\\style.qss\")",
       "mcp__ide__getDiagnostics",
       "Bash(dir /S /B \"C:\\Users\\A\\Desktop\\STR\\V2\\issues\")"
+=======
+      "Bash(pip install:*)",
+      "Bash(del main.py add_report_module.py reports_module.py admin_panel.py export_module.py pyqt6_prototype.py)",
+      "Bash(git restore:*)"
+>>>>>>> claude/debug-uppercase-error-011CUq4tvHBACbTt6CBUkV19
     ],
     "deny": [],
     "ask": []
