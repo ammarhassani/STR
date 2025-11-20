@@ -90,18 +90,21 @@ class VersionHistoryDialog(QDialog):
         self.versions_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.versions_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.versions_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.versions_table.verticalHeader().setVisible(False)
+        self.versions_table.verticalHeader().setVisible(True)
         self.versions_table.itemSelectionChanged.connect(self.on_version_selected)
 
-        # Set column widths
+        # Configure responsive column sizing
         header = self.versions_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(0, 80)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(1, 120)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(2, 150)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Version
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Created By
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Created At
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Summary - takes remaining space
+
+        # Configure vertical header for responsive row heights
+        vertical_header = self.versions_table.verticalHeader()
+        vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        vertical_header.setDefaultSectionSize(35)
+        vertical_header.setMinimumSectionSize(30)
 
         left_layout.addWidget(self.versions_table)
 

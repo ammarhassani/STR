@@ -130,7 +130,7 @@ class HelpDialog(QDialog):
 
         # Topics list
         self.topics_list = QListWidget()
-        self.topics_list.setMaximumWidth(250)
+        self.topics_list.setMinimumWidth(250)  # Changed from setMaximumWidth for responsiveness
         self.topics_list.currentItemChanged.connect(self.on_topic_selected)
         splitter.addWidget(self.topics_list)
 

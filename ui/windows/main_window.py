@@ -5,7 +5,8 @@ Contains navigation and view management.
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QPushButton, QStackedWidget, QFrame,
-                             QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox)
+                             QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox,
+                             QSizePolicy)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QFont
 from pathlib import Path
@@ -23,7 +24,7 @@ class MainWindow(QMainWindow):
 
     logout_requested = pyqtSignal()
 
-    def __init__(self, auth_service, logging_service, report_service, dashboard_service, db_manager=None):
+    def __init__(self, auth_service, logging_service, report_service, dashboard_service, approval_service=None, db_manager=None, report_number_service=None):
         """
         Initialize the main window.
 
@@ -32,12 +33,16 @@ class MainWindow(QMainWindow):
             logging_service: LoggingService instance
             report_service: ReportService instance
             dashboard_service: DashboardService instance
+            approval_service: ApprovalService instance (optional)
             db_manager: DatabaseManager instance (optional)
+            report_number_service: ReportNumberService instance (optional)
         """
         super().__init__()
         self.auth_service = auth_service
         self.logging_service = logging_service
         self.report_service = report_service
+        self.approval_service = approval_service
+        self.report_number_service = report_number_service
         self.dashboard_service = dashboard_service
         self.db_manager = db_manager
 
@@ -293,7 +298,7 @@ class MainWindow(QMainWindow):
         """
         header = QFrame()
         header.setMinimumHeight(60)
-        header.setMaximumHeight(80)
+        header.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         header.setStyleSheet("""
             QFrame {
                 background-color: #0d1117;
@@ -319,7 +324,7 @@ class MainWindow(QMainWindow):
         try:
             from ui.widgets.notification_widget import NotificationWidget
             self.notification_widget = NotificationWidget(
-                self.report_service,
+                self.approval_service,
                 self.current_user,
                 self
             )
@@ -378,6 +383,29 @@ class MainWindow(QMainWindow):
             settings_action = QAction(get_icon('cog'), "&Settings", self)
             settings_action.triggered.connect(lambda: self.switch_view('settings'))
             admin_menu.addAction(settings_action)
+
+            admin_menu.addSeparator()
+
+            # Dropdown Management
+            dropdown_mgmt_action = QAction(get_icon('list'), "Dropdown &Management", self)
+            dropdown_mgmt_action.triggered.connect(lambda: self.switch_view('dropdown_mgmt'))
+            admin_menu.addAction(dropdown_mgmt_action)
+
+            # System Settings
+            system_settings_action = QAction(get_icon('sliders-h'), "System Se&ttings", self)
+            system_settings_action.triggered.connect(lambda: self.switch_view('system_settings'))
+            admin_menu.addAction(system_settings_action)
+
+            admin_menu.addSeparator()
+
+            approvals_history_action = QAction(get_icon('history'), "Approvals &History", self)
+            approvals_history_action.triggered.connect(self.show_approvals_history)
+            admin_menu.addAction(approvals_history_action)
+
+            # Reservation Management
+            reservation_mgmt_action = QAction(get_icon('database'), "&Reservation Management", self)
+            reservation_mgmt_action.triggered.connect(self.show_reservation_management)
+            admin_menu.addAction(reservation_mgmt_action)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -475,6 +503,9 @@ class MainWindow(QMainWindow):
                 self.report_service,
                 self.logging_service,
                 self.current_user,
+                auth_service=self.auth_service,
+                approval_service=self.approval_service,
+                report_number_service=self.report_number_service,
                 parent=self
             )
 
@@ -528,7 +559,9 @@ class MainWindow(QMainWindow):
                 'approvals': 'Approval Management',
                 'users': 'User Management',
                 'logs': 'System Logs',
-                'settings': 'Settings'
+                'settings': 'Settings',
+                'dropdown_mgmt': 'Dropdown Management',
+                'system_settings': 'System Settings'
             }
             self.page_title.setText(titles.get(view_id, view_id.title()))
 
@@ -606,6 +639,78 @@ class MainWindow(QMainWindow):
             "<p>Financial Intelligence Unit Report Management</p>"
             "<p>Built with PyQt6 and modern architecture</p>"
         )
+
+    def show_approvals_history(self):
+        """Show approvals history dialog (admin only)."""
+        from ui.dialogs.approvals_history_dialog import ApprovalsHistoryDialog
+        try:
+            if not self.current_user or self.current_user.get('role') != 'admin':
+                QMessageBox.warning(
+                    self,
+                    "Access Denied",
+                    "Only administrators can view approvals history."
+                )
+                return
+
+            if not self.report_service or not self.logging_service:
+                QMessageBox.warning(
+                    self,
+                    "Not Available",
+                    "Approvals history requires database access."
+                )
+                return
+
+            dialog = ApprovalsHistoryDialog(
+                self.report_service,
+                self.logging_service,
+                self
+            )
+            dialog.exec()
+            self.logging_service.info(f"Admin {self.current_user['username']} viewed approvals history")
+
+        except Exception as e:
+            self.logging_service.error(f"Error showing approvals history: {str(e)}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to open approvals history: {str(e)}"
+            )
+
+    def show_reservation_management(self):
+        """Show reservation management dialog (admin only)."""
+        from ui.dialogs.reservation_management_dialog import ReservationManagementDialog
+        try:
+            if not self.current_user or self.current_user.get('role') != 'admin':
+                QMessageBox.warning(
+                    self,
+                    "Access Denied",
+                    "Only administrators can access reservation management."
+                )
+                return
+
+            if not self.report_number_service:
+                QMessageBox.warning(
+                    self,
+                    "Not Available",
+                    "Reservation management requires report number service."
+                )
+                return
+
+            dialog = ReservationManagementDialog(
+                self.report_number_service,
+                self.auth_service,
+                self
+            )
+            dialog.exec()
+            self.logging_service.info(f"Admin {self.current_user['username']} opened reservation management")
+
+        except Exception as e:
+            self.logging_service.error(f"Error showing reservation management: {str(e)}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to open reservation management: {str(e)}"
+            )
 
     def handle_notification_clicked(self, notification):
         """

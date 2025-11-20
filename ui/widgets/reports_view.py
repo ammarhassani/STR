@@ -25,7 +25,7 @@ class ReportsView(QWidget):
     - View/Edit reports
     """
 
-    def __init__(self, report_service, logging_service, auth_service):
+    def __init__(self, report_service, logging_service, auth_service, version_service, approval_service):
         """
         Initialize reports view.
 
@@ -33,11 +33,15 @@ class ReportsView(QWidget):
             report_service: ReportService instance
             logging_service: LoggingService instance
             auth_service: AuthService instance
+            version_service: VersionService instance
+            approval_service: ApprovalService instance
         """
         super().__init__()
         self.report_service = report_service
         self.logging_service = logging_service
         self.auth_service = auth_service
+        self.version_service = version_service
+        self.approval_service = approval_service
         self.current_user = auth_service.get_current_user()
         self.current_reports = []
         self.worker = None
@@ -246,13 +250,13 @@ class ReportsView(QWidget):
         stats_row.addWidget(pagination_widget)
         layout.addLayout(stats_row)
 
-        # Reports table
+        # Reports table - configure dynamically based on database columns
         self.reports_table = QTableWidget()
-        self.reports_table.setColumnCount(9)
-        self.reports_table.setHorizontalHeaderLabels([
-            'SN', 'Report Number', 'Date', 'Entity Name',
-            'Status', 'Version', 'Approval', 'Created By', 'Created At'
-        ])
+
+        # Define columns to display (excluding internal system fields)
+        self.display_columns = self._get_display_columns()
+        self.reports_table.setColumnCount(len(self.display_columns))
+        self.reports_table.setHorizontalHeaderLabels([col['header'] for col in self.display_columns])
 
         # Configure table
         self.reports_table.setAlternatingRowColors(True)
@@ -265,16 +269,10 @@ class ReportsView(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
         header.setStretchLastSection(False)
 
-        # Set default column widths
-        header.resizeSection(0, 80)   # SN
-        header.resizeSection(1, 150)  # Report Number
-        header.resizeSection(2, 120)  # Date
-        header.resizeSection(3, 250)  # Entity Name
-        header.resizeSection(4, 150)  # Status
-        header.resizeSection(5, 80)   # Version
-        header.resizeSection(6, 120)  # Approval
-        header.resizeSection(7, 130)  # Created By
-        header.resizeSection(8, 170)  # Created At
+        # Set dynamic column widths based on column type
+        for i, col_def in enumerate(self.display_columns):
+            width = col_def.get('width', 120)  # Default width
+            header.resizeSection(i, width)
 
         # Enable manual row resizing like Excel (drag row borders to resize)
         self.reports_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -294,6 +292,51 @@ class ReportsView(QWidget):
         self.status_label = QLabel("")
         self.status_label.setObjectName("hintLabel")
         layout.addWidget(self.status_label)
+
+    def _get_display_columns(self):
+        """
+        Define all columns to display in the reports table.
+        Returns list of dicts with 'key', 'header', and 'width' for each column.
+        """
+        return [
+            {'key': 'sn', 'header': 'SN', 'width': 70},
+            {'key': 'report_number', 'header': 'Report Number', 'width': 130},
+            {'key': 'report_date', 'header': 'Report Date', 'width': 110},
+            {'key': 'outgoing_letter_number', 'header': 'Outgoing Letter #', 'width': 140},
+            {'key': 'reported_entity_name', 'header': 'Reported Entity', 'width': 200},
+            {'key': 'legal_entity_owner', 'header': 'Legal Entity Owner', 'width': 180},
+            {'key': 'gender', 'header': 'Gender', 'width': 80},
+            {'key': 'nationality', 'header': 'Nationality', 'width': 120},
+            {'key': 'id_type', 'header': 'ID Type', 'width': 100},
+            {'key': 'id_cr', 'header': 'ID/CR', 'width': 120},
+            {'key': 'relationship', 'header': 'Relationship', 'width': 120},
+            {'key': 'account_membership', 'header': 'Account/Membership', 'width': 160},
+            {'key': 'branch_id', 'header': 'Branch ID', 'width': 100},
+            {'key': 'cic', 'header': 'CIC', 'width': 100},
+            {'key': 'first_reason_for_suspicion', 'header': '1st Reason for Suspicion', 'width': 180},
+            {'key': 'second_reason_for_suspicion', 'header': '2nd Reason for Suspicion', 'width': 180},
+            {'key': 'type_of_suspected_transaction', 'header': 'Transaction Type', 'width': 150},
+            {'key': 'arb_staff', 'header': 'ARB Staff', 'width': 120},
+            {'key': 'total_transaction', 'header': 'Total Transaction', 'width': 130},
+            {'key': 'report_classification', 'header': 'Classification', 'width': 130},
+            {'key': 'report_source', 'header': 'Source', 'width': 120},
+            {'key': 'reporting_entity', 'header': 'Reporting Entity', 'width': 160},
+            {'key': 'reporter_initials', 'header': 'Reporter Initials', 'width': 130},
+            {'key': 'sending_date', 'header': 'Sending Date', 'width': 120},
+            {'key': 'original_copy_confirmation', 'header': 'Original Copy Confirmation', 'width': 180},
+            {'key': 'fiu_number', 'header': 'FIU Number', 'width': 120},
+            {'key': 'fiu_letter_receive_date', 'header': 'FIU Letter Receive Date', 'width': 170},
+            {'key': 'fiu_feedback', 'header': 'FIU Feedback', 'width': 150},
+            {'key': 'fiu_letter_number', 'header': 'FIU Letter Number', 'width': 150},
+            {'key': 'fiu_date', 'header': 'FIU Date', 'width': 110},
+            {'key': 'status', 'header': 'Status', 'width': 100},
+            {'key': 'current_version', 'header': 'Version', 'width': 80},
+            {'key': 'approval_status', 'header': 'Approval', 'width': 110},
+            {'key': 'created_by', 'header': 'Created By', 'width': 120},
+            {'key': 'created_at', 'header': 'Created At', 'width': 160},
+            {'key': 'updated_by', 'header': 'Updated By', 'width': 120},
+            {'key': 'updated_at', 'header': 'Updated At', 'width': 160},
+        ]
 
     def toggle_advanced_filters(self):
         """Toggle advanced filters panel visibility."""
@@ -404,69 +447,50 @@ class ReportsView(QWidget):
         self.reports_table.setRowCount(0)
         self.reports_table.setRowCount(len(reports))
 
+        # Approval status labels and colors for special formatting
+        approval_labels = {
+            'draft': 'Draft',
+            'pending_approval': 'Pending',
+            'approved': 'Approved',
+            'rejected': 'Rejected',
+            'rework': 'Rework'
+        }
+        approval_colors = {
+            'draft': '#6e7681',
+            'pending_approval': '#d29922',
+            'approved': '#2ea043',
+            'rejected': '#f85149',
+            'rework': '#d29922'
+        }
+
         for row, report in enumerate(reports):
-            # SN
-            sn_item = QTableWidgetItem(str(report.get('sn', '')))
-            self.reports_table.setItem(row, 0, sn_item)
+            # Dynamically populate all columns based on display_columns definition
+            for col_idx, col_def in enumerate(self.display_columns):
+                key = col_def['key']
+                value = report.get(key, '')
 
-            # Report Number
-            report_num_item = QTableWidgetItem(report.get('report_number', ''))
-            self.reports_table.setItem(row, 1, report_num_item)
+                # Format specific columns
+                if key == 'current_version':
+                    # Version formatting
+                    item = QTableWidgetItem(f"v{value}" if value else '')
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif key == 'approval_status':
+                    # Approval status with color coding
+                    label = approval_labels.get(value, value) if value else ''
+                    item = QTableWidgetItem(label)
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    if value:
+                        color = approval_colors.get(value, '#6e7681')
+                        item.setForeground(QColor(color))
+                elif key in ['created_at', 'updated_at']:
+                    # Timestamp formatting (remove microseconds)
+                    formatted_value = value[:19] if value else ''
+                    item = QTableWidgetItem(formatted_value)
+                else:
+                    # Default: convert to string
+                    item = QTableWidgetItem(str(value) if value is not None else '')
 
-            # Date
-            date_item = QTableWidgetItem(report.get('report_date', ''))
-            self.reports_table.setItem(row, 2, date_item)
-
-            # Entity Name
-            entity_item = QTableWidgetItem(report.get('reported_entity_name', ''))
-            self.reports_table.setItem(row, 3, entity_item)
-
-            # Status
-            status_item = QTableWidgetItem(report.get('status', ''))
-            self.reports_table.setItem(row, 4, status_item)
-
-            # Version
-            version = report.get('current_version', 1)
-            version_item = QTableWidgetItem(f"v{version}")
-            version_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.reports_table.setItem(row, 5, version_item)
-
-            # Approval Status
-            approval_status = report.get('approval_status', 'draft')
-            approval_labels = {
-                'draft': 'Draft',
-                'pending_approval': 'Pending',
-                'approved': 'Approved',
-                'rejected': 'Rejected',
-                'rework': 'Rework'
-            }
-            approval_colors = {
-                'draft': '#6e7681',
-                'pending_approval': '#d29922',
-                'approved': '#2ea043',
-                'rejected': '#f85149',
-                'rework': '#d29922'
-            }
-            approval_label = approval_labels.get(approval_status, approval_status)
-            approval_item = QTableWidgetItem(approval_label)
-            approval_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
-            # Color-code approval status
-            approval_color = approval_colors.get(approval_status, '#6e7681')
-            approval_item.setForeground(QColor(approval_color))
-
-            self.reports_table.setItem(row, 6, approval_item)
-
-            # Created By
-            created_by_item = QTableWidgetItem(report.get('created_by', ''))
-            self.reports_table.setItem(row, 7, created_by_item)
-
-            # Created At
-            created_at = report.get('created_at', '')
-            if created_at:
-                created_at = created_at[:19]  # Remove microseconds
-            created_at_item = QTableWidgetItem(created_at)
-            self.reports_table.setItem(row, 8, created_at_item)
+                self.reports_table.setItem(row, col_idx, item)
 
         # Update stats
         start_record = (self.current_page - 1) * self.page_size + 1
@@ -508,6 +532,8 @@ class ReportsView(QWidget):
                 self.report_service,
                 self.logging_service,
                 self.current_user,
+                auth_service=self.auth_service,
+                approval_service=self.approval_service,
                 report_data=report,
                 parent=self
             )
@@ -523,6 +549,8 @@ class ReportsView(QWidget):
             self.report_service,
             self.logging_service,
             self.current_user,
+            auth_service=self.auth_service,
+            approval_service=self.approval_service,
             parent=self
         )
         dialog.report_saved.connect(self.load_reports)
@@ -747,7 +775,7 @@ class ReportsView(QWidget):
             failed_reports = []
 
             for report in draft_approval_reports:
-                success, approval_id, message = self.report_service.request_approval(
+                success, approval_id, message = self.approval_service.request_approval(
                     report['report_id'],
                     comment="Bulk submission via Send All"
                 )

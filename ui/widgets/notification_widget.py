@@ -263,17 +263,17 @@ class NotificationWidget(QWidget):
 
     notification_clicked = pyqtSignal(dict)
 
-    def __init__(self, report_service, current_user, parent=None):
+    def __init__(self, approval_service, current_user, parent=None):
         """
         Initialize notification widget.
 
         Args:
-            report_service: ReportService instance
+            approval_service: ApprovalService instance (has notification methods)
             current_user: Current user dictionary
             parent: Parent widget
         """
         super().__init__(parent)
-        self.report_service = report_service
+        self.approval_service = approval_service
         self.current_user = current_user
         self.notifications = []
         self.unread_count = 0
@@ -337,8 +337,8 @@ class NotificationWidget(QWidget):
     def refresh_notifications(self):
         """Refresh notifications from database."""
         try:
-            self.notifications = self.report_service.get_user_notifications()
-            self.unread_count = self.report_service.get_unread_notification_count()
+            self.notifications = self.approval_service.get_user_notifications()
+            self.unread_count = len([n for n in self.notifications if not n.get('is_read', False)])
 
             # Update badge
             if self.unread_count > 0:

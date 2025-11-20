@@ -72,7 +72,6 @@ CREATE TABLE IF NOT EXISTS reports (
     report_classification TEXT,
     report_source TEXT,
     reporting_entity TEXT,
-    paper_or_automated TEXT CHECK(paper_or_automated IN ('ÙˆØ±Ù‚ÙŠ', 'Ø¢Ù„ÙŠ', '')),
     reporter_initials TEXT,
     sending_date TEXT,
     original_copy_confirmation TEXT,
@@ -324,29 +323,6 @@ INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, conf
 ('backup_time', '02:00', 'setting', 'backup', 4),
 ('backup_retention_days', '30', 'setting', 'backup', 5);
 
--- Default Dropdown Values - Gender
-INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, display_order) VALUES
-('dropdown_gender_1', 'Ø°ÙƒØ±', 'dropdown', 'gender', 1),
-('dropdown_gender_2', 'Ø£Ù†Ø«Ù‰', 'dropdown', 'gender', 2);
-
--- Default Dropdown Values - ARB Staff
-INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, display_order) VALUES
-('dropdown_arb_staff_1', 'Ù†Ø¹Ù…', 'dropdown', 'arb_staff', 1),
-('dropdown_arb_staff_2', 'Ù„Ø§', 'dropdown', 'arb_staff', 2);
-
--- Default Dropdown Values - Paper or Automated
-INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, display_order) VALUES
-('dropdown_paper_automated_1', 'ÙˆØ±Ù‚ÙŠ', 'dropdown', 'paper_or_automated', 1),
-('dropdown_paper_automated_2', 'Ø¢Ù„ÙŠ', 'dropdown', 'paper_or_automated', 2);
-
--- Default Dropdown Values - Status
-INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, display_order) VALUES
-('dropdown_status_1', 'Open', 'dropdown', 'status', 1),
-('dropdown_status_2', 'Case Review', 'dropdown', 'status', 2),
-('dropdown_status_3', 'Under Investigation', 'dropdown', 'status', 3),
-('dropdown_status_4', 'Case Validation', 'dropdown', 'status', 4),
-('dropdown_status_5', 'Close Case', 'dropdown', 'status', 5),
-('dropdown_status_6', 'Closed with STR', 'dropdown', 'status', 6);
 
 -- Default Column Settings (All Report Fields)
 INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_name_ar, data_type, is_visible, is_required, display_order, validation_rules) VALUES
@@ -370,7 +346,6 @@ INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_nam
 ('report_classification', 'Report Classification', 'ØªØµÙ†ÙŠÙ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 0, 18, '{}'),
 ('report_source', 'Report Source', 'Ù…ØµØ¯Ø± Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 0, 19, '{}'),
 ('reporting_entity', 'Reporting Entity', 'Ø§Ù„Ø¬Ù‡Ø© Ø§Ù„Ù…Ø¨Ù„ØºØ©', 'TEXT', 1, 0, 20, '{}'),
-('paper_or_automated', 'Paper or Automated', 'ÙˆØ±Ù‚ÙŠ Ø£Ùˆ Ø¢Ù„ÙŠ', 'DROPDOWN', 1, 0, 21, '{"options": ["ÙˆØ±Ù‚ÙŠ", "Ø¢Ù„ÙŠ"]}'),
 ('reporter_initials', 'Reporter Initials', 'Ø£Ø­Ø±Ù Ø§Ù„Ù…Ø¨Ù„Øº', 'TEXT', 1, 0, 22, '{"pattern": "^[A-Z]{2}$", "maxLength": 2}'),
 ('sending_date', 'Sending Date', 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ø±Ø³Ø§Ù„', 'DATE', 1, 0, 23, '{"format": "DD/MM/YYYY"}'),
 ('original_copy_confirmation', 'Original Copy Confirmation', 'ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„Ø£ØµÙ„ÙŠØ©', 'TEXT', 1, 0, 24, '{}'),
@@ -405,7 +380,7 @@ INSERT OR IGNORE INTO reports (
     legal_entity_owner, gender, nationality, id_cr, account_membership,
     branch_id, cic, first_reason_for_suspicion, second_reason_for_suspicion,
     type_of_suspected_transaction, arb_staff, total_transaction, report_classification,
-    report_source, reporting_entity, paper_or_automated, reporter_initials,
+    report_source, reporting_entity, reporter_initials,
     sending_date, original_copy_confirmation, fiu_number, fiu_letter_receive_date,
     fiu_feedback, fiu_letter_number, fiu_date, status, created_by
 ) VALUES
@@ -413,7 +388,7 @@ INSERT OR IGNORE INTO reports (
  'Owner Name', 'Ø°ÙƒØ±', 'Saudi Arabian', '1122334455', '606051234567', 
  '55', '22554411', 'Suspicious transaction patterns detected during review period',
  'Potential fraud and deception indicators', 'Internal Transfers', 'Ù„Ø§', '605040 SAR',
- 'Crime', 'INCIDENT REPORT', 'Compliance Department', 'Ø¢Ù„ÙŠ', 'ZM',
+ 'Crime', 'INCIDENT REPORT', 'Compliance Department', 'ZM',
  '04/11/2025', 'CONFIRMED', '416158', '04/11/2025',
  'Entity added to database for monitoring', '5040', '04/11/2025',
  'Open', 'admin'),
@@ -421,7 +396,7 @@ INSERT OR IGNORE INTO reports (
  'Second Owner', 'Ø£Ù†Ø«Ù‰', 'Egyptian', '2233445566', '606051234568', 
  '56', '22554412', 'Unusual cash deposit patterns', 'Large transactions without clear business purpose', 
  'Cash Deposits', 'Ù†Ø¹Ù…', '1250000 SAR', 'Crime', 'INCIDENT REPORT', 
- 'Branch Compliance', 'ÙˆØ±Ù‚ÙŠ', 'AK', '04/11/2025', 'PENDING', '416159', 
+ 'Branch Compliance', 'AK', '04/11/2025', 'PENDING', '416159', 
  '04/11/2025', 'Under review', '5041', '04/11/2025', 'Case Review', 'agent1');
 
 -- ============================================================================

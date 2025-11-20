@@ -272,8 +272,9 @@ class LoggingService:
             params.append(start_date)
 
         if end_date:
+            # Add time component to include entire end date
             query += " AND timestamp <= ?"
-            params.append(end_date)
+            params.append(f"{end_date} 23:59:59")
 
         query += " ORDER BY timestamp DESC LIMIT ?"
         params.append(limit)

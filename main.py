@@ -29,8 +29,13 @@ from database.migrations import migrate_database
 from services.logging_service import LoggingService
 from services.auth_service import AuthService
 from services.report_service import ReportService
+from services.version_service import VersionService
+from services.approval_service import ApprovalService
 from services.dashboard_service import DashboardService
 from services.settings_service import SettingsService
+from services.dropdown_service import DropdownService
+from services.validation_service import ValidationService
+from services.report_number_service import ReportNumberService
 
 # Import UI windows
 from ui.windows.login_window import LoginWindow
@@ -44,6 +49,9 @@ from ui.widgets.admin_panel import AdminPanel
 from ui.widgets.approval_panel import ApprovalPanel
 from ui.widgets.placeholder_view import PlaceholderView
 from ui.widgets.settings_view import SettingsView
+from ui.widgets.dropdown_management_view import DropdownManagementView
+from ui.widgets.system_settings_view import SystemSettingsView
+from ui.widgets.field_management_view import FieldManagementView
 
 
 class FIUApplication:
@@ -59,8 +67,12 @@ class FIUApplication:
         self.logging_service = None
         self.auth_service = None
         self.report_service = None
+        self.version_service = None
+        self.approval_service = None
         self.dashboard_service = None
         self.settings_service = None
+        self.dropdown_service = None
+        self.validation_service = None
 
         self.setup_wizard = None
         self.login_window = None
@@ -220,6 +232,13 @@ class FIUApplication:
             self.settings_service = SettingsService(self.db_manager, self.auth_service)
             self.report_service = ReportService(self.db_manager, self.logging_service, self.auth_service)
             self.dashboard_service = DashboardService(self.db_manager, self.logging_service)
+            self.dropdown_service = DropdownService(self.db_manager, self.logging_service)
+            self.validation_service = ValidationService(self.db_manager, self.logging_service)
+            self.report_number_service = ReportNumberService(self.db_manager, self.logging_service)
+
+            # Initialize version and approval services (depend on report_service)
+            self.version_service = VersionService(self.db_manager, self.logging_service, self.auth_service, self.report_service)
+            self.approval_service = ApprovalService(self.db_manager, self.logging_service, self.auth_service, self.version_service, self.report_service)
 
             self.logging_service.info("All services initialized successfully")
             return True
@@ -284,7 +303,9 @@ class FIUApplication:
             self.logging_service,
             self.report_service,
             self.dashboard_service,
-            self.db_manager
+            approval_service=self.approval_service,
+            db_manager=self.db_manager,
+            report_number_service=self.report_number_service
         )
 
         # Add views to main window
@@ -309,7 +330,9 @@ class FIUApplication:
         reports_view = ReportsView(
             self.report_service,
             self.logging_service,
-            self.auth_service
+            self.auth_service,
+            self.version_service,
+            self.approval_service
         )
         self.main_window.add_view('reports', reports_view)
 
@@ -327,7 +350,9 @@ class FIUApplication:
             current_user = self.auth_service.get_current_user()
             approvals_view = ApprovalPanel(
                 self.report_service,
-                current_user
+                current_user,
+                self.approval_service,
+                self.version_service
             )
             self.main_window.add_view('approvals', approvals_view)
 
@@ -351,6 +376,30 @@ class FIUApplication:
                 self.logging_service
             )
             self.main_window.add_view('settings', settings_view)
+
+            # Dropdown Management view
+            dropdown_mgmt_view = DropdownManagementView(
+                self.dropdown_service,
+                self.logging_service,
+                current_user
+            )
+            self.main_window.add_view('dropdown_mgmt', dropdown_mgmt_view)
+
+            # System Settings view
+            system_settings_view = SystemSettingsView(
+                self.db_manager,
+                self.logging_service,
+                current_user
+            )
+            self.main_window.add_view('system_settings', system_settings_view)
+
+            # Field Management view
+            field_management_view = FieldManagementView(
+                self.validation_service,
+                self.logging_service,
+                current_user
+            )
+            self.main_window.add_view('field_management', field_management_view)
 
         # Switch to dashboard
         self.main_window.switch_view('dashboard')

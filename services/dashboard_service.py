@@ -28,48 +28,32 @@ class DashboardService:
             Dictionary with summary statistics
         """
         try:
-            stats = {}
+            # Optimized: Single query instead of 6 separate queries (N+1 fix)
+            query = """
+                SELECT
+                    COUNT(*) FILTER (WHERE r.is_deleted = 0) as total_reports,
+                    COUNT(*) FILTER (WHERE r.status = 'Open' AND r.is_deleted = 0) as open_reports,
+                    COUNT(*) FILTER (WHERE r.status = 'Under Investigation' AND r.is_deleted = 0) as under_investigation,
+                    COUNT(*) FILTER (WHERE r.status IN ('Close Case', 'Closed with STR') AND r.is_deleted = 0) as closed_cases,
+                    COUNT(*) FILTER (WHERE strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now') AND r.is_deleted = 0) as reports_this_month,
+                    (SELECT COUNT(*) FROM users WHERE is_active = 1) as active_users
+                FROM reports r
+            """
 
-            # Total reports
-            result = self.db_manager.execute_with_retry(
-                "SELECT COUNT(*) FROM reports WHERE is_deleted = 0"
-            )
-            stats['total_reports'] = result[0][0] if result else 0
+            result = self.db_manager.execute_with_retry(query)
 
-            # Open reports
-            result = self.db_manager.execute_with_retry(
-                "SELECT COUNT(*) FROM reports WHERE status = 'Open' AND is_deleted = 0"
-            )
-            stats['open_reports'] = result[0][0] if result else 0
+            if result and result[0]:
+                row = result[0]
+                return {
+                    'total_reports': row[0] or 0,
+                    'open_reports': row[1] or 0,
+                    'under_investigation': row[2] or 0,
+                    'closed_cases': row[3] or 0,
+                    'reports_this_month': row[4] or 0,
+                    'active_users': row[5] or 0
+                }
 
-            # Under investigation
-            result = self.db_manager.execute_with_retry(
-                "SELECT COUNT(*) FROM reports WHERE status = 'Under Investigation' AND is_deleted = 0"
-            )
-            stats['under_investigation'] = result[0][0] if result else 0
-
-            # Closed cases
-            result = self.db_manager.execute_with_retry(
-                """SELECT COUNT(*) FROM reports
-                   WHERE status IN ('Close Case', 'Closed with STR') AND is_deleted = 0"""
-            )
-            stats['closed_cases'] = result[0][0] if result else 0
-
-            # Active users
-            result = self.db_manager.execute_with_retry(
-                "SELECT COUNT(*) FROM users WHERE is_active = 1"
-            )
-            stats['active_users'] = result[0][0] if result else 0
-
-            # Reports this month
-            result = self.db_manager.execute_with_retry(
-                """SELECT COUNT(*) FROM reports
-                   WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
-                   AND is_deleted = 0"""
-            )
-            stats['reports_this_month'] = result[0][0] if result else 0
-
-            return stats
+            return {}
 
         except Exception as e:
             self.logger.error(f"Error fetching summary statistics: {str(e)}", exc_info=True)

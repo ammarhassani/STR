@@ -149,17 +149,21 @@ class ApprovalPanel(QWidget):
 
     approval_processed = pyqtSignal()
 
-    def __init__(self, report_service, current_user):
+    def __init__(self, report_service, current_user, approval_service, version_service):
         """
         Initialize the approval panel.
 
         Args:
             report_service: ReportService instance
             current_user: Current user dictionary
+            approval_service: ApprovalService instance
+            version_service: VersionService instance
         """
         super().__init__()
         self.report_service = report_service
         self.current_user = current_user
+        self.approval_service = approval_service
+        self.version_service = version_service
         self.pending_approvals = []
 
         self.setup_ui()
@@ -208,26 +212,23 @@ class ApprovalPanel(QWidget):
         self.approvals_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.approvals_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.approvals_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.approvals_table.verticalHeader().setVisible(False)
+        self.approvals_table.verticalHeader().setVisible(True)
 
-        # Enable manual column resizing (drag column borders to resize)
+        # Configure responsive column sizing
         header = self.approvals_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
-        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Report #
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Entity Name - takes space
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Requested By
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Requested At
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Comment
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Actions
 
-        # Set default column widths
-        header.resizeSection(0, 120)  # Report #
-        header.resizeSection(1, 250)  # Entity Name
-        header.resizeSection(2, 120)  # Requested By
-        header.resizeSection(3, 150)  # Requested At
-        header.resizeSection(4, 100)  # Status
-        header.resizeSection(5, 200)  # Comment
-        header.resizeSection(6, 150)  # Actions
-
-        # Enable manual row resizing like Excel (drag row borders to resize)
-        self.approvals_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.approvals_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
-        self.approvals_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
+        # Configure vertical header for responsive row heights
+        vertical_header = self.approvals_table.verticalHeader()
+        vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        vertical_header.setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
+        vertical_header.setMinimumSectionSize(40)  # Minimum to prevent too small
 
         # Connect signals to save geometry when user resizes
         header.sectionResized.connect(self.save_table_geometry)
@@ -248,7 +249,7 @@ class ApprovalPanel(QWidget):
     def load_pending_approvals(self):
         """Load pending approval requests from database."""
         try:
-            self.pending_approvals = self.report_service.get_pending_approvals()
+            self.pending_approvals = self.approval_service.get_pending_approvals()
 
             if not self.pending_approvals:
                 self.info_label.setText("No pending approval requests at this time.")
@@ -347,10 +348,10 @@ class ApprovalPanel(QWidget):
             approval_id = approval_data['approval_id']
 
             if decision == 'approve':
-                success, message = self.report_service.approve_report(approval_id, comment)
+                success, message = self.approval_service.approve_report(approval_id, comment)
             else:
                 request_rework = (decision == 'rework')
-                success, message = self.report_service.reject_report(
+                success, message = self.approval_service.reject_report(
                     approval_id, comment, request_rework
                 )
 

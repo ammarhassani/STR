@@ -332,7 +332,25 @@ class ValidationService:
     - Custom validation rules
     - Form-level validation
     - Real-time validation support
+    - Database-backed admin-manageable validation rules
     """
+
+    # Fields that support admin-manageable validation
+    VALIDATABLE_FIELDS = [
+        'id_cr',              # ID/CR number field
+        'account_membership', # Account/Membership number field
+    ]
+
+    def __init__(self, db_manager=None, logging_service=None):
+        """
+        Initialize the validation service.
+
+        Args:
+            db_manager: Optional DatabaseManager instance for DB-backed validation
+            logging_service: Optional LoggingService instance for logging
+        """
+        self.db_manager = db_manager
+        self.logger = logging_service
 
     @staticmethod
     def validate_field(value: Any, rules: List[ValidationRule]) -> Tuple[bool, str]:
@@ -443,3 +461,284 @@ class ValidationService:
                                     require_lowercase=True, require_digit=True)
             ]
         }
+
+    # ==================================================
+    # Database-backed Admin-Manageable Validation Rules
+    # ==================================================
+
+    def get_validation_rules(self, field_name: str) -> Optional[Dict]:
+        """
+        Get validation rules for a specific field from database.
+
+        Args:
+            field_name: Column name in column_settings table
+
+        Returns:
+            Dictionary with validation rules, or None if not found
+        """
+        if not self.db_manager:
+            return None
+
+        try:
+            import json
+            query = """
+                SELECT validation_rules
+                FROM column_settings
+                WHERE column_name = ?
+            """
+            result = self.db_manager.execute_with_retry(query, (field_name,))
+
+            if not result or not result[0][0]:
+                return None
+
+            # Parse JSON validation rules
+            rules_json = result[0][0]
+            return json.loads(rules_json) if rules_json else None
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error getting validation rules for {field_name}: {str(e)}")
+            return None
+
+    def update_validation_rules(self, field_name: str, rules: Dict, username: str) -> Tuple[bool, str]:
+        """
+        Update validation rules for a field in database.
+
+        Args:
+            field_name: Column name in column_settings table
+            rules: Dictionary with validation rules
+            username: User performing the action
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.db_manager:
+            return False, "Database manager not available"
+
+        try:
+            import json
+            # Convert rules to JSON
+            rules_json = json.dumps(rules)
+
+            # Update validation rules
+            update_query = """
+                UPDATE column_settings
+                SET validation_rules = ?, updated_at = ?, updated_by = ?
+                WHERE column_name = ?
+            """
+            self.db_manager.execute_with_retry(
+                update_query,
+                (rules_json, datetime.now().isoformat(), username, field_name)
+            )
+
+            if self.logger:
+                self.logger.info(f"User {username} updated validation rules for field '{field_name}'")
+            return True, "Validation rules updated successfully."
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error updating validation rules: {str(e)}")
+            return False, f"Error updating validation rules: {str(e)}"
+
+    def get_all_field_settings(self) -> List[Dict]:
+        """
+        Get all field settings including validation rules and required status.
+
+        Returns:
+            List of dictionaries with field settings
+        """
+        if not self.db_manager:
+            return []
+
+        try:
+            import json
+            query = """
+                SELECT column_name, display_name_en, display_name_ar,
+                       is_required, validation_rules, updated_by
+                FROM column_settings
+                WHERE column_name IN ('id_cr', 'account_membership')
+                ORDER BY column_name
+            """
+            results = self.db_manager.execute_with_retry(query)
+
+            if not results:
+                return []
+
+            fields = []
+            for row in results:
+                # Parse validation rules JSON
+                validation_rules = None
+                if row[4]:
+                    try:
+                        validation_rules = json.loads(row[4])
+                    except:
+                        validation_rules = None
+
+                fields.append({
+                    'column_name': row[0],
+                    'display_name_en': row[1],
+                    'display_name_ar': row[2],
+                    'is_required': row[3],
+                    'validation_rules': validation_rules,
+                    'updated_by': row[5]
+                })
+
+            return fields
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error getting all field settings: {str(e)}")
+            return []
+
+    def update_required_status(self, field_name: str, is_required: bool, username: str) -> Tuple[bool, str]:
+        """
+        Update required status for a field.
+
+        Args:
+            field_name: Column name in column_settings table
+            is_required: Whether field is required
+            username: User performing the action
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.db_manager:
+            return False, "Database manager not available"
+
+        try:
+            update_query = """
+                UPDATE column_settings
+                SET is_required = ?, updated_at = ?, updated_by = ?
+                WHERE column_name = ?
+            """
+            self.db_manager.execute_with_retry(
+                update_query,
+                (1 if is_required else 0, datetime.now().isoformat(), username, field_name)
+            )
+
+            status = "required" if is_required else "optional"
+            if self.logger:
+                self.logger.info(f"User {username} set field '{field_name}' as {status}")
+            return True, f"Field marked as {status} successfully."
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error updating required status: {str(e)}")
+            return False, f"Error updating required status: {str(e)}"
+
+    def validate_field_from_db(self, field_name: str, value: str, nationality: Optional[str] = None,
+                              is_cr: bool = False, is_membership: bool = False) -> Tuple[bool, str]:
+        """
+        Validate a field value against database-stored validation rules.
+
+        Args:
+            field_name: Field name (id_cr or account_membership)
+            value: Value to validate
+            nationality: Nationality (for ID validation)
+            is_cr: Whether ID/CR field is a CR number
+            is_membership: Whether Account/Membership field is membership
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            # Get validation rules from database
+            rules = self.get_validation_rules(field_name)
+            if not rules:
+                return True, ""  # No rules = always valid
+
+            # Strip whitespace
+            value = value.strip()
+
+            # Check if empty (required check should be done separately)
+            if not value:
+                return True, ""
+
+            # Validate based on field type
+            if field_name == 'id_cr':
+                return self._validate_id_cr(value, rules, nationality, is_cr)
+            elif field_name == 'account_membership':
+                return self._validate_account_membership(value, rules, is_membership)
+            else:
+                return True, ""
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error validating field {field_name}: {str(e)}")
+            return False, f"Validation error: {str(e)}"
+
+    def _validate_id_cr(self, value: str, rules: Dict, nationality: Optional[str], is_cr: bool) -> Tuple[bool, str]:
+        """Validate ID or CR number."""
+        # Check length
+        required_length = rules.get('length', 10)
+        if len(value) != required_length:
+            return False, f"Must be {required_length} digits"
+
+        # Check if all digits
+        pattern = rules.get('pattern', r'^[0-9]{10}$')
+        if not re.match(pattern, value):
+            return False, "Must contain only digits"
+
+        # Check starting digit based on type
+        if is_cr:
+            # CR must start with 7
+            cr_starts_with = rules.get('cr_starts_with', '7')
+            if not value.startswith(cr_starts_with):
+                return False, f"CR number must start with {cr_starts_with}"
+        else:
+            # ID - check if Saudi
+            if nationality and 'Saudi' in nationality:
+                saudi_starts_with = rules.get('saudi_starts_with', '1')
+                if not value.startswith(saudi_starts_with):
+                    return False, f"Saudi ID must start with {saudi_starts_with}"
+
+        return True, ""
+
+    def _validate_account_membership(self, value: str, rules: Dict, is_membership: bool) -> Tuple[bool, str]:
+        """Validate Account or Membership number."""
+        # Check if all digits
+        if not value.isdigit():
+            return False, "Must contain only digits"
+
+        # Check length based on type
+        if is_membership:
+            required_length = rules.get('membership_length', 8)
+            if len(value) != required_length:
+                return False, f"Membership must be {required_length} digits"
+        else:
+            required_length = rules.get('account_length', 21)
+            if len(value) != required_length:
+                return False, f"Account number must be {required_length} digits"
+
+        return True, ""
+
+    def is_field_required(self, field_name: str) -> bool:
+        """
+        Check if a field is marked as required in database.
+
+        Args:
+            field_name: Column name in column_settings table
+
+        Returns:
+            True if field is required
+        """
+        if not self.db_manager:
+            return False
+
+        try:
+            query = """
+                SELECT is_required
+                FROM column_settings
+                WHERE column_name = ?
+            """
+            result = self.db_manager.execute_with_retry(query, (field_name,))
+
+            if not result:
+                return False
+
+            return bool(result[0][0])
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error checking if field is required: {str(e)}")
+            return False

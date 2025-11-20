@@ -144,6 +144,12 @@ class LogManagementView(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # User
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Message
 
+        # Configure vertical header for responsive row heights
+        vertical_header = self.logs_table.verticalHeader()
+        vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        vertical_header.setDefaultSectionSize(35)
+        vertical_header.setMinimumSectionSize(30)
+
         layout.addWidget(self.logs_table)
 
         # Status label
