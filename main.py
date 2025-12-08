@@ -209,7 +209,8 @@ class FIUApplication:
                 return False
 
             # Initialize logging service first
-            log_dir = Path.home() / '.fiu_system'
+            # Store logs with application files instead of user home directory
+            log_dir = Path(__file__).parent / 'logs'
             self.logging_service = LoggingService(self.db_manager, log_dir)
 
             # Run migrations

@@ -22,8 +22,8 @@ class Config:
     RECORDS_PER_PAGE = 50
     DATE_FORMAT = "DD/MM/YYYY"
     
-    # Configuration file location
-    CONFIG_FILE = Path.home() / '.fiu_system' / 'config.json'
+    # Configuration file location - store with application files
+    CONFIG_FILE = Path(__file__).parent / 'config' / 'config.json'
     
     @classmethod
     def load(cls):
@@ -66,7 +66,16 @@ class Config:
     @classmethod
     def is_configured(cls) -> bool:
         """Check if configuration exists and is valid"""
-        return cls.DATABASE_PATH is not None and cls.BACKUP_PATH is not None
+        # Check if paths are configured
+        if cls.DATABASE_PATH is None or cls.BACKUP_PATH is None:
+            return False
+        
+        # Check if database file actually exists
+        db_path = Path(cls.DATABASE_PATH)
+        if not db_path.exists():
+            return False
+        
+        return True
     
     @classmethod
     def validate_paths(cls) -> tuple[bool, str]:

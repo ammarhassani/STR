@@ -1,0 +1,6 @@
+{
+  "database_path": "C:/Users/azahr/Desktop/STR/STR/DB/fiu_reports.db",
+  "backup_path": "C:/Users/azahr/Desktop/STR/STR/DB/backup",
+  "session_timeout": 30,
+  "max_login_attempts": 5
+}
