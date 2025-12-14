@@ -3,10 +3,12 @@ Modern UI Widgets and Components
 """
 from PyQt6.QtWidgets import (
     QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLineEdit, QGraphicsDropShadowEffect
+    QPushButton, QLineEdit, QGraphicsDropShadowEffect, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty
 from PyQt6.QtGui import QColor, QFont
+from ui.utils.responsive_sizing import ResponsiveSize
+from ui.theme_colors import ThemeColors
 
 
 class StatCard(QFrame):
@@ -15,8 +17,10 @@ class StatCard(QFrame):
     def __init__(self, title, value, icon, color, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
-        self.setFixedHeight(160)
-        self.setMinimumWidth(220)
+
+        # Responsive sizing instead of fixed
+        self.setMinimumHeight(ResponsiveSize.get_scaled_size(140))
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         # Add shadow effect
         shadow = QGraphicsDropShadowEffect(self)
@@ -38,14 +42,21 @@ class StatCard(QFrame):
 
         # Icon
         icon_label = QLabel(icon)
+        # Responsive icon sizing
+        icon_size = ResponsiveSize.get_scaled_size(80)
+        icon_font = ResponsiveSize.get_scaled_size(48)
+        icon_radius = ResponsiveSize.get_scaled_size(16)
+        icon_padding = ResponsiveSize.get_scaled_size(12)
+
         icon_label.setStyleSheet(f"""
-            font-size: 48px;
+            font-size: {icon_font}px;
             color: {color};
             background-color: {color}15;
-            border-radius: 16px;
-            padding: 12px;
+            border-radius: {icon_radius}px;
+            padding: {icon_padding}px;
         """)
-        icon_label.setFixedSize(80, 80)
+        icon_label.setMinimumSize(icon_size, icon_size)
+        icon_label.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_row.addWidget(icon_label)
 
@@ -65,9 +76,9 @@ class StatCard(QFrame):
 
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet("""
+        title_label.setStyleSheet(f"""
             font-size: 15px;
-            color: #757575;
+            color: {ThemeColors.TEXT_SECONDARY};
             font-weight: 600;
         """)
         title_label.setWordWrap(True)
@@ -124,19 +135,21 @@ class SearchBar(QLineEdit):
     def __init__(self, placeholder="Search...", parent=None):
         super().__init__(parent)
         self.setPlaceholderText(f"🔍 {placeholder}")
-        self.setMinimumHeight(48)
-        self.setStyleSheet("""
-            QLineEdit {
-                border: 2px solid #E0E0E0;
+        self.setMinimumHeight(ResponsiveSize.get_scaled_size(44))
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setStyleSheet(f"""
+            QLineEdit {{
+                border: 2px solid {ThemeColors.BORDER_SUBTLE};
                 border-radius: 24px;
                 padding: 12px 20px;
                 font-size: 14px;
-                background-color: white;
-            }
-            QLineEdit:focus {
-                border: 2px solid #1976D2;
-                background-color: white;
-            }
+                background-color: {ThemeColors.BG_INPUT};
+                color: {ThemeColors.TEXT_PRIMARY};
+            }}
+            QLineEdit:focus {{
+                border: 2px solid {ThemeColors.PRIMARY};
+                background-color: {ThemeColors.BG_INPUT};
+            }}
         """)
 
         # Add shadow
@@ -149,21 +162,22 @@ class SearchBar(QLineEdit):
 
 
 class StatusBadge(QLabel):
-    """Colored status badge"""
+    """Colored status badge - dark theme compatible"""
 
+    # Dark theme status colors (text_color, bg_color)
     STATUS_COLORS = {
-        'Open': ('#4CAF50', '#E8F5E9'),
-        'Under Investigation': ('#FF9800', '#FFF3E0'),
-        'Case Review': ('#2196F3', '#E3F2FD'),
-        'Case Validation': ('#9C27B0', '#F3E5F5'),
-        'Close Case': ('#F44336', '#FFEBEE'),
-        'Closed with STR': ('#F44336', '#FFEBEE'),
+        'Open': ('#4ade80', '#0d2818'),
+        'Under Investigation': ('#fbbf24', '#2d2310'),
+        'Case Review': ('#60a5fa', '#0d1f2d'),
+        'Case Validation': ('#c084fc', '#1f1530'),
+        'Close Case': ('#f87171', '#2d1518'),
+        'Closed with STR': ('#f87171', '#2d1518'),
     }
 
     def __init__(self, status, parent=None):
         super().__init__(status, parent)
 
-        color, bg_color = self.STATUS_COLORS.get(status, ('#757575', '#F5F5F5'))
+        color, bg_color = self.STATUS_COLORS.get(status, (ThemeColors.TEXT_SECONDARY, ThemeColors.BG_TERTIARY))
 
         self.setStyleSheet(f"""
             QLabel {{
@@ -176,7 +190,8 @@ class StatusBadge(QLabel):
             }}
         """)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setFixedHeight(28)
+        self.setMinimumHeight(ResponsiveSize.get_scaled_size(28))
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
 
 class ModernCard(QFrame):
@@ -220,7 +235,7 @@ class SectionHeader(QWidget):
         divider = QFrame()
         divider.setFrameShape(QFrame.Shape.HLine)
         divider.setFixedHeight(2)
-        divider.setStyleSheet("background-color: #E0E0E0;")
+        divider.setStyleSheet(f"background-color: {ThemeColors.BORDER_SUBTLE};")
         layout.addWidget(divider)
 
 
@@ -244,17 +259,17 @@ class AnimatedWidget(QWidget):
 
 
 class FieldGroup(QFrame):
-    """Grouped form fields with styling"""
+    """Grouped form fields with styling - dark theme compatible"""
 
     def __init__(self, title, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border: 2px solid #E0E0E0;
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {ThemeColors.BG_SECONDARY};
+                border: 2px solid {ThemeColors.BORDER_SUBTLE};
                 border-radius: 12px;
                 padding: 20px;
-            }
+            }}
         """)
 
         self.layout = QVBoxLayout(self)
@@ -262,12 +277,12 @@ class FieldGroup(QFrame):
 
         # Group title
         title_label = QLabel(title)
-        title_label.setStyleSheet("""
+        title_label.setStyleSheet(f"""
             font-size: 16px;
             font-weight: bold;
-            color: #1976D2;
+            color: {ThemeColors.PRIMARY_LIGHT};
             padding-bottom: 8px;
-            border-bottom: 2px solid #E0E0E0;
+            border-bottom: 2px solid {ThemeColors.BORDER_SUBTLE};
         """)
         self.layout.addWidget(title_label)
 

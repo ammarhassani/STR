@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 from datetime import datetime
+from ui.utils.responsive_sizing import ResponsiveSize
+from ui.theme_colors import ThemeColors
 
 
 class ReservationManagementDialog(QDialog):
@@ -30,7 +32,11 @@ class ReservationManagementDialog(QDialog):
         self.auth_service = auth_service
 
         self.setWindowTitle("Report Number Reservation Management")
-        self.setMinimumSize(1000, 700)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('large')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         self.setup_ui()
         self.load_data()
@@ -197,7 +203,7 @@ class ReservationManagementDialog(QDialog):
             "Controls how many report numbers can be reserved simultaneously across all users.\n"
             "Example: Set to 3 if you have 3 employees who need to create reports at the same time."
         )
-        concurrent_info.setStyleSheet("color: gray; font-style: italic;")
+        concurrent_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-style: italic;")
         limits_layout.addWidget(concurrent_info)
 
         limits_layout.addSpacing(15)
@@ -222,7 +228,7 @@ class ReservationManagementDialog(QDialog):
             "Controls how many report numbers each user can reserve at once.\n"
             "Typically set to 1 - each user can work on one report at a time."
         )
-        per_user_info.setStyleSheet("color: gray; font-style: italic;")
+        per_user_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-style: italic;")
         limits_layout.addWidget(per_user_info)
 
         limits_layout.addSpacing(15)
@@ -259,7 +265,7 @@ class ReservationManagementDialog(QDialog):
             "How long a user can hold a reserved report number before it expires.\n"
             "Expired reservations are automatically cleaned up."
         )
-        timeout_info.setStyleSheet("color: gray; font-style: italic;")
+        timeout_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-style: italic;")
         timeout_layout.addWidget(timeout_info)
 
         layout.addWidget(timeout_group)

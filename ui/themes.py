@@ -1,7 +1,9 @@
 """
 Modern Theme System
-Professional color schemes and styles
+Professional color schemes and styles with DPI-aware responsive sizing
 """
+
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class ModernTheme:
@@ -31,6 +33,18 @@ class ModernTheme:
     BORDER = "#E0E0E0"
     DIVIDER = "#EEEEEE"
 
+    # Sidebar colors for proper contrast
+    SIDEBAR_BG = "#2c3e50"
+    SIDEBAR_TEXT = "#ecf0f1"  # Light gray text
+    SIDEBAR_HOVER = "#34495e"
+
+    # Table header colors
+    HEADER_BG = "#34495e"  # Dark background
+    HEADER_TEXT = "#ffffff"  # White text
+
+    # Hover background for cards
+    HOVER_BG = "#f8f9fa"  # Light hover background
+
     # Shadows
     SHADOW_SM = "0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)"
     SHADOW_MD = "0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.12)"
@@ -39,6 +53,23 @@ class ModernTheme:
 
     @classmethod
     def get_stylesheet(cls):
+        # Calculate DPI-aware sizes
+        card_radius = ResponsiveSize.get_scaled_size(12)
+        card_padding = ResponsiveSize.get_scaled_size(16)
+        header_padding = ResponsiveSize.get_scaled_size(8)
+
+        # Button dimensions
+        btn_radius = ResponsiveSize.get_scaled_size(8)
+        btn_primary_padding_v = ResponsiveSize.get_scaled_size(12)
+        btn_primary_padding_h = ResponsiveSize.get_scaled_size(24)
+        btn_primary_height = ResponsiveSize.get_scaled_size(40)
+        btn_primary_font = ResponsiveSize.get_font_size('large')
+
+        btn_secondary_padding_v = ResponsiveSize.get_scaled_size(10)
+        btn_secondary_padding_h = ResponsiveSize.get_scaled_size(20)
+        btn_secondary_height = ResponsiveSize.get_scaled_size(36)
+        btn_secondary_font = ResponsiveSize.get_font_size('medium')
+
         return f"""
             /* ========== Global Styles ========== */
             QMainWindow, QDialog, QWidget {{
@@ -49,14 +80,42 @@ class ModernTheme:
             /* ========== Cards ========== */
             QWidget#card {{
                 background-color: {cls.SURFACE};
-                border-radius: 12px;
+                border-radius: {card_radius}px;
                 border: 1px solid {cls.BORDER};
             }}
 
             QFrame#card {{
                 background-color: {cls.SURFACE};
-                border-radius: 12px;
+                border-radius: {card_radius}px;
                 border: 1px solid {cls.BORDER};
+            }}
+
+            /* KPI Cards - Add visual definition */
+            QFrame#kpiCard {{
+                background-color: {cls.SURFACE};
+                border: 1px solid {cls.BORDER};
+                border-radius: {card_radius}px;
+                padding: {card_padding}px;
+            }}
+
+            QFrame#kpiCard:hover {{
+                border-color: {cls.PRIMARY};
+                background-color: {cls.HOVER_BG};
+            }}
+
+            /* Welcome Section Container */
+            QFrame#welcomeSection {{
+                background-color: {cls.SURFACE};
+                border-radius: {card_radius}px;
+                padding: {card_padding}px;
+            }}
+
+            QLabel#welcomeTitle {{
+                color: {cls.TEXT_PRIMARY};
+            }}
+
+            QLabel#welcomeSubtitle {{
+                color: {cls.TEXT_SECONDARY};
             }}
 
             /* ========== Sidebar ========== */
@@ -71,11 +130,11 @@ class ModernTheme:
                 background-color: {cls.PRIMARY};
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
+                border-radius: {btn_radius}px;
+                padding: {btn_primary_padding_v}px {btn_primary_padding_h}px;
+                font-size: {btn_primary_font}pt;
                 font-weight: bold;
-                min-height: 40px;
+                min-height: {btn_primary_height}px;
             }}
 
             QPushButton#primary:hover {{
@@ -91,11 +150,11 @@ class ModernTheme:
                 background-color: {cls.SECONDARY_LIGHT};
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 13px;
+                border-radius: {btn_radius}px;
+                padding: {btn_secondary_padding_v}px {btn_secondary_padding_h}px;
+                font-size: {btn_secondary_font}pt;
                 font-weight: 600;
-                min-height: 36px;
+                min-height: {btn_secondary_height}px;
             }}
 
             QPushButton#secondary:hover {{
@@ -106,11 +165,11 @@ class ModernTheme:
                 background-color: {cls.SUCCESS};
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 12px 24px;
-                font-size: 14px;
+                border-radius: {btn_radius}px;
+                padding: {btn_primary_padding_v}px {btn_primary_padding_h}px;
+                font-size: {btn_primary_font}pt;
                 font-weight: bold;
-                min-height: 40px;
+                min-height: {btn_primary_height}px;
             }}
 
             QPushButton#success:hover {{
@@ -121,11 +180,11 @@ class ModernTheme:
                 background-color: {cls.DANGER};
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 13px;
+                border-radius: {btn_radius}px;
+                padding: {btn_secondary_padding_v}px {btn_secondary_padding_h}px;
+                font-size: {btn_secondary_font}pt;
                 font-weight: 600;
-                min-height: 36px;
+                min-height: {btn_secondary_height}px;
             }}
 
             QPushButton#danger:hover {{
@@ -136,11 +195,11 @@ class ModernTheme:
                 background-color: transparent;
                 color: {cls.PRIMARY};
                 border: 2px solid {cls.PRIMARY};
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 13px;
+                border-radius: {btn_radius}px;
+                padding: {btn_secondary_padding_v}px {btn_secondary_padding_h}px;
+                font-size: {btn_secondary_font}pt;
                 font-weight: 600;
-                min-height: 36px;
+                min-height: {btn_secondary_height}px;
             }}
 
             QPushButton#outline:hover {{
@@ -152,10 +211,10 @@ class ModernTheme:
                 color: white;
                 border: none;
                 text-align: left;
-                padding: 14px 20px;
-                font-size: 14px;
+                padding: {btn_primary_padding_v}px {btn_secondary_padding_h}px;
+                font-size: {btn_primary_font}pt;
                 font-weight: 500;
-                border-left: 4px solid transparent;
+                border-left: {ResponsiveSize.get_scaled_size(4)}px solid transparent;
             }}
 
             QPushButton#navButton:hover {{
@@ -320,11 +379,11 @@ class ModernTheme:
             }}
 
             QHeaderView::section {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 {cls.PRIMARY}, stop:1 {cls.PRIMARY_DARK});
-                color: white;
-                padding: 12px;
+                background-color: {cls.HEADER_BG};
+                color: {cls.HEADER_TEXT};
+                padding: {header_padding}px;
                 border: none;
+                border-bottom: 2px solid {cls.PRIMARY};
                 font-weight: bold;
                 font-size: 13px;
             }}
@@ -547,6 +606,18 @@ class DarkTheme(ModernTheme):
 
     BORDER = "#424242"
     DIVIDER = "#383838"
+
+    # Sidebar colors for proper contrast
+    SIDEBAR_BG = "#1e2936"
+    SIDEBAR_TEXT = "#e1e4e8"
+    SIDEBAR_HOVER = "#2d3748"
+
+    # Table header colors
+    HEADER_BG = "#1e2936"
+    HEADER_TEXT = "#e1e4e8"
+
+    # Hover background for cards
+    HOVER_BG = "#3d5170"  # Darker hover background
 
 
 class OceanTheme(ModernTheme):

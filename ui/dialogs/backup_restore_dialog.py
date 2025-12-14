@@ -14,6 +14,8 @@ from datetime import datetime
 import shutil
 import sqlite3
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class BackupWorker(QThread):
@@ -159,7 +161,11 @@ class BackupRestoreDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("Backup & Restore")
-        self.setMinimumSize(700, 600)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('medium')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -178,7 +184,7 @@ class BackupRestoreDialog(QDialog):
             "You can restore from any backup to revert to a previous state."
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #7f8c8d;")
+        info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(info_label)
 
         # Backup actions group
@@ -187,18 +193,18 @@ class BackupRestoreDialog(QDialog):
         actions_layout.setSpacing(12)
 
         create_backup_btn = QPushButton("Create Backup Now")
-        create_backup_btn.setIcon(get_icon('save'))
+        create_backup_btn.setIcon(get_icon('save', color=ThemeColors.ICON_DEFAULT))
         create_backup_btn.setObjectName("primaryButton")
         create_backup_btn.clicked.connect(self.create_backup)
         actions_layout.addWidget(create_backup_btn)
 
         import_backup_btn = QPushButton("Import Backup")
-        import_backup_btn.setIcon(get_icon('download'))
+        import_backup_btn.setIcon(get_icon('download', color=ThemeColors.ICON_DEFAULT))
         import_backup_btn.clicked.connect(self.import_backup)
         actions_layout.addWidget(import_backup_btn)
 
         open_folder_btn = QPushButton("Open Backup Folder")
-        open_folder_btn.setIcon(get_icon('folder-open'))
+        open_folder_btn.setIcon(get_icon('folder-open', color=ThemeColors.ICON_DEFAULT))
         open_folder_btn.clicked.connect(self.open_backup_folder)
         actions_layout.addWidget(open_folder_btn)
 
@@ -227,20 +233,20 @@ class BackupRestoreDialog(QDialog):
         backup_actions_layout = QHBoxLayout()
 
         self.restore_btn = QPushButton("Restore Selected")
-        self.restore_btn.setIcon(get_icon('refresh'))
+        self.restore_btn.setIcon(get_icon('refresh', color=ThemeColors.ICON_DEFAULT))
         self.restore_btn.setObjectName("primaryButton")
         self.restore_btn.setEnabled(False)
         self.restore_btn.clicked.connect(self.restore_backup)
         backup_actions_layout.addWidget(self.restore_btn)
 
         self.export_btn = QPushButton("Export")
-        self.export_btn.setIcon(get_icon('file-export'))
+        self.export_btn.setIcon(get_icon('file-export', color=ThemeColors.ICON_DEFAULT))
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self.export_backup)
         backup_actions_layout.addWidget(self.export_btn)
 
         self.delete_btn = QPushButton("Delete")
-        self.delete_btn.setIcon(get_icon('trash'))
+        self.delete_btn.setIcon(get_icon('trash', color=ThemeColors.ICON_DEFAULT))
         self.delete_btn.setObjectName("dangerButton")
         self.delete_btn.setEnabled(False)
         self.delete_btn.clicked.connect(self.delete_backup)
@@ -274,12 +280,12 @@ class BackupRestoreDialog(QDialog):
         button_layout.addStretch()
 
         refresh_btn = QPushButton("Refresh List")
-        refresh_btn.setIcon(get_icon('refresh'))
+        refresh_btn.setIcon(get_icon('refresh', color=ThemeColors.ICON_DEFAULT))
         refresh_btn.clicked.connect(self.refresh_backup_list)
         button_layout.addWidget(refresh_btn)
 
         close_btn = QPushButton("Close")
-        close_btn.setIcon(get_icon('times'))
+        close_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         close_btn.setObjectName("secondaryButton")
         close_btn.setMinimumWidth(100)
         close_btn.clicked.connect(self.close)

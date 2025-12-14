@@ -6,11 +6,13 @@ View and edit current user profile information.
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QLineEdit, QTextEdit, QMessageBox,
                              QGroupBox, QFormLayout, QFrame, QTabWidget,
-                             QWidget, QScrollArea, QComboBox)
+                             QWidget, QScrollArea, QComboBox, QListView)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
 from datetime import datetime
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class UserProfileDialog(QDialog):
@@ -52,7 +54,11 @@ class UserProfileDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("User Profile")
-        self.setMinimumSize(700, 600)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('medium')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -93,7 +99,7 @@ class UserProfileDialog(QDialog):
         info_layout.addWidget(name_label)
 
         username_label = QLabel(f"@{self.current_user['username']}")
-        username_label.setStyleSheet("color: #7f8c8d; font-size: 11pt;")
+        username_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 11pt;")
         info_layout.addWidget(username_label)
 
         role_label = QLabel(f"Role: {self.current_user['role'].title()}")
@@ -117,14 +123,14 @@ class UserProfileDialog(QDialog):
         button_layout.addStretch()
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setIcon(get_icon('times'))
+        cancel_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         cancel_btn.setObjectName("secondaryButton")
         cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save Changes")
-        save_btn.setIcon(get_icon('save'))
+        save_btn.setIcon(get_icon('save', color=ThemeColors.ICON_DEFAULT))
         save_btn.setObjectName("primaryButton")
         save_btn.setMinimumWidth(120)
         save_btn.clicked.connect(self.save_profile)
@@ -188,10 +194,16 @@ class UserProfileDialog(QDialog):
         pref_layout.setSpacing(12)
 
         self.language_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.language_combo.setView(QListView())
+        self.language_combo.setMaxVisibleItems(10)
         self.language_combo.addItems(["English", "Arabic", "French", "Spanish"])
         pref_layout.addRow("Language:", self.language_combo)
 
         self.timezone_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.timezone_combo.setView(QListView())
+        self.timezone_combo.setMaxVisibleItems(10)
         self.timezone_combo.addItems(["UTC", "UTC+1", "UTC+2", "UTC+3", "UTC+4", "UTC+5", "UTC-5", "UTC-8"])
         pref_layout.addRow("Timezone:", self.timezone_combo)
 
@@ -292,17 +304,17 @@ class UserProfileDialog(QDialog):
             "Keep your account secure by using a strong password and changing it regularly."
         )
         password_info.setWordWrap(True)
-        password_info.setStyleSheet("color: #7f8c8d;")
+        password_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         password_layout.addWidget(password_info)
 
         change_password_btn = QPushButton("Change Password")
-        change_password_btn.setIcon(get_icon('key'))
+        change_password_btn.setIcon(get_icon('key', color=ThemeColors.ICON_DEFAULT))
         change_password_btn.setMaximumWidth(200)
         change_password_btn.clicked.connect(self.change_password)
         password_layout.addWidget(change_password_btn)
 
         self.password_changed_label = QLabel("Last changed: Loading...")
-        self.password_changed_label.setStyleSheet("color: #7f8c8d; font-size: 9pt;")
+        self.password_changed_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         password_layout.addWidget(self.password_changed_label)
 
         password_group.setLayout(password_layout)
@@ -318,14 +330,14 @@ class UserProfileDialog(QDialog):
             "Your current session information."
         )
         session_info.setWordWrap(True)
-        session_info.setStyleSheet("color: #7f8c8d;")
+        session_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         session_layout.addWidget(session_info)
 
         self.current_session_label = QLabel("Loading session info...")
         session_layout.addWidget(self.current_session_label)
 
         logout_all_btn = QPushButton("Logout All Other Sessions")
-        logout_all_btn.setIcon(get_icon('sign-out-alt'))
+        logout_all_btn.setIcon(get_icon('sign-out-alt', color=ThemeColors.ICON_DEFAULT))
         logout_all_btn.setObjectName("dangerButton")
         logout_all_btn.setMaximumWidth(220)
         logout_all_btn.clicked.connect(self.logout_other_sessions)
@@ -344,7 +356,7 @@ class UserProfileDialog(QDialog):
             "Additional security options can be configured in Settings → Security."
         )
         security_info.setWordWrap(True)
-        security_info.setStyleSheet("color: #7f8c8d;")
+        security_info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         security_layout.addWidget(security_info)
 
         security_group.setLayout(security_layout)

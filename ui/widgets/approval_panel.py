@@ -11,6 +11,13 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 from datetime import datetime
+from ui.utils.table_utils import (
+    configure_table_row_heights,
+    fix_table_button_overlap,
+    create_action_cell_widget,
+    setup_responsive_table_columns
+)
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class ApprovalDecisionDialog(QDialog):
@@ -216,25 +223,35 @@ class ApprovalPanel(QWidget):
 
         # Configure responsive column sizing
         header = self.approvals_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Report #
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Entity Name - takes space
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Requested By
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Requested At
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Comment
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Actions
+
+        # Configure responsive column widths with ratio-based sizing
+        column_configs = [
+            {'index': 0, 'ratio': 0.08, 'min_width': 70, 'resize_mode': 'ResizeToContents'},  # Report #
+            {'index': 1, 'ratio': 0.25, 'min_width': 150, 'resize_mode': 'Stretch'},  # Entity Name - flexible
+            {'index': 2, 'ratio': 0.15, 'min_width': 100, 'resize_mode': 'ResizeToContents'},  # Requested By
+            {'index': 3, 'ratio': 0.15, 'min_width': 120, 'resize_mode': 'ResizeToContents'},  # Requested At
+            {'index': 4, 'ratio': 0.10, 'min_width': 80, 'resize_mode': 'ResizeToContents'},   # Status
+            {'index': 5, 'ratio': 0.10, 'min_width': 80, 'resize_mode': 'ResizeToContents'},   # Comment
+            {'index': 6, 'ratio': 0.17, 'min_width': 220, 'resize_mode': 'ResizeToContents'},  # Actions - FLEXIBLE!
+        ]
+        setup_responsive_table_columns(self.approvals_table, column_configs)
 
         # Configure vertical header for responsive row heights
+        row_height = ResponsiveSize.get_row_height('normal')
+        min_row_height = ResponsiveSize.get_row_height('compact')
         vertical_header = self.approvals_table.verticalHeader()
         vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        vertical_header.setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
-        vertical_header.setMinimumSectionSize(40)  # Minimum to prevent too small
+        vertical_header.setDefaultSectionSize(row_height)
+        vertical_header.setMinimumSectionSize(min_row_height)
 
         # Connect signals to save geometry when user resizes
         header.sectionResized.connect(self.save_table_geometry)
         self.approvals_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
 
         layout.addWidget(self.approvals_table)
+
+        # Fix button overlap after loading data
+        fix_table_button_overlap(self.approvals_table, 6)
 
         # Restore saved column widths and row heights
         self.restore_table_geometry()
@@ -296,21 +313,16 @@ class ApprovalPanel(QWidget):
                 comment_item.setToolTip(comment)
                 self.approvals_table.setItem(row, 5, comment_item)
 
-                # Actions - Review button - fully responsive to cell size
-                actions_widget = QWidget()
-                actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(4, 4, 4, 4)  # Minimal padding
-
-                review_button = QPushButton("Review")
-                review_button.setObjectName("primaryButton")
-                # No size constraints - button adapts to cell size
-                review_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                review_button.clicked.connect(lambda checked, r=row: self.review_approval(r))
-                actions_layout.addWidget(review_button)
-
-                # Make container fill the cell completely
-                actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
+                # Actions - Review button with proper sizing to prevent overlap
+                actions = [
+                    {
+                        'text': 'Review',
+                        'style': 'primaryButton',
+                        'callback': lambda r=row: self.review_approval(r)
+                    }
+                ]
+                
+                actions_widget = create_action_cell_widget(actions, button_width=90)
                 self.approvals_table.setCellWidget(row, 6, actions_widget)
 
         except Exception as e:

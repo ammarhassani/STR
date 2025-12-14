@@ -5,10 +5,11 @@ Shows a bell icon with unread count and dropdown with recent notifications.
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QFrame, QScrollArea, QMenu,
-                             QToolButton)
+                             QToolButton, QApplication)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QCursor
 from datetime import datetime
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class NotificationItem(QFrame):
@@ -153,8 +154,15 @@ class NotificationDropdown(QFrame):
     def setup_ui(self):
         """Setup the user interface."""
         self.setObjectName("notificationDropdown")
-        self.setFixedWidth(380)
-        self.setMaximumHeight(500)
+
+        # Responsive dropdown sizing
+        screen_width = QApplication.primaryScreen().geometry().width()
+        dropdown_width = min(int(screen_width * 0.25), ResponsiveSize.get_scaled_size(400))
+        dropdown_width = max(dropdown_width, ResponsiveSize.get_scaled_size(300))
+        self.setMaximumWidth(dropdown_width)
+
+        dropdown_height = ResponsiveSize.get_scaled_size(500)
+        self.setMaximumHeight(dropdown_height)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -360,7 +368,7 @@ class NotificationWidget(QWidget):
             self.show_dropdown()
 
     def show_dropdown(self):
-        """Show the notification dropdown."""
+        """Show notification dropdown with smart positioning to prevent overflow."""
         if self.dropdown:
             self.dropdown.close()
 
@@ -368,13 +376,34 @@ class NotificationWidget(QWidget):
         self.dropdown.notification_clicked.connect(self.on_notification_clicked)
         self.dropdown.mark_all_read.connect(self.mark_all_read)
 
-        # Position dropdown below button
-        button_pos = self.notif_button.mapToGlobal(self.notif_button.rect().bottomLeft())
-        dropdown_x = button_pos.x() - self.dropdown.width() + self.notif_button.width()
-        dropdown_y = button_pos.y() + 5
+        # Get button geometry in global coordinates
+        button_rect = self.notif_button.geometry()
+        button_global_pos = self.notif_button.mapToGlobal(button_rect.topLeft())
 
+        # Get screen geometry
+        screen = QApplication.primaryScreen().availableGeometry()
+
+        # Calculate initial position (right-align dropdown with button)
+        dropdown_x = button_global_pos.x() + button_rect.width() - self.dropdown.width()
+        dropdown_y = button_global_pos.y() + button_rect.height() + ResponsiveSize.get_scaled_size(5)
+
+        # Prevent right edge overflow
+        if dropdown_x + self.dropdown.width() > screen.right():
+            dropdown_x = screen.right() - self.dropdown.width() - 10
+
+        # Prevent left edge overflow
+        if dropdown_x < screen.left():
+            dropdown_x = screen.left() + 10
+
+        # Prevent bottom overflow
+        if dropdown_y + self.dropdown.height() > screen.bottom():
+            # Show above button instead
+            dropdown_y = button_global_pos.y() - self.dropdown.height() - ResponsiveSize.get_scaled_size(5)
+
+        # Position and show
         self.dropdown.move(dropdown_x, dropdown_y)
         self.dropdown.show()
+        self.dropdown.raise_()
 
     def on_notification_clicked(self, notification):
         """

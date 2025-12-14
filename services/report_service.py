@@ -26,7 +26,7 @@ class ReportService:
         'relationship', 'id_type'
     }
 
-    def __init__(self, db_manager, logging_service, auth_service):
+    def __init__(self, db_manager, logging_service, auth_service, activity_service=None):
         """
         Initialize the report service.
 
@@ -34,10 +34,16 @@ class ReportService:
             db_manager: DatabaseManager instance
             logging_service: LoggingService instance
             auth_service: AuthService instance
+            activity_service: ActivityService instance (for logging activities)
         """
         self.db_manager = db_manager
         self.logger = logging_service
         self.auth_service = auth_service
+        self.activity_service = activity_service
+
+    def set_activity_service(self, activity_service):
+        """Set activity service (for late binding to avoid circular imports)."""
+        self.activity_service = activity_service
 
     def create_report(self, report_data: Dict[str, Any]) -> Tuple[bool, Optional[int], str]:
         """
@@ -114,6 +120,19 @@ class ReportService:
                 {'report_id': report_id, 'report_number': report_data['report_number']}
             )
 
+            # Log to activity service for GitHub-style activity feed
+            if self.activity_service:
+                self.activity_service.log_activity(
+                    action_type='CREATE',
+                    description=f"{current_user['username']} created Report #{report_data['report_number']}",
+                    report_id=report_id,
+                    report_number=report_data['report_number'],
+                    metadata={
+                        'entity_name': report_data.get('reported_entity_name', ''),
+                        'status': report_data.get('status', 'Open')
+                    }
+                )
+
             return True, report_id, "Report created successfully"
 
         except Exception as e:
@@ -181,6 +200,36 @@ class ReportService:
                 {'report_id': report_id, 'fields_updated': fields}
             )
 
+            # Get report number for activity logging
+            report_number_query = "SELECT report_number, reported_entity_name FROM reports WHERE report_id = ?"
+            report_info = self.db_manager.execute_with_retry(report_number_query, (report_id,))
+            report_number = report_info[0][0] if report_info else str(report_id)
+            entity_name = report_info[0][1] if report_info else ''
+
+            # Log to activity service for GitHub-style activity feed
+            if self.activity_service:
+                # Create a description that shows what fields were changed
+                if len(fields) == 1:
+                    field_name = fields[0].replace('_', ' ').title()
+                    description = f"{current_user['username']} updated {field_name} in Report #{report_number}"
+                elif len(fields) <= 3:
+                    field_names = ', '.join([f.replace('_', ' ').title() for f in fields])
+                    description = f"{current_user['username']} updated {field_names} in Report #{report_number}"
+                else:
+                    description = f"{current_user['username']} updated {len(fields)} fields in Report #{report_number}"
+
+                self.activity_service.log_activity(
+                    action_type='UPDATE',
+                    description=description,
+                    report_id=report_id,
+                    report_number=report_number,
+                    metadata={
+                        'entity_name': entity_name,
+                        'fields_updated': fields,
+                        'field_count': len(fields)
+                    }
+                )
+
             return True, "Report updated successfully"
 
         except Exception as e:
@@ -189,7 +238,7 @@ class ReportService:
 
     def delete_report(self, report_id: int) -> Tuple[bool, str]:
         """
-        Delete a report (soft delete).
+        Delete a report (soft delete). Admin only.
 
         Args:
             report_id: Report ID to delete
@@ -202,30 +251,51 @@ class ReportService:
             if not current_user:
                 return False, "User not authenticated"
 
+            # Check if user is admin
+            if current_user.get('role') != 'admin':
+                return False, "Only administrators can delete reports"
+
             # Check if report exists
-            check_query = "SELECT report_number FROM reports WHERE report_id = ?"
+            check_query = "SELECT report_number, reported_entity_name, is_deleted FROM reports WHERE report_id = ?"
             result = self.db_manager.execute_with_retry(check_query, (report_id,))
 
             if not result:
                 return False, "Report not found"
 
             report_number = result[0][0]
+            entity_name = result[0][1]
+            is_deleted = result[0][2]
 
-            # Soft delete
+            if is_deleted:
+                return False, "Report is already deleted"
+
+            # Soft delete with tracking
             query = """
                 UPDATE reports
-                SET is_deleted = 1, updated_by = ?, updated_at = ?
+                SET is_deleted = 1, updated_by = ?, updated_at = ?,
+                    deleted_at = ?, deleted_by = ?
                 WHERE report_id = ?
             """
+            now = datetime.now().isoformat()
             self.db_manager.execute_with_retry(
                 query,
-                (current_user['username'], datetime.now().isoformat(), report_id)
+                (current_user['username'], now, now, current_user['username'], report_id)
             )
 
             self.logger.log_user_action(
                 "REPORT_DELETED",
                 {'report_id': report_id, 'report_number': report_number}
             )
+
+            # Log to activity service if available
+            if self.activity_service:
+                self.activity_service.log_activity(
+                    action_type='SOFT_DELETE',
+                    description=f"{current_user['username']} deleted Report #{report_number}",
+                    report_id=report_id,
+                    report_number=report_number,
+                    metadata={'entity_name': entity_name, 'delete_type': 'soft'}
+                )
 
             return True, "Report deleted successfully"
 
@@ -266,7 +336,8 @@ class ReportService:
                     date_to: Optional[str] = None,
                     created_by: Optional[str] = None,
                     limit: Optional[int] = 50,
-                    offset: int = 0) -> Tuple[List[Dict], int]:
+                    offset: int = 0,
+                    include_deleted: bool = False) -> Tuple[List[Dict], int]:
         """
         Get reports with optional filtering and pagination.
 
@@ -278,14 +349,19 @@ class ReportService:
             created_by: Filter by creator
             limit: Maximum number of records to return (None for all)
             offset: Offset for pagination
+            include_deleted: Whether to include soft-deleted reports
 
         Returns:
             Tuple of (list of reports, total count)
         """
         try:
             # Build query
-            query = "SELECT * FROM reports WHERE is_deleted = 0"
-            count_query = "SELECT COUNT(*) FROM reports WHERE is_deleted = 0"
+            if include_deleted:
+                query = "SELECT * FROM reports WHERE 1=1"
+                count_query = "SELECT COUNT(*) FROM reports WHERE 1=1"
+            else:
+                query = "SELECT * FROM reports WHERE is_deleted = 0"
+                count_query = "SELECT COUNT(*) FROM reports WHERE is_deleted = 0"
             params = []
 
             if status:
@@ -498,3 +574,208 @@ class ReportService:
         except Exception as e:
             self.logger.error(f"Error fetching status history: {str(e)}", exc_info=True)
             return []
+
+    def hard_delete_report(self, report_id: int, reason: str = "") -> Tuple[bool, str]:
+        """
+        Permanently delete a report (admin only). Cascades to versions, approvals, etc.
+
+        Args:
+            report_id: Report ID to delete
+            reason: Reason for deletion
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            current_user = self.auth_service.get_current_user()
+            if not current_user:
+                return False, "User not authenticated"
+
+            # Check if user is admin
+            if current_user.get('role') != 'admin':
+                return False, "Only administrators can permanently delete reports"
+
+            # Get report info for logging
+            check_query = "SELECT report_number, reported_entity_name FROM reports WHERE report_id = ?"
+            result = self.db_manager.execute_with_retry(check_query, (report_id,))
+
+            if not result:
+                return False, "Report not found"
+
+            report_number = result[0][0]
+            entity_name = result[0][1]
+
+            # Get counts for warning
+            version_count = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM report_versions WHERE report_id = ?", (report_id,)
+            )[0][0]
+            approval_count = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM report_approvals WHERE report_id = ?", (report_id,)
+            )[0][0]
+
+            # Delete related records first (cascade)
+            self.db_manager.execute_with_retry(
+                "DELETE FROM report_versions WHERE report_id = ?", (report_id,)
+            )
+            self.db_manager.execute_with_retry(
+                "DELETE FROM report_approvals WHERE report_id = ?", (report_id,)
+            )
+            self.db_manager.execute_with_retry(
+                "DELETE FROM status_history WHERE report_id = ?", (report_id,)
+            )
+            self.db_manager.execute_with_retry(
+                "DELETE FROM change_history WHERE table_name = 'reports' AND record_id = ?", (report_id,)
+            )
+            self.db_manager.execute_with_retry(
+                "DELETE FROM notifications WHERE related_report_id = ?", (report_id,)
+            )
+
+            # Delete the report itself
+            self.db_manager.execute_with_retry(
+                "DELETE FROM reports WHERE report_id = ?", (report_id,)
+            )
+
+            self.logger.log_user_action(
+                "REPORT_HARD_DELETED",
+                {
+                    'report_id': report_id,
+                    'report_number': report_number,
+                    'versions_deleted': version_count,
+                    'approvals_deleted': approval_count,
+                    'reason': reason
+                }
+            )
+
+            # Log to activity service if available
+            if self.activity_service:
+                self.activity_service.log_activity(
+                    action_type='HARD_DELETE',
+                    description=f"{current_user['username']} permanently deleted Report #{report_number}",
+                    report_id=None,  # Report no longer exists
+                    report_number=report_number,
+                    metadata={
+                        'entity_name': entity_name,
+                        'versions_deleted': version_count,
+                        'approvals_deleted': approval_count,
+                        'reason': reason
+                    }
+                )
+
+            return True, f"Report #{report_number} permanently deleted ({version_count} versions, {approval_count} approvals removed)"
+
+        except Exception as e:
+            self.logger.error(f"Error hard deleting report: {str(e)}", exc_info=True)
+            return False, f"Error deleting report: {str(e)}"
+
+    def restore_report(self, report_id: int) -> Tuple[bool, str]:
+        """
+        Restore a soft-deleted report (admin only).
+
+        Args:
+            report_id: Report ID to restore
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            current_user = self.auth_service.get_current_user()
+            if not current_user:
+                return False, "User not authenticated"
+
+            # Check if user is admin
+            if current_user.get('role') != 'admin':
+                return False, "Only administrators can restore deleted reports"
+
+            # Get report info
+            check_query = "SELECT report_number, reported_entity_name, is_deleted FROM reports WHERE report_id = ?"
+            result = self.db_manager.execute_with_retry(check_query, (report_id,))
+
+            if not result:
+                return False, "Report not found"
+
+            report_number = result[0][0]
+            entity_name = result[0][1]
+            is_deleted = result[0][2]
+
+            if not is_deleted:
+                return False, "Report is not deleted"
+
+            # Restore the report
+            query = """
+                UPDATE reports
+                SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL,
+                    updated_by = ?, updated_at = ?
+                WHERE report_id = ?
+            """
+            self.db_manager.execute_with_retry(
+                query,
+                (current_user['username'], datetime.now().isoformat(), report_id)
+            )
+
+            self.logger.log_user_action(
+                "REPORT_RESTORED",
+                {'report_id': report_id, 'report_number': report_number}
+            )
+
+            # Log to activity service if available
+            if self.activity_service:
+                self.activity_service.log_activity(
+                    action_type='UNDELETE',
+                    description=f"{current_user['username']} restored Report #{report_number}",
+                    report_id=report_id,
+                    report_number=report_number,
+                    metadata={'entity_name': entity_name}
+                )
+
+            return True, f"Report #{report_number} restored successfully"
+
+        except Exception as e:
+            self.logger.error(f"Error restoring report: {str(e)}", exc_info=True)
+            return False, f"Error restoring report: {str(e)}"
+
+    def get_deleted_reports_count(self) -> int:
+        """
+        Get count of soft-deleted reports.
+
+        Returns:
+            Number of deleted reports
+        """
+        try:
+            result = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM reports WHERE is_deleted = 1"
+            )
+            return result[0][0] if result else 0
+        except Exception as e:
+            self.logger.error(f"Error getting deleted reports count: {str(e)}", exc_info=True)
+            return 0
+
+    def get_report_impact(self, report_id: int) -> Dict[str, int]:
+        """
+        Get counts of related records that would be affected by hard delete.
+
+        Args:
+            report_id: Report ID
+
+        Returns:
+            Dictionary with counts of related records
+        """
+        try:
+            versions = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM report_versions WHERE report_id = ?", (report_id,)
+            )[0][0]
+            approvals = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM report_approvals WHERE report_id = ?", (report_id,)
+            )[0][0]
+            pending_approvals = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM report_approvals WHERE report_id = ? AND approval_status = 'pending'",
+                (report_id,)
+            )[0][0]
+
+            return {
+                'versions': versions,
+                'approvals': approvals,
+                'pending_approvals': pending_approvals
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting report impact: {str(e)}", exc_info=True)
+            return {'versions': 0, 'approvals': 0, 'pending_approvals': 0}

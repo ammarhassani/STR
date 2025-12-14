@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont
 from ui.workers import Worker, LogExportWorker
+from ui.theme_colors import ThemeColors
 from datetime import datetime
 
 
@@ -104,7 +105,7 @@ class LogManagementView(QWidget):
         actions_layout = QHBoxLayout()
 
         self.stats_label = QLabel("0 logs loaded")
-        self.stats_label.setStyleSheet("color: #7f8c8d; font-weight: 500;")
+        self.stats_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-weight: 500;")
         actions_layout.addWidget(self.stats_label)
 
         actions_layout.addStretch()
@@ -154,7 +155,7 @@ class LogManagementView(QWidget):
 
         # Status label
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #7f8c8d;")
+        self.status_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(self.status_label)
 
     def on_filter_changed(self):

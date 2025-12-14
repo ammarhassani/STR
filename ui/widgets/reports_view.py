@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QFont, QColor
 from ui.workers import ReportLoadWorker
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
 from pathlib import Path
 from datetime import datetime
 
@@ -78,7 +79,7 @@ class ReportsView(QWidget):
         # My Reports quick filter (for agents)
         if self.current_user.get('role') != 'admin':
             my_reports_btn = QPushButton("My Reports")
-            my_reports_btn.setIcon(get_icon('user'))
+            my_reports_btn.setIcon(get_icon('user', color=ThemeColors.ICON_DEFAULT))
             my_reports_btn.setObjectName("secondaryButton")
             my_reports_btn.setCheckable(True)
             my_reports_btn.clicked.connect(self.toggle_my_reports)
@@ -88,7 +89,7 @@ class ReportsView(QWidget):
 
             # Send All to Approval button
             send_all_btn = QPushButton("Send All to Approval")
-            send_all_btn.setIcon(get_icon('check-circle'))
+            send_all_btn.setIcon(get_icon('check-circle', color=ThemeColors.ICON_DEFAULT))
             send_all_btn.setObjectName("primaryButton")
             send_all_btn.clicked.connect(self.send_all_to_approval)
             send_all_btn.setToolTip("Send all my draft reports for approval")
@@ -97,14 +98,14 @@ class ReportsView(QWidget):
 
         # Export to Excel button
         export_btn = QPushButton("Export to Excel")
-        export_btn.setIcon(get_icon('file-excel', color='#27ae60'))
+        export_btn.setIcon(get_icon('file-excel', color=ThemeColors.SUCCESS))
         export_btn.setObjectName("secondaryButton")
         export_btn.clicked.connect(self.export_to_excel)
         header_layout.addWidget(export_btn)
 
         # Add Report button
         add_btn = QPushButton("Add New Report")
-        add_btn.setIcon(get_icon('plus'))
+        add_btn.setIcon(get_icon('plus', color=ThemeColors.ICON_DEFAULT))
         add_btn.setObjectName("primaryButton")
         add_btn.clicked.connect(self.add_report)
         header_layout.addWidget(add_btn)
@@ -135,20 +136,20 @@ class ReportsView(QWidget):
 
         # Advanced filters toggle
         self.advanced_btn = QPushButton("Advanced Filters")
-        self.advanced_btn.setIcon(get_icon('filter'))
+        self.advanced_btn.setIcon(get_icon('filter', color=ThemeColors.ICON_DEFAULT))
         self.advanced_btn.setCheckable(True)
         self.advanced_btn.clicked.connect(self.toggle_advanced_filters)
         filters_layout.addWidget(self.advanced_btn)
 
         # Clear filters
         clear_btn = QPushButton("Clear")
-        clear_btn.setIcon(get_icon('times'))
+        clear_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         clear_btn.clicked.connect(self.clear_filters)
         filters_layout.addWidget(clear_btn)
 
         # Search/Refresh button
         search_btn = QPushButton("Search")
-        search_btn.setIcon(get_icon('search'))
+        search_btn.setIcon(get_icon('search', color=ThemeColors.ICON_DEFAULT))
         search_btn.clicked.connect(self.on_filter_changed)
         filters_layout.addWidget(search_btn)
 
@@ -223,17 +224,17 @@ class ReportsView(QWidget):
         pagination_layout.setSpacing(8)
 
         self.prev_btn = QPushButton("Previous")
-        self.prev_btn.setIcon(get_icon('chevron-left'))
+        self.prev_btn.setIcon(get_icon('chevron-left', color=ThemeColors.ICON_DEFAULT))
         self.prev_btn.clicked.connect(self.previous_page)
         self.prev_btn.setEnabled(False)
         pagination_layout.addWidget(self.prev_btn)
 
         self.page_label = QLabel("Page 1")
-        self.page_label.setStyleSheet("font-weight: 500; padding: 0 12px;")
+        self.page_label.setStyleSheet(f"font-weight: 500; padding: 0 12px; color: {ThemeColors.TEXT_PRIMARY};")
         pagination_layout.addWidget(self.page_label)
 
         self.next_btn = QPushButton("Next")
-        self.next_btn.setIcon(get_icon('chevron-right'))
+        self.next_btn.setIcon(get_icon('chevron-right', color=ThemeColors.ICON_DEFAULT))
         self.next_btn.clicked.connect(self.next_page)
         pagination_layout.addWidget(self.next_btn)
 

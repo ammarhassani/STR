@@ -10,7 +10,7 @@ from typing import Optional, Dict, List, Tuple
 class ApprovalService:
     """Service for managing report approvals and notifications."""
 
-    def __init__(self, db_manager, logging_service, auth_service, version_service, report_service):
+    def __init__(self, db_manager, logging_service, auth_service, version_service, report_service, activity_service=None):
         """
         Initialize the approval service.
 
@@ -20,12 +20,18 @@ class ApprovalService:
             auth_service: AuthService instance
             version_service: VersionService instance (for creating snapshots)
             report_service: ReportService instance (for getting report data)
+            activity_service: ActivityService instance (for logging activities)
         """
         self.db_manager = db_manager
         self.logger = logging_service
         self.auth_service = auth_service
         self.version_service = version_service
         self.report_service = report_service
+        self.activity_service = activity_service
+
+    def set_activity_service(self, activity_service):
+        """Set activity service (for late binding to avoid circular imports)."""
+        self.activity_service = activity_service
 
     # ==================== Approval Workflow Methods ====================
 
@@ -192,6 +198,21 @@ class ApprovalService:
                 {'report_id': report_id, 'approval_id': approval_id, 'comment': comment}
             )
 
+            # Log to activity service for GitHub-style activity feed
+            if self.activity_service:
+                report = self.report_service.get_report(report_id)
+                report_number = report.get('report_number', str(report_id)) if report else str(report_id)
+                self.activity_service.log_activity(
+                    action_type='APPROVE',
+                    description=f"{current_user['username']} approved Report #{report_number}",
+                    report_id=report_id,
+                    report_number=report_number,
+                    metadata={
+                        'comment': comment,
+                        'requested_by': requested_by
+                    }
+                )
+
             return True, "Report approved successfully"
 
         except Exception as e:
@@ -280,6 +301,24 @@ class ApprovalService:
                 "REPORT_REJECTED" if not request_rework else "REPORT_REWORK_REQUESTED",
                 {'report_id': report_id, 'approval_id': approval_id, 'comment': comment}
             )
+
+            # Log to activity service for GitHub-style activity feed
+            if self.activity_service:
+                report = self.report_service.get_report(report_id)
+                report_number = report.get('report_number', str(report_id)) if report else str(report_id)
+                action_type = 'REJECT'
+                action_text = "requested rework for" if request_rework else "rejected"
+                self.activity_service.log_activity(
+                    action_type=action_type,
+                    description=f"{current_user['username']} {action_text} Report #{report_number}",
+                    report_id=report_id,
+                    report_number=report_number,
+                    metadata={
+                        'comment': comment,
+                        'requested_by': requested_by,
+                        'request_rework': request_rework
+                    }
+                )
 
             action_msg = "marked for rework" if request_rework else "rejected"
             return True, f"Report {action_msg} successfully"

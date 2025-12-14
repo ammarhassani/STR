@@ -6,11 +6,14 @@ Displays complete approval history with filtering and search capabilities (Admin
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QTableWidget, QTableWidgetItem,
                              QHeaderView, QComboBox, QLineEdit, QFrame,
-                             QMessageBox, QFileDialog, QWidget, QSizePolicy)
+                             QMessageBox, QFileDialog, QWidget, QSizePolicy,
+                             QListView)
 from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QFont, QColor
 from datetime import datetime
 import csv
+from ui.utils.table_utils import configure_table_row_heights
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class ApprovalsHistoryDialog(QDialog):
@@ -44,7 +47,11 @@ class ApprovalsHistoryDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("Approval History")
-        self.setMinimumSize(1200, 700)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('xlarge')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -92,6 +99,9 @@ class ApprovalsHistoryDialog(QDialog):
         filter_layout.addWidget(filter_label)
 
         self.status_filter = QComboBox()
+        # Fix dropdown visibility issues
+        self.status_filter.setView(QListView())
+        self.status_filter.setMaxVisibleItems(10)
         self.status_filter.addItem("All", None)
         self.status_filter.addItem("Pending", "pending")
         self.status_filter.addItem("Approved", "approved")
@@ -147,24 +157,30 @@ class ApprovalsHistoryDialog(QDialog):
         self.approvals_table.verticalHeader().setVisible(True)
         self.approvals_table.setAlternatingRowColors(True)
 
-        # Configure responsive column sizing
+        # Configure responsive column sizing with proper minimum widths
         header = self.approvals_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Approval ID
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Report #
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Entity Name - takes space
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Status
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Requested By
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Requested At
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Reviewed By
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Reviewed At
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Report Status
-        header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)  # Comment
+        header.setMinimumSectionSize(60)  # Set minimum for all columns
+        
+        column_configs = [
+            {'index': 0, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 80},   # Approval ID
+            {'index': 1, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 100},  # Report #
+            {'index': 2, 'mode': QHeaderView.ResizeMode.Stretch, 'min_width': 150},          # Entity Name
+            {'index': 3, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 80},   # Status
+            {'index': 4, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 100},  # Requested By
+            {'index': 5, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 120},  # Requested At
+            {'index': 6, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 100},  # Reviewed By
+            {'index': 7, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 120},  # Reviewed At
+            {'index': 8, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 80},   # Report Status
+            {'index': 9, 'mode': QHeaderView.ResizeMode.ResizeToContents, 'min_width': 120},  # Comment
+        ]
+        
+        for config in column_configs:
+            header.setSectionResizeMode(config['index'], config['mode'])
+            if config['min_width'] > 60:
+                self.approvals_table.setColumnWidth(config['index'], config['min_width'])
 
         # Configure vertical header for responsive row heights
-        vertical_header = self.approvals_table.verticalHeader()
-        vertical_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        vertical_header.setDefaultSectionSize(45)
-        vertical_header.setMinimumSectionSize(35)
+        configure_table_row_heights(self.approvals_table, default_height=48, min_height=40)
 
         # Connect signals for saving geometry
         header.sectionResized.connect(self.save_table_geometry)

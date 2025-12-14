@@ -6,12 +6,15 @@ Contains navigation and view management.
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QPushButton, QStackedWidget, QFrame,
                              QMenuBar, QMenu, QToolBar, QStatusBar, QMessageBox,
-                             QSizePolicy)
-from PyQt6.QtCore import Qt, pyqtSignal
+                             QSizePolicy, QApplication, QScrollArea)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QAction, QIcon, QFont
 from pathlib import Path
 from services.icon_service import get_icon
 from services.keyboard_shortcuts_service import KeyboardShortcutsService
+from ui.utils.responsive_sizing import ResponsiveSize
+from ui.themes import ModernTheme
+from ui.theme_colors import ThemeColors
 
 
 class MainWindow(QMainWindow):
@@ -50,6 +53,10 @@ class MainWindow(QMainWindow):
 
         # Initialize keyboard shortcuts service
         self.shortcuts_service = KeyboardShortcutsService()
+        
+        # Initialize resize timer for responsive behavior
+        self.resize_timer = None
+        self.resizing = False
 
         self.setup_ui()
         self.setup_menu_bar()
@@ -61,7 +68,8 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("FIU Report Management System")
-        self.setMinimumSize(1200, 800)
+        # Reduce minimum size to fit 15" laptop screens (1366x768)
+        self.setMinimumSize(1024, 600)
         self.showMaximized()
 
         # Central widget
@@ -70,8 +78,11 @@ class MainWindow(QMainWindow):
 
         # Main layout
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        # Add proper margins and spacing for breathing room
+        margin = ResponsiveSize.get_margin('normal')
+        spacing = ResponsiveSize.get_spacing('normal')
+        main_layout.setContentsMargins(margin, 0, margin, margin)  # Top stays 0 for header
+        main_layout.setSpacing(spacing)
 
         # Left sidebar navigation
         self.sidebar = self.create_sidebar()
@@ -105,36 +116,57 @@ class MainWindow(QMainWindow):
         """
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(200)
-        sidebar.setMaximumWidth(280)
-        sidebar.setStyleSheet("""
-            QFrame#sidebar {
-                background-color: #34495e;
-                border-right: 1px solid #2c3e50;
-            }
-            QPushButton {
+
+        # Responsive sidebar width based on screen size
+        screen_width = QApplication.primaryScreen().geometry().width()
+        if screen_width >= 1920:
+            sidebar.setMinimumWidth(ResponsiveSize.get_scaled_size(200))
+            sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(320))
+        elif screen_width >= 1400:
+            sidebar.setMinimumWidth(ResponsiveSize.get_scaled_size(180))
+            sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(250))
+        else:
+            sidebar.setMinimumWidth(ResponsiveSize.get_scaled_size(160))
+            sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(200))
+
+        sidebar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        # Dynamic stylesheet with responsive sizing
+        padding_v = ResponsiveSize.get_scaled_size(12)
+        padding_h = ResponsiveSize.get_scaled_size(16)
+        font_size = ResponsiveSize.get_font_size('normal')
+        border_radius = ResponsiveSize.get_scaled_size(4)
+
+        sidebar.setStyleSheet(f"""
+            QFrame#sidebar {{
+                background-color: {ModernTheme.SIDEBAR_BG};
+                border-right: 1px solid {ModernTheme.BORDER};
+            }}
+            QPushButton {{
+                color: {ModernTheme.SIDEBAR_TEXT};
                 background-color: transparent;
-                color: white;
                 border: none;
-                border-radius: 4px;
-                padding: 12px 16px;
                 text-align: left;
-                font-size: 11pt;
-            }
-            QPushButton:hover {
-                background-color: #2c3e50;
-            }
-            QPushButton:checked {
-                background-color: #3498db;
+                padding: {padding_v}px {padding_h}px;
+                font-size: {font_size}pt;
+                border-radius: {border_radius}px;
+            }}
+            QPushButton:hover {{
+                background-color: {ModernTheme.SIDEBAR_HOVER};
+            }}
+            QPushButton:checked {{
+                background-color: {ModernTheme.PRIMARY};
+                color: white;
                 font-weight: 600;
-            }
+            }}
         """)
 
-        layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(8, 16, 8, 16)
-        layout.setSpacing(4)
+        # Main sidebar layout (no margins here, will be on scroll content)
+        main_sidebar_layout = QVBoxLayout(sidebar)
+        main_sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        main_sidebar_layout.setSpacing(0)
 
-        # App logo/title
+        # App logo/title (fixed at top, not scrollable)
         title_label = QLabel("FIU System")
         title_label.setStyleSheet("""
             color: white;
@@ -143,9 +175,26 @@ class MainWindow(QMainWindow):
             padding: 12px;
         """)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
+        main_sidebar_layout.addWidget(title_label)
 
-        layout.addSpacing(20)
+        # Create scroll area for nav buttons
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        # Content widget for scrollable buttons
+        scroll_content = QWidget()
+        layout = QVBoxLayout(scroll_content)
+
+        # Responsive margins and spacing
+        margin_h = ResponsiveSize.get_margin('tight')
+        margin_v = ResponsiveSize.get_margin('normal')
+        spacing = ResponsiveSize.get_spacing('tight')
+        layout.setContentsMargins(margin_h, margin_v, margin_h, margin_v)
+        layout.setSpacing(spacing)
 
         # Navigation buttons
         self.nav_buttons = {}
@@ -177,8 +226,8 @@ class MainWindow(QMainWindow):
             layout.addSpacing(20)
 
             admin_label = QLabel("ADMINISTRATION")
-            admin_label.setStyleSheet("""
-                color: #95a5a6;
+            admin_label.setStyleSheet(f"""
+                color: {ThemeColors.TEXT_SECONDARY};
                 font-size: 9pt;
                 font-weight: 600;
                 padding: 8px 16px;
@@ -219,7 +268,7 @@ class MainWindow(QMainWindow):
         user_name.setStyleSheet("font-weight: 600; font-size: 10pt;")
 
         user_role = QLabel(self.current_user['role'].capitalize() if self.current_user else "")
-        user_role.setStyleSheet("color: #95a5a6; font-size: 9pt;")
+        user_role.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
 
         user_layout.addWidget(user_name)
         user_layout.addWidget(user_role)
@@ -264,6 +313,10 @@ class MainWindow(QMainWindow):
         logout_btn.clicked.connect(self.handle_logout)
         layout.addWidget(logout_btn)
 
+        # Set scroll content and add to main sidebar layout
+        scroll_area.setWidget(scroll_content)
+        main_sidebar_layout.addWidget(scroll_area)
+
         return sidebar
 
     def create_nav_button(self, text: str, view_id: str, icon_name: str = None):
@@ -297,7 +350,7 @@ class MainWindow(QMainWindow):
             QFrame: Header widget
         """
         header = QFrame()
-        header.setMinimumHeight(60)
+        header.setMinimumHeight(50)  # Reduced minimum height for smaller screens
         header.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         header.setStyleSheet("""
             QFrame {
@@ -333,6 +386,36 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logging_service.error(f"Error creating notification widget: {str(e)}")
 
+        # Profile button in header for easy access
+        self.profile_btn = QPushButton()
+        self.profile_btn.setObjectName("profileButton")
+        self.profile_btn.setIcon(get_icon('user', color='#ffffff'))
+        self.profile_btn.setIconSize(ResponsiveSize.get_icon_size('medium'))
+        self.profile_btn.setToolTip(f"Profile: {self.current_user['username'] if self.current_user else 'User'}")
+        self.profile_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Create profile menu
+        profile_menu = QMenu(self)
+        profile_menu.addAction("My Profile", self.show_profile)
+        profile_menu.addSeparator()
+        profile_menu.addAction("Logout", self.handle_logout)
+        self.profile_btn.setMenu(profile_menu)
+
+        # Style the profile button
+        self.profile_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+        """)
+
+        layout.addWidget(self.profile_btn)
+
         return header
 
     def setup_menu_bar(self):
@@ -343,28 +426,28 @@ class MainWindow(QMainWindow):
         file_menu = menubar.addMenu("&File")
 
         if self.auth_service.has_permission('export'):
-            export_action = QAction(get_icon('file-export'), "&Export Reports", self)
+            export_action = QAction(get_icon('file-export', color=ThemeColors.ICON_DEFAULT), "&Export Reports", self)
             export_action.triggered.connect(lambda: self.switch_view('export'))
             file_menu.addAction(export_action)
 
         file_menu.addSeparator()
 
-        logout_action = QAction(get_icon('sign-out-alt'), "&Logout", self)
+        logout_action = QAction(get_icon('sign-out-alt', color=ThemeColors.ICON_DEFAULT), "&Logout", self)
         logout_action.triggered.connect(self.handle_logout)
         file_menu.addAction(logout_action)
 
-        exit_action = QAction(get_icon('times-circle'), "E&xit", self)
+        exit_action = QAction(get_icon('times-circle', color=ThemeColors.ICON_DEFAULT), "E&xit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
         # View menu
         view_menu = menubar.addMenu("&View")
 
-        dashboard_action = QAction(get_icon('dashboard'), "&Dashboard", self)
+        dashboard_action = QAction(get_icon('dashboard', color=ThemeColors.ICON_DEFAULT), "&Dashboard", self)
         dashboard_action.triggered.connect(lambda: self.switch_view('dashboard'))
         view_menu.addAction(dashboard_action)
 
-        reports_action = QAction(get_icon('clipboard-list'), "&Reports", self)
+        reports_action = QAction(get_icon('clipboard-list', color=ThemeColors.ICON_DEFAULT), "&Reports", self)
         reports_action.triggered.connect(lambda: self.switch_view('reports'))
         view_menu.addAction(reports_action)
 
@@ -372,52 +455,52 @@ class MainWindow(QMainWindow):
         if self.current_user and self.current_user['role'] == 'admin':
             admin_menu = menubar.addMenu("&Admin")
 
-            users_action = QAction(get_icon('users'), "&Users", self)
+            users_action = QAction(get_icon('users', color=ThemeColors.ICON_DEFAULT), "&Users", self)
             users_action.triggered.connect(lambda: self.switch_view('users'))
             admin_menu.addAction(users_action)
 
-            logs_action = QAction(get_icon('history'), "System &Logs", self)
+            logs_action = QAction(get_icon('history', color=ThemeColors.ICON_DEFAULT), "System &Logs", self)
             logs_action.triggered.connect(lambda: self.switch_view('logs'))
             admin_menu.addAction(logs_action)
 
-            settings_action = QAction(get_icon('cog'), "&Settings", self)
+            settings_action = QAction(get_icon('cog', color=ThemeColors.ICON_DEFAULT), "&Settings", self)
             settings_action.triggered.connect(lambda: self.switch_view('settings'))
             admin_menu.addAction(settings_action)
 
             admin_menu.addSeparator()
 
             # Dropdown Management
-            dropdown_mgmt_action = QAction(get_icon('list'), "Dropdown &Management", self)
+            dropdown_mgmt_action = QAction(get_icon('list', color=ThemeColors.ICON_DEFAULT), "Dropdown &Management", self)
             dropdown_mgmt_action.triggered.connect(lambda: self.switch_view('dropdown_mgmt'))
             admin_menu.addAction(dropdown_mgmt_action)
 
             # System Settings
-            system_settings_action = QAction(get_icon('sliders-h'), "System Se&ttings", self)
+            system_settings_action = QAction(get_icon('sliders-h', color=ThemeColors.ICON_DEFAULT), "System Se&ttings", self)
             system_settings_action.triggered.connect(lambda: self.switch_view('system_settings'))
             admin_menu.addAction(system_settings_action)
 
             admin_menu.addSeparator()
 
-            approvals_history_action = QAction(get_icon('history'), "Approvals &History", self)
+            approvals_history_action = QAction(get_icon('history', color=ThemeColors.ICON_DEFAULT), "Approvals &History", self)
             approvals_history_action.triggered.connect(self.show_approvals_history)
             admin_menu.addAction(approvals_history_action)
 
             # Reservation Management
-            reservation_mgmt_action = QAction(get_icon('database'), "&Reservation Management", self)
+            reservation_mgmt_action = QAction(get_icon('database', color=ThemeColors.ICON_DEFAULT), "&Reservation Management", self)
             reservation_mgmt_action.triggered.connect(self.show_reservation_management)
             admin_menu.addAction(reservation_mgmt_action)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
-        help_action = QAction(get_icon('book'), "&Help & Documentation", self)
+        help_action = QAction(get_icon('book', color=ThemeColors.ICON_DEFAULT), "&Help & Documentation", self)
         help_action.setShortcut("F1")
         help_action.triggered.connect(self.show_help)
         help_menu.addAction(help_action)
 
         help_menu.addSeparator()
 
-        about_action = QAction(get_icon('info-circle'), "&About", self)
+        about_action = QAction(get_icon('info-circle', color=ThemeColors.ICON_DEFAULT), "&About", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
@@ -429,13 +512,13 @@ class MainWindow(QMainWindow):
 
         # Add common actions
         if self.auth_service.has_permission('add_report'):
-            add_report_action = QAction(get_icon('plus'), "New Report", self)
+            add_report_action = QAction(get_icon('plus', color=ThemeColors.ICON_DEFAULT), "New Report", self)
             add_report_action.triggered.connect(self.quick_add_report)
             self.toolbar.addAction(add_report_action)
 
         self.toolbar.addSeparator()
 
-        refresh_action = QAction(get_icon('refresh'), "Refresh", self)
+        refresh_action = QAction(get_icon('refresh', color=ThemeColors.ICON_DEFAULT), "Refresh", self)
         refresh_action.triggered.connect(self.refresh_current_view)
         self.toolbar.addAction(refresh_action)
 
@@ -730,6 +813,44 @@ class MainWindow(QMainWindow):
             # Navigate to reports view
             self.switch_view('reports')
 
+    def resizeEvent(self, event):
+        """Handle window resize for responsive layout adjustments."""
+        super().resizeEvent(event)
+        
+        # Debounce resize events to improve performance
+        if self.resize_timer:
+            self.resize_timer.stop()
+        
+        self.resize_timer = QTimer()
+        self.resize_timer.setSingleShot(True)
+        self.resize_timer.timeout.connect(self.handle_resize)
+        self.resize_timer.start(100)
+    
+    def handle_resize(self):
+        """Handle delayed resize operations with responsive sizing."""
+        width = self.width()
+
+        # Adjust sidebar width based on window size with DPI scaling
+        if width < 1200:
+            # Compact mode for smaller screens
+            self.sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(160))
+        elif width < 1600:
+            # Normal mode
+            self.sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(220))
+        else:
+            # Wide mode for larger screens
+            self.sidebar.setMaximumWidth(ResponsiveSize.get_scaled_size(280))
+
+        # Adjust header height based on window size
+        header_height = ResponsiveSize.get_scaled_size(50 if width >= 1200 else 45)
+        if hasattr(self, 'header'):
+            self.header.setMinimumHeight(header_height)
+
+        # Notify current view of resize if it supports it
+        current_view = self.stacked_widget.currentWidget()
+        if hasattr(current_view, 'handle_resize'):
+            current_view.handle_resize(width, self.height())
+    
     def closeEvent(self, event):
         """Handle window close event."""
         reply = QMessageBox.question(

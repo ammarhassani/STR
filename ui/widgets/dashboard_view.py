@@ -3,13 +3,16 @@ Dashboard view widget showing summary statistics and charts.
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QFrame, QGridLayout, QPushButton, QTabWidget, QApplication)
+                             QFrame, QGridLayout, QPushButton, QTabWidget, QApplication,
+                             QScrollArea)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from ui.workers import DashboardDataWorker
 from services.icon_service import get_icon, IconService
+from ui.theme_colors import ThemeColors
 from ui.widgets.chart_widget import (PieChartWidget, BarChartWidget,
                                      LineChartWidget, HorizontalBarChartWidget)
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class KPICard(QFrame):
@@ -98,44 +101,87 @@ class DashboardView(QWidget):
 
     def setup_ui(self):
         """Setup the user interface."""
-        layout = QVBoxLayout(self)
+        # Main layout for scroll area
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Create scroll area for responsiveness on small screens
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        # Content widget inside scroll area
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(24)
 
-        # Welcome message
-        welcome_label = QLabel("Welcome to FIU Report Management System")
-        welcome_font = QFont()
-        welcome_font.setPointSize(14)
-        welcome_label.setFont(welcome_font)
-        layout.addWidget(welcome_label)
+        # Welcome container with proper styling
+        welcome_container = QFrame()
+        welcome_container.setObjectName("welcomeSection")
+        welcome_container_layout = QVBoxLayout(welcome_container)
+        welcome_container_layout.setContentsMargins(*ResponsiveSize.get_margins('normal'))
+        welcome_container_layout.setSpacing(ResponsiveSize.get_spacing('tight'))
 
-        # KPI Cards Grid
-        kpi_grid = QGridLayout()
-        kpi_grid.setSpacing(16)
+        # Welcome title
+        welcome_label = QLabel("Welcome to FIU System")
+        welcome_label.setObjectName("welcomeTitle")
+        welcome_label_font = welcome_label.font()
+        welcome_label_font.setPointSize(ResponsiveSize.get_font_size('xlarge'))
+        welcome_label_font.setBold(True)
+        welcome_label.setFont(welcome_label_font)
+
+        # Subtitle
+        subtitle_label = QLabel("Financial Intelligence Unit Report Management System")
+        subtitle_label.setObjectName("welcomeSubtitle")
+        subtitle_font = subtitle_label.font()
+        subtitle_font.setPointSize(ResponsiveSize.get_font_size('normal'))
+        subtitle_label.setFont(subtitle_font)
+
+        welcome_container_layout.addWidget(welcome_label)
+        welcome_container_layout.addWidget(subtitle_label)
+
+        layout.addWidget(welcome_container)
+
+        # KPI Cards Grid - Responsive layout (2x2 for smaller screens, 1x4 for wide screens)
+        kpi_container = QWidget()
+        self.kpi_grid = QGridLayout(kpi_container)
+        self.kpi_grid.setSpacing(ResponsiveSize.get_spacing('normal'))
+        self.kpi_grid.setContentsMargins(0, 0, 0, 0)
 
         self.kpi_cards = {}
 
         # Total Reports
         self.kpi_cards['total'] = KPICard("Total Reports", "0", "info", "clipboard-list")
-        kpi_grid.addWidget(self.kpi_cards['total'], 0, 0)
 
         # Open Reports
         self.kpi_cards['open'] = KPICard("Open Reports", "0", "success", "file-alt")
-        kpi_grid.addWidget(self.kpi_cards['open'], 0, 1)
 
         # Under Investigation
         self.kpi_cards['investigation'] = KPICard("Under Investigation", "0", "warning", "search")
-        kpi_grid.addWidget(self.kpi_cards['investigation'], 0, 2)
 
         # Closed Cases
         self.kpi_cards['closed'] = KPICard("Closed Cases", "0", "danger", "check-circle")
-        kpi_grid.addWidget(self.kpi_cards['closed'], 0, 3)
 
-        layout.addLayout(kpi_grid)
+        # Start with 2x2 layout (responsive default)
+        self.kpi_grid.addWidget(self.kpi_cards['total'], 0, 0)
+        self.kpi_grid.addWidget(self.kpi_cards['open'], 0, 1)
+        self.kpi_grid.addWidget(self.kpi_cards['investigation'], 1, 0)
+        self.kpi_grid.addWidget(self.kpi_cards['closed'], 1, 1)
+
+        # Set stretch factors so cards expand evenly
+        for col in range(2):
+            self.kpi_grid.setColumnStretch(col, 1)
+
+        layout.addWidget(kpi_container)
 
         # Charts section with tabs
         charts_frame = QFrame()
         charts_frame.setObjectName("card")
+        charts_frame.setMaximumHeight(ResponsiveSize.get_scaled_size(500))  # Constrain height for small screens
         charts_layout = QVBoxLayout(charts_frame)
         charts_layout.setContentsMargins(16, 16, 16, 16)
 
@@ -178,12 +224,16 @@ class DashboardView(QWidget):
 
         # Refresh button
         refresh_btn = QPushButton("Refresh Dashboard")
-        refresh_btn.setIcon(get_icon('refresh'))
+        refresh_btn.setIcon(get_icon('refresh', color=ThemeColors.ICON_DEFAULT))
         refresh_btn.clicked.connect(self.load_data)
         refresh_btn.setMaximumWidth(200)
         layout.addWidget(refresh_btn)
 
         layout.addStretch()
+
+        # Set scroll widget and add to main layout
+        scroll.setWidget(content_widget)
+        main_layout.addWidget(scroll)
 
     def load_data(self):
         """Load dashboard data asynchronously."""

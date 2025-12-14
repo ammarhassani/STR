@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QSettings, QRect, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QScreen
 from typing import Dict, List, Optional, Callable
+from ui.theme_colors import ThemeColors
 
 
 class MiniWindow(QDialog):
@@ -208,7 +209,7 @@ class FieldDisplayWidget(QFrame):
         label_font = QFont()
         label_font.setPointSize(8)
         label_widget.setFont(label_font)
-        label_widget.setStyleSheet("color: #666;")
+        label_widget.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(label_widget)
 
         # Value
@@ -273,7 +274,7 @@ class DataGridWidget(QWidget):
 
             layout.addWidget(separator, 1)
             label = QLabel(text)
-            label.setStyleSheet("color: #888; font-weight: bold; font-size: 10px;")
+            label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-weight: bold; font-size: 10px;")
             layout.addWidget(label)
             layout.addWidget(QFrame(), 1)
 

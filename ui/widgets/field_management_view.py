@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
 
 
 class FieldValidationDialog(QDialog):
@@ -113,7 +114,7 @@ class FieldValidationDialog(QDialog):
             "• Saudi ID: Starting digit for Saudi Arabian IDs\n"
             "• CR: Starting digit for Commercial Registration numbers"
         )
-        info.setStyleSheet("color: #666; font-size: 11px;")
+        info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 11px;")
         info.setWordWrap(True)
         rules_layout.addWidget(info)
 
@@ -155,7 +156,7 @@ class FieldValidationDialog(QDialog):
             "• Account: Number of digits for bank account numbers\n"
             "• Membership: Number of digits for membership numbers"
         )
-        info.setStyleSheet("color: #666; font-size: 11px;")
+        info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 11px;")
         info.setWordWrap(True)
         rules_layout.addWidget(info)
 
@@ -243,7 +244,7 @@ class FieldManagementView(QWidget):
 
         # Refresh button
         refresh_btn = QPushButton("Refresh")
-        refresh_btn.setIcon(get_icon('refresh'))
+        refresh_btn.setIcon(get_icon('refresh', color=ThemeColors.ICON_DEFAULT))
         refresh_btn.setObjectName("secondaryButton")
         refresh_btn.clicked.connect(self.load_fields)
         header_layout.addWidget(refresh_btn)
@@ -256,7 +257,7 @@ class FieldManagementView(QWidget):
             "These rules will be applied when creating or editing reports."
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666;")
+        info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(info_label)
 
         # Table
@@ -361,7 +362,7 @@ class FieldManagementView(QWidget):
 
         # Edit button
         edit_btn = QPushButton("Edit")
-        edit_btn.setIcon(get_icon('edit'))
+        edit_btn.setIcon(get_icon('edit', color=ThemeColors.ICON_DEFAULT))
         edit_btn.setObjectName("secondaryButton")
         edit_btn.setMaximumWidth(80)
         edit_btn.clicked.connect(lambda: self.edit_field(field))

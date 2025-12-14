@@ -7,12 +7,14 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QTextEdit, QComboBox, QDateEdit,
                              QTabWidget, QWidget, QPushButton, QMessageBox,
                              QGroupBox, QFormLayout, QScrollArea, QFrame,
-                             QCheckBox, QSizePolicy)
+                             QCheckBox, QSizePolicy, QListView)
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont
 from datetime import datetime
 import re
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class ReportDialog(QDialog):
@@ -79,7 +81,11 @@ class ReportDialog(QDialog):
         """Setup the user interface."""
         title = "Edit Report" if self.is_edit_mode else "Add New Report"
         self.setWindowTitle(title)
-        self.setMinimumSize(900, 700)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('large')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -162,7 +168,7 @@ class ReportDialog(QDialog):
         # Left side buttons (version history)
         if self.is_edit_mode and self.report_data:
             history_btn = QPushButton("View History")
-            history_btn.setIcon(get_icon('history'))
+            history_btn.setIcon(get_icon('history', color=ThemeColors.ICON_DEFAULT))
             history_btn.setObjectName("secondaryButton")
             history_btn.setMinimumWidth(120)
             history_btn.clicked.connect(self.view_history)
@@ -172,14 +178,14 @@ class ReportDialog(QDialog):
 
         # Right side buttons (actions)
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setIcon(get_icon('times'))
+        cancel_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         cancel_btn.setObjectName("secondaryButton")
         cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save Report")
-        save_btn.setIcon(get_icon('save'))
+        save_btn.setIcon(get_icon('save', color=ThemeColors.ICON_DEFAULT))
         save_btn.setObjectName("primaryButton")
         save_btn.setMinimumWidth(120)
         save_btn.clicked.connect(self.save_report)
@@ -190,7 +196,7 @@ class ReportDialog(QDialog):
             approval_status = self.report_data.get('approval_status', 'draft')
             if approval_status not in ['pending_approval', 'approved']:
                 submit_approval_btn = QPushButton("Submit for Approval")
-                submit_approval_btn.setIcon(get_icon('check'))
+                submit_approval_btn.setIcon(get_icon('check', color=ThemeColors.ICON_DEFAULT))
                 submit_approval_btn.setObjectName("successButton")
                 submit_approval_btn.setMinimumWidth(150)
                 submit_approval_btn.clicked.connect(self.submit_for_approval)
@@ -262,6 +268,9 @@ class ReportDialog(QDialog):
         self.gender_combo = QComboBox()
         self.gender_combo.setEditable(True)  # Allow custom values
         self.gender_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)  # Accept custom input
+        # Fix dropdown visibility issues
+        self.gender_combo.setView(QListView())
+        self.gender_combo.setMaxVisibleItems(10)
         genders = self.dropdown_service.get_active_dropdown_values('gender')
         self.gender_combo.addItem('')  # Empty option
         self.gender_combo.addItems(genders)
@@ -271,6 +280,9 @@ class ReportDialog(QDialog):
         self.nationality_combo = QComboBox()
         self.nationality_combo.setEditable(True)  # Allow filtering/searching
         self.nationality_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        # Fix dropdown visibility issues
+        self.nationality_combo.setView(QListView())
+        self.nationality_combo.setMaxVisibleItems(10)
         # Load nationalities from dropdown service
         nationalities = self.dropdown_service.get_active_dropdown_values('nationality')
         self.nationality_combo.addItem('')  # Empty option
@@ -490,6 +502,9 @@ class ReportDialog(QDialog):
         # FIU Feedback - CHANGED TO DROPDOWN (Req #18)
         self.fiu_feedback_combo = QComboBox()
         self.fiu_feedback_combo.setEditable(True)  # Allow custom values
+        # Fix dropdown visibility issues
+        self.fiu_feedback_combo.setView(QListView())
+        self.fiu_feedback_combo.setMaxVisibleItems(10)
         fiu_feedbacks = self.dropdown_service.get_active_dropdown_values('fiu_feedback')
         self.fiu_feedback_combo.addItem('')  # Empty option
         self.fiu_feedback_combo.addItems(fiu_feedbacks)

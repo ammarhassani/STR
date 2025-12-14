@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from services.icon_service import get_icon
 from ui.dialogs.settings_dialog import SettingsDialog
+from ui.theme_colors import ThemeColors
 
 
 class SettingsView(QWidget):
@@ -96,7 +97,7 @@ class SettingsView(QWidget):
 
         # Open settings button
         open_settings_btn = QPushButton("Open Settings")
-        open_settings_btn.setIcon(get_icon('cog'))
+        open_settings_btn.setIcon(get_icon('cog', color=ThemeColors.ICON_DEFAULT))
         open_settings_btn.setObjectName("primaryButton")
         open_settings_btn.setMinimumHeight(40)
         open_settings_btn.clicked.connect(self.open_settings_dialog)

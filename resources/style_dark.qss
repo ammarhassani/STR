@@ -56,14 +56,19 @@ Spacing (8px grid):
 
 QMainWindow, QDialog {
     background-color: #0a0e12;
-    color: #f0f6fc;
+    color: #ffffff;
 }
 
 QWidget {
-    background-color: transparent;
-    color: #f0f6fc;
-    selection-background-color: #0d7377;
+    background-color: #0a0e12;
+    color: #ffffff;
+    selection-background-color: #1e88e5;
     selection-color: #ffffff;
+}
+
+/* Labels and some elements need transparent backgrounds */
+QLabel, QCheckBox, QRadioButton {
+    background-color: transparent;
 }
 
 /* ==================== SCROLLBARS ==================== */
@@ -140,6 +145,30 @@ QPushButton:disabled {
 
 QPushButton:focus {
     border: 2px solid #32e0c4;
+    outline: none;
+}
+
+/* Enhanced focus indicators for better keyboard navigation */
+QPushButton:focus, QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus,
+QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {
+    outline: 2px solid #32e0c4;
+    outline-offset: 2px;
+}
+
+/* Tab order focus indicators */
+QTabBar::tab:focus {
+    outline: 2px solid #32e0c4;
+    outline-offset: 2px;
+}
+
+QTableWidget::item:focus, QTableView::item:focus {
+    outline: 2px solid #32e0c4;
+    outline-offset: -2px;
+}
+
+QCheckBox:focus::indicator, QRadioButton:focus::indicator {
+    outline: 2px solid #32e0c4;
+    outline-offset: 2px;
 }
 
 /* Button Variants */
@@ -327,8 +356,22 @@ QTableWidget, QTableView {
 }
 
 QTableWidget::item, QTableView::item {
-    padding: 12px 8px;
+    padding: 8px 12px;  /* Reduced vertical padding, increased horizontal */
     border: none;
+    min-height: 32px;  /* Ensure minimum height for buttons */
+}
+
+/* Enhanced styling for buttons inside table cells */
+QTableWidget QPushButton, QTableView QPushButton {
+    margin: 2px;
+    padding: 6px 12px;  /* Consistent button padding */
+    min-height: 28px;  /* Minimum button height */
+    border-radius: 4px;  /* Slightly smaller radius for table buttons */
+}
+
+/* Action column specific styling */
+QTableWidget::item:nth-child(6) {
+    padding: 6px 8px;  /* Reduced padding for action column */
 }
 
 QTableWidget::item:hover, QTableView::item:hover {
@@ -580,6 +623,11 @@ QToolButton:pressed {
 QToolButton:checked {
     background-color: #0d7377;
     color: #ffffff;
+}
+
+QToolButton:focus {
+    border: 2px solid #32e0c4;
+    outline: none;
 }
 
 /* ==================== STATUS BAR ==================== */
@@ -923,6 +971,8 @@ QListWidget::item {
 
 QListWidget::item:hover {
     background-color: #1f2937;
+    border-left: 3px solid #0d7377;
+    padding-left: 13px; /* Compensate for border */
 }
 
 QListWidget::item:selected {
@@ -944,6 +994,8 @@ QTreeWidget::item {
 
 QTreeWidget::item:hover {
     background-color: #1f2937;
+    border-left: 3px solid #0d7377;
+    padding-left: 7px; /* Compensate for border */
 }
 
 QTreeWidget::item:selected {
@@ -976,31 +1028,73 @@ QToolTip {
 
 /* ==================== SCROLL AREA ==================== */
 QScrollArea {
-    background-color: transparent;
+    background-color: #0a0e12;
     border: none;
 }
 
 QScrollArea > QWidget > QWidget {
-    background-color: transparent;
+    background-color: #0a0e12;
 }
 
-/* ==================== RESPONSIVE UTILITIES ==================== */
-.text-primary { color: #f0f6fc; }
-.text-secondary { color: #8b949e; }
-.text-disabled { color: #6e7681; }
-.text-success { color: #00d084; }
-.text-warning { color: #ffa726; }
-.text-danger { color: #f44336; }
-.text-info { color: #2196f3; }
+/* Viewport inside scroll areas */
+QScrollArea QWidget#qt_scrollarea_viewport {
+    background-color: #0a0e12;
+}
 
-.bg-primary { background-color: #0a0e12; }
-.bg-secondary { background-color: #0d1117; }
-.bg-tertiary { background-color: #161b22; }
+/* ==================== WIZARD ==================== */
+QWizard {
+    background-color: #0a0e12;
+}
 
-/* ==================== ANIMATIONS (via property) ==================== */
-/* Note: QSS doesn't support animations directly, but Qt can animate properties */
-QPushButton[animated="true"], QFrame[animated="true"] {
-    /* Properties that can be animated via QPropertyAnimation */
+QWizard > QWidget {
+    background-color: #0a0e12;
+}
+
+QWizardPage {
+    background-color: #0a0e12;
+}
+
+/* ==================== STACKED WIDGET ==================== */
+QStackedWidget {
+    background-color: #0a0e12;
+}
+
+QStackedWidget > QWidget {
+    background-color: #0a0e12;
+}
+
+/* ==================== MESSAGE BOX ==================== */
+QMessageBox {
+    background-color: #0a0e12;
+}
+
+QMessageBox QLabel {
+    color: #f0f6fc;
+}
+
+/* ==================== INPUT DIALOG ==================== */
+QInputDialog {
+    background-color: #0a0e12;
+}
+
+/* ==================== FILE DIALOG ==================== */
+QFileDialog {
+    background-color: #0a0e12;
+}
+
+QFileDialog QWidget {
+    background-color: #0a0e12;
+    color: #f0f6fc;
+}
+
+/* ==================== COLOR DIALOG ==================== */
+QColorDialog {
+    background-color: #0a0e12;
+}
+
+/* ==================== FONT DIALOG ==================== */
+QFontDialog {
+    background-color: #0a0e12;
 }
 
 /* ==================== END OF STYLESHEET ==================== */

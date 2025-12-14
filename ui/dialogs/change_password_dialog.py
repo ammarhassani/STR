@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
 
 
 class ChangePasswordDialog(QDialog):
@@ -52,7 +53,7 @@ class ChangePasswordDialog(QDialog):
 
         # Info
         info_label = QLabel("Please enter your current password and choose a new password.")
-        info_label.setStyleSheet("color: #7f8c8d;")
+        info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
@@ -94,7 +95,7 @@ class ChangePasswordDialog(QDialog):
             "• At least one lowercase letter\n"
             "• At least one number"
         )
-        requirements_label.setStyleSheet("color: #7f8c8d; font-size: 9pt;")
+        requirements_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         layout.addWidget(requirements_label)
 
         # Buttons
@@ -102,14 +103,14 @@ class ChangePasswordDialog(QDialog):
         button_layout.addStretch()
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setIcon(get_icon('times'))
+        cancel_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         cancel_btn.setObjectName("secondaryButton")
         cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
         change_btn = QPushButton("Change Password")
-        change_btn.setIcon(get_icon('key'))
+        change_btn.setIcon(get_icon('key', color=ThemeColors.ICON_DEFAULT))
         change_btn.setObjectName("primaryButton")
         change_btn.setMinimumWidth(150)
         change_btn.clicked.connect(self.change_password)

@@ -11,6 +11,15 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from datetime import datetime
 
+# Import table utility functions
+from ui.utils.table_utils import (
+    fix_table_button_overlap,
+    create_action_cell_widget,
+    setup_responsive_table_columns,
+    configure_table_row_heights
+)
+from ui.utils.responsive_sizing import ResponsiveSize
+
 
 class UserDialog(QDialog):
     """Dialog for creating or editing users."""
@@ -293,28 +302,35 @@ class AdminPanel(QWidget):
 
         # Enable manual column resizing (drag column borders to resize)
         header = self.users_table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)  # All columns manually resizable
+
+        # Configure responsive column widths with ratio-based sizing
+        column_configs = [
+            {'index': 0, 'ratio': 0.06, 'min_width': 50, 'resize_mode': 'Interactive'},   # ID
+            {'index': 1, 'ratio': 0.15, 'min_width': 100, 'resize_mode': 'Interactive'},  # Username
+            {'index': 2, 'ratio': 0.22, 'min_width': 150, 'resize_mode': 'Stretch'},      # Full Name - flexible
+            {'index': 3, 'ratio': 0.12, 'min_width': 90, 'resize_mode': 'ResizeToContents'},   # Role
+            {'index': 4, 'ratio': 0.10, 'min_width': 80, 'resize_mode': 'ResizeToContents'},   # Status
+            {'index': 5, 'ratio': 0.15, 'min_width': 120, 'resize_mode': 'Interactive'},  # Last Login
+            {'index': 6, 'ratio': 0.20, 'min_width': 200, 'resize_mode': 'ResizeToContents'},  # Actions - FLEXIBLE!
+        ]
+        setup_responsive_table_columns(self.users_table, column_configs)
         header.setStretchLastSection(False)
 
-        # Set default column widths
-        header.resizeSection(0, 60)   # ID
-        header.resizeSection(1, 120)  # Username
-        header.resizeSection(2, 200)  # Full Name
-        header.resizeSection(3, 100)  # Role
-        header.resizeSection(4, 100)  # Status
-        header.resizeSection(5, 180)  # Last Login
-        header.resizeSection(6, 150)  # Actions
-
-        # Enable manual row resizing like Excel (drag row borders to resize)
+        # Enable manual row resizing with responsive heights
+        row_height = ResponsiveSize.get_row_height('normal')
+        min_row_height = ResponsiveSize.get_row_height('compact')
         self.users_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.users_table.verticalHeader().setDefaultSectionSize(52)  # Default height: 36px button + 16px padding
-        self.users_table.verticalHeader().setMinimumSectionSize(30)  # Minimum to prevent too small
+        self.users_table.verticalHeader().setDefaultSectionSize(row_height)
+        self.users_table.verticalHeader().setMinimumSectionSize(min_row_height)
 
         # Connect signals to save geometry when user resizes
         header.sectionResized.connect(self.save_table_geometry)
         self.users_table.verticalHeader().sectionResized.connect(self.save_table_geometry)
 
         layout.addWidget(self.users_table)
+
+        # Fix button overlap after loading data
+        fix_table_button_overlap(self.users_table, 6)
 
         # Restore saved column widths and row heights
         self.restore_table_geometry()
@@ -393,30 +409,24 @@ class AdminPanel(QWidget):
                 last_login_item = QTableWidgetItem(last_login if last_login else 'Never')
                 self.users_table.setItem(row, 5, last_login_item)
 
-                # Actions (create widget with buttons) - fully responsive to cell size
-                actions_widget = QWidget()
-                actions_layout = QHBoxLayout(actions_widget)
-                actions_layout.setContentsMargins(4, 4, 4, 4)  # Minimal padding
-                actions_layout.setSpacing(4)
-
-                edit_btn = QPushButton("Edit")
-                # No size constraints - button adapts to cell size
-                edit_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                edit_btn.clicked.connect(lambda checked, u=user: self.edit_user(u))
-                actions_layout.addWidget(edit_btn)
-
+                # Actions (create widget with buttons) - properly sized to prevent overlap
+                actions = [
+                    {
+                        'text': 'Edit',
+                        'style': 'secondaryButton',
+                        'callback': lambda u=user: self.edit_user(u)
+                    }
+                ]
+                
                 # Don't allow deleting admin user (user_id = 1)
                 if user['user_id'] != 1:
-                    delete_btn = QPushButton("Delete")
-                    delete_btn.setObjectName("dangerButton")
-                    # No size constraints - button adapts to cell size
-                    delete_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                    delete_btn.clicked.connect(lambda checked, u=user: self.delete_user(u))
-                    actions_layout.addWidget(delete_btn)
-
-                # Make container fill the cell completely
-                actions_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
+                    actions.append({
+                        'text': 'Delete',
+                        'style': 'dangerButton',
+                        'callback': lambda u=user: self.delete_user(u)
+                    })
+                
+                actions_widget = create_action_cell_widget(actions)
                 self.users_table.setCellWidget(row, 6, actions_widget)
 
             # Update stats

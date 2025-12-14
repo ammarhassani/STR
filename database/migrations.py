@@ -754,6 +754,119 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             # If migration fails, just log it and continue
             messages.append(f"Gender constraint migration skipped: {str(e)}")
 
+        # Migration 21: Create activity_log table for GitHub-style changelog
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='activity_log'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("""
+                CREATE TABLE activity_log (
+                    activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    username TEXT NOT NULL,
+                    action_type TEXT NOT NULL CHECK(action_type IN (
+                        'CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'APPROVE',
+                        'REJECT', 'VERSION_CREATE', 'VERSION_DELETE', 'VERSION_RESTORE',
+                        'HARD_DELETE', 'SOFT_DELETE', 'UNDELETE'
+                    )),
+                    report_id INTEGER,
+                    report_number TEXT,
+                    version_id INTEGER,
+                    version_number INTEGER,
+                    description TEXT NOT NULL,
+                    metadata TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+                    FOREIGN KEY (report_id) REFERENCES reports(report_id) ON DELETE SET NULL,
+                    FOREIGN KEY (version_id) REFERENCES report_versions(version_id) ON DELETE SET NULL
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_activity_log_user ON activity_log(user_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_activity_log_report ON activity_log(report_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_activity_log_action ON activity_log(action_type)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_activity_log_created ON activity_log(created_at DESC)
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_activity_log_composite ON activity_log(report_id, created_at DESC)
+            """)
+            conn.commit()
+            messages.append("Created activity_log table for GitHub-style changelog")
+
+        # Migration 22: Add soft delete columns to report_versions table
+        try:
+            cursor.execute("SELECT is_deleted FROM report_versions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE report_versions
+                ADD COLUMN is_deleted INTEGER DEFAULT 0
+            """)
+            conn.commit()
+            messages.append("Added is_deleted column to report_versions table")
+
+        try:
+            cursor.execute("SELECT deleted_at FROM report_versions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE report_versions
+                ADD COLUMN deleted_at TEXT
+            """)
+            conn.commit()
+            messages.append("Added deleted_at column to report_versions table")
+
+        try:
+            cursor.execute("SELECT deleted_by FROM report_versions LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE report_versions
+                ADD COLUMN deleted_by TEXT
+            """)
+            conn.commit()
+            messages.append("Added deleted_by column to report_versions table")
+
+        # Migration 23: Add delete tracking columns to reports table
+        try:
+            cursor.execute("SELECT deleted_at FROM reports LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE reports
+                ADD COLUMN deleted_at TEXT
+            """)
+            conn.commit()
+            messages.append("Added deleted_at column to reports table")
+
+        try:
+            cursor.execute("SELECT deleted_by FROM reports LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE reports
+                ADD COLUMN deleted_by TEXT
+            """)
+            conn.commit()
+            messages.append("Added deleted_by column to reports table")
+
+        # Add index for version soft delete queries
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='index' AND name='idx_report_versions_is_deleted'
+        """)
+        if not cursor.fetchone():
+            try:
+                cursor.execute("""
+                    CREATE INDEX idx_report_versions_is_deleted ON report_versions(is_deleted)
+                """)
+                conn.commit()
+                messages.append("Created index for report_versions is_deleted column")
+            except sqlite3.OperationalError:
+                pass
+
         conn.close()
 
         if messages:

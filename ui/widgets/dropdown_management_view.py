@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QTextEdit, QSizePolicy)
 from PyQt6.QtCore import Qt, QSettings, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
+from ui.theme_colors import ThemeColors
 from datetime import datetime
 
 
@@ -139,7 +140,7 @@ class DropdownManagementView(QWidget):
         # Info label
         info_label = QLabel("Manage dropdown values for various fields. Admin-manageable categories can be freely modified.")
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666;")
+        info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(info_label)
 
         # Category selection
@@ -204,7 +205,7 @@ class DropdownManagementView(QWidget):
             ", ".join(self.dropdown_service.ADMIN_MANAGEABLE_CATEGORIES)
         )
         notice_label.setWordWrap(True)
-        notice_label.setStyleSheet("background-color: #e3f2fd; padding: 10px; border-radius: 4px;")
+        notice_label.setStyleSheet(f"background-color: {ThemeColors.BG_TERTIARY}; padding: 10px; border-radius: 4px; color: {ThemeColors.TEXT_PRIMARY};")
         layout.addWidget(notice_label)
 
     def load_categories(self):
@@ -334,7 +335,7 @@ class DropdownManagementView(QWidget):
                 actions_layout.addWidget(restore_btn)
         else:
             info_label = QLabel("Read-Only")
-            info_label.setStyleSheet("color: #999;")
+            info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
             actions_layout.addWidget(info_label)
 
         actions_layout.addStretch()

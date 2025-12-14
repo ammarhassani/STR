@@ -10,6 +10,8 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QFont, QDesktopServices
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class HelpDialog(QDialog):
@@ -40,7 +42,11 @@ class HelpDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("Help & Documentation")
-        self.setMinimumSize(900, 650)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('large')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -59,7 +65,7 @@ class HelpDialog(QDialog):
 
         # Version label
         version_label = QLabel("Version 2.0.0")
-        version_label.setStyleSheet("color: #7f8c8d; font-size: 10pt;")
+        version_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 10pt;")
         header_layout.addWidget(version_label)
 
         layout.addLayout(header_layout)
@@ -78,12 +84,12 @@ class HelpDialog(QDialog):
         button_layout.addStretch()
 
         online_help_btn = QPushButton("Online Documentation")
-        online_help_btn.setIcon(get_icon('book'))
+        online_help_btn.setIcon(get_icon('book', color=ThemeColors.ICON_DEFAULT))
         online_help_btn.clicked.connect(self.open_online_help)
         button_layout.addWidget(online_help_btn)
 
         close_btn = QPushButton("Close")
-        close_btn.setIcon(get_icon('times'))
+        close_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         close_btn.setObjectName("secondaryButton")
         close_btn.setMinimumWidth(100)
         close_btn.clicked.connect(self.close)
@@ -193,7 +199,7 @@ class HelpDialog(QDialog):
 
         # Version
         version = QLabel("Version 2.0.0")
-        version.setStyleSheet("font-size: 14pt; color: #7f8c8d;")
+        version.setStyleSheet(f"font-size: 14pt; color: {ThemeColors.TEXT_SECONDARY};")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version)
 
@@ -207,7 +213,7 @@ class HelpDialog(QDialog):
         )
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc.setStyleSheet("color: #7f8c8d;")
+        desc.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(desc)
 
         layout.addSpacing(20)
@@ -223,7 +229,7 @@ class HelpDialog(QDialog):
             "Matplotlib • OpenPyXL • Bcrypt"
         )
         tech_stack.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tech_stack.setStyleSheet("color: #7f8c8d;")
+        tech_stack.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(tech_stack)
 
         layout.addSpacing(20)
@@ -234,7 +240,7 @@ class HelpDialog(QDialog):
             "All rights reserved."
         )
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        copyright_label.setStyleSheet("color: #7f8c8d; font-size: 9pt;")
+        copyright_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         layout.addWidget(copyright_label)
 
         layout.addStretch()
@@ -248,15 +254,16 @@ class HelpDialog(QDialog):
         <head>
             <style>
                 body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #0d7377; border-bottom: 2px solid #0d7377; padding-bottom: 10px; }
-                h2 { color: #2c3e50; margin-top: 25px; }
-                h3 { color: #34495e; margin-top: 20px; }
-                .step { background-color: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #0d7377; }
-                .tip { background-color: #d1f2eb; padding: 12px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
-                .warning { background-color: #fef5e7; padding: 12px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #f39c12; }
+                body { color: #c9d1d9; }
+                h1 { color: #14b8a6; border-bottom: 2px solid #14b8a6; padding-bottom: 10px; }
+                h2 { color: #f0f6fc; margin-top: 25px; }
+                h3 { color: #c9d1d9; margin-top: 20px; }
+                .step { background-color: #21262d; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #14b8a6; }
+                .tip { background-color: #0d2818; padding: 12px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
+                .warning { background-color: #2d2310; padding: 12px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #f39c12; }
                 ul { padding-left: 25px; }
                 li { margin: 8px 0; }
-                code { background-color: #ecf0f1; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; }
+                code { background-color: #3d444d; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; color: #f0f6fc; }
             </style>
         </head>
         <body>
@@ -478,15 +485,15 @@ class HelpDialog(QDialog):
         <html>
         <head>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding: 20px; }
-                h1 { color: #0d7377; border-bottom: 2px solid #0d7377; padding-bottom: 10px; }
-                h2 { color: #2c3e50; margin-top: 20px; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; padding: 20px; color: #c9d1d9; }
+                h1 { color: #14b8a6; border-bottom: 2px solid #14b8a6; padding-bottom: 10px; }
+                h2 { color: #f0f6fc; margin-top: 20px; }
                 p { margin: 10px 0; }
                 ul, ol { padding-left: 25px; }
                 li { margin: 8px 0; }
-                .note { background-color: #d1f2eb; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
-                .warning { background-color: #fef5e7; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #f39c12; }
-                code { background-color: #ecf0f1; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; }
+                .note { background-color: #0d2818; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
+                .warning { background-color: #2d2310; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #f39c12; }
+                code { background-color: #3d444d; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; color: #f0f6fc; }
             </style>
         </head>
         <body>
@@ -613,15 +620,15 @@ class HelpDialog(QDialog):
         <html>
         <head>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #0d7377; border-bottom: 2px solid #0d7377; padding-bottom: 10px; }
-                h2 { color: #2c3e50; margin-top: 25px; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #c9d1d9; }
+                h1 { color: #14b8a6; border-bottom: 2px solid #14b8a6; padding-bottom: 10px; }
+                h2 { color: #f0f6fc; margin-top: 25px; }
                 table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                th { background-color: #0d7377; color: white; padding: 12px; text-align: left; }
-                td { padding: 10px; border-bottom: 1px solid #ddd; }
-                tr:hover { background-color: #f8f9fa; }
-                .key { background-color: #ecf0f1; padding: 4px 8px; border-radius: 4px; font-family: 'Consolas', monospace; font-weight: 600; border: 1px solid #bdc3c7; }
-                .note { background-color: #d1f2eb; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
+                th { background-color: #14b8a6; color: white; padding: 12px; text-align: left; }
+                td { padding: 10px; border-bottom: 1px solid #3d444d; color: #c9d1d9; }
+                tr:hover { background-color: #21262d; }
+                .key { background-color: #3d444d; padding: 4px 8px; border-radius: 4px; font-family: 'Consolas', monospace; font-weight: 600; border: 1px solid #6e7681; color: #f0f6fc; }
+                .note { background-color: #0d2818; padding: 12px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #27ae60; }
             </style>
         </head>
         <body>
@@ -796,12 +803,12 @@ class HelpDialog(QDialog):
         <html>
         <head>
             <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #0d7377; border-bottom: 2px solid #0d7377; padding-bottom: 10px; }
-                h2 { color: #2c3e50; margin-top: 25px; }
-                .faq-item { background-color: #f8f9fa; padding: 15px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #0d7377; }
-                .question { font-weight: 600; color: #2c3e50; margin-bottom: 10px; }
-                .answer { color: #555; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #c9d1d9; }
+                h1 { color: #14b8a6; border-bottom: 2px solid #14b8a6; padding-bottom: 10px; }
+                h2 { color: #f0f6fc; margin-top: 25px; }
+                .faq-item { background-color: #21262d; padding: 15px; margin: 15px 0; border-radius: 6px; border-left: 4px solid #14b8a6; }
+                .question { font-weight: 600; color: #f0f6fc; margin-bottom: 10px; }
+                .answer { color: #c9d1d9; }
                 ul { padding-left: 25px; }
                 li { margin: 8px 0; }
             </style>

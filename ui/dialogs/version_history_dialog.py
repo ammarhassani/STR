@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from datetime import datetime
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class VersionHistoryDialog(QDialog):
@@ -44,8 +45,11 @@ class VersionHistoryDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle(f"Version History - Report #{self.report_id}")
-        self.setMinimumSize(900, 600)
-        self.resize(1000, 700)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('large')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         # Main layout
         layout = QVBoxLayout(self)

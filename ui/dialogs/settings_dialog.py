@@ -7,10 +7,12 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QTabWidget, QWidget, QPushButton, QComboBox,
                              QCheckBox, QSpinBox, QGroupBox, QFormLayout,
                              QLineEdit, QMessageBox, QScrollArea, QFrame,
-                             QSlider, QRadioButton, QButtonGroup)
+                             QSlider, QRadioButton, QButtonGroup, QListView)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
+from ui.utils.responsive_sizing import ResponsiveSize
 
 
 class SettingsDialog(QDialog):
@@ -55,7 +57,11 @@ class SettingsDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface."""
         self.setWindowTitle("Settings & Preferences")
-        self.setMinimumSize(800, 600)
+
+        # Responsive dialog sizing
+        dialog_width, dialog_height, min_width, min_height = ResponsiveSize.get_dialog_size('medium')
+        self.setMinimumSize(min_width, min_height)
+        self.resize(dialog_width, dialog_height)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
@@ -82,20 +88,20 @@ class SettingsDialog(QDialog):
         button_layout.addStretch()
 
         reset_btn = QPushButton("Reset to Defaults")
-        reset_btn.setIcon(get_icon('refresh'))
+        reset_btn.setIcon(get_icon('refresh', color=ThemeColors.ICON_DEFAULT))
         reset_btn.setObjectName("dangerButton")
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setIcon(get_icon('times'))
+        cancel_btn.setIcon(get_icon('times', color=ThemeColors.ICON_DEFAULT))
         cancel_btn.setObjectName("secondaryButton")
         cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save Settings")
-        save_btn.setIcon(get_icon('save'))
+        save_btn.setIcon(get_icon('save', color=ThemeColors.ICON_DEFAULT))
         save_btn.setObjectName("primaryButton")
         save_btn.setMinimumWidth(120)
         save_btn.clicked.connect(self.save_settings)
@@ -121,14 +127,23 @@ class SettingsDialog(QDialog):
         language_layout.setSpacing(12)
 
         self.language_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.language_combo.setView(QListView())
+        self.language_combo.setMaxVisibleItems(10)
         self.language_combo.addItems(["English", "Arabic", "French", "Spanish"])
         language_layout.addRow("Interface Language:", self.language_combo)
 
         self.date_format_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.date_format_combo.setView(QListView())
+        self.date_format_combo.setMaxVisibleItems(10)
         self.date_format_combo.addItems(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"])
         language_layout.addRow("Date Format:", self.date_format_combo)
 
         self.time_format_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.time_format_combo.setView(QListView())
+        self.time_format_combo.setMaxVisibleItems(10)
         self.time_format_combo.addItems(["24 Hour", "12 Hour (AM/PM)"])
         language_layout.addRow("Time Format:", self.time_format_combo)
 
@@ -194,11 +209,17 @@ class SettingsDialog(QDialog):
         font_layout.setSpacing(12)
 
         self.font_size_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.font_size_combo.setView(QListView())
+        self.font_size_combo.setMaxVisibleItems(10)
         self.font_size_combo.addItems(["Small", "Medium", "Large", "Extra Large"])
         self.font_size_combo.setCurrentIndex(1)
         font_layout.addRow("Interface Font Size:", self.font_size_combo)
 
         self.table_font_size_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.table_font_size_combo.setView(QListView())
+        self.table_font_size_combo.setMaxVisibleItems(10)
         self.table_font_size_combo.addItems(["Small", "Medium", "Large"])
         self.table_font_size_combo.setCurrentIndex(1)
         font_layout.addRow("Table Font Size:", self.table_font_size_combo)
@@ -281,6 +302,9 @@ class SettingsDialog(QDialog):
         toast_layout.addWidget(self.enable_toasts_check)
 
         self.toast_position_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.toast_position_combo.setView(QListView())
+        self.toast_position_combo.setMaxVisibleItems(10)
         self.toast_position_combo.addItems(["Top Right", "Top Left", "Bottom Right", "Bottom Left"])
         position_layout = QHBoxLayout()
         position_layout.addWidget(QLabel("Position:"))
@@ -374,7 +398,7 @@ class SettingsDialog(QDialog):
         password_layout.setSpacing(12)
 
         change_password_btn = QPushButton("Change Password")
-        change_password_btn.setIcon(get_icon('key'))
+        change_password_btn.setIcon(get_icon('key', color=ThemeColors.ICON_DEFAULT))
         change_password_btn.setMinimumWidth(180)
         change_password_btn.setMinimumHeight(36)
         change_password_btn.clicked.connect(self.change_password)
@@ -441,6 +465,9 @@ class SettingsDialog(QDialog):
         backup_freq_layout.addSpacing(20)
         backup_freq_layout.addWidget(QLabel("Backup frequency:"))
         self.backup_frequency_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.backup_frequency_combo.setView(QListView())
+        self.backup_frequency_combo.setMaxVisibleItems(10)
         self.backup_frequency_combo.addItems(["Daily", "Weekly", "Monthly"])
         backup_freq_layout.addWidget(self.backup_frequency_combo)
         backup_freq_layout.addStretch()
@@ -492,14 +519,14 @@ class SettingsDialog(QDialog):
         db_layout.addLayout(cache_layout)
 
         optimize_btn = QPushButton("Optimize Database")
-        optimize_btn.setIcon(get_icon('cog'))
+        optimize_btn.setIcon(get_icon('cog', color=ThemeColors.ICON_DEFAULT))
         optimize_btn.setMaximumWidth(200)
         optimize_btn.setEnabled(self.current_user and self.current_user['role'] == 'admin')
         optimize_btn.clicked.connect(self.optimize_database)
         db_layout.addWidget(optimize_btn)
 
         backup_btn = QPushButton("Backup & Restore")
-        backup_btn.setIcon(get_icon('save'))
+        backup_btn.setIcon(get_icon('save', color=ThemeColors.ICON_DEFAULT))
         backup_btn.setMaximumWidth(200)
         backup_btn.setEnabled(self.current_user and self.current_user['role'] == 'admin')
         backup_btn.clicked.connect(self.open_backup_dialog)
@@ -532,6 +559,9 @@ class SettingsDialog(QDialog):
         export_layout.setSpacing(12)
 
         self.export_format_combo = QComboBox()
+        # Fix dropdown visibility issues
+        self.export_format_combo.setView(QListView())
+        self.export_format_combo.setMaxVisibleItems(10)
         self.export_format_combo.addItems(["CSV (UTF-8)", "CSV (UTF-8 BOM)", "Excel (.xlsx)"])
         export_layout.addRow("Default export format:", self.export_format_combo)
 
@@ -556,7 +586,7 @@ class SettingsDialog(QDialog):
         debug_layout.addWidget(self.verbose_logging_check)
 
         logs_btn = QPushButton("View Application Logs")
-        logs_btn.setIcon(get_icon('file-alt'))
+        logs_btn.setIcon(get_icon('file-alt', color=ThemeColors.ICON_DEFAULT))
         logs_btn.setMaximumWidth(200)
         logs_btn.clicked.connect(self.view_logs)
         debug_layout.addWidget(logs_btn)

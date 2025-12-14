@@ -13,6 +13,7 @@ from pathlib import Path
 from datetime import datetime
 from utils.export import export_reports
 from services.icon_service import get_icon
+from ui.theme_colors import ThemeColors
 
 
 class ExportWorker(QThread):
@@ -179,7 +180,7 @@ class ExportView(QWidget):
         self.output_path_input.setReadOnly(True)
 
         browse_btn = QPushButton("Browse...")
-        browse_btn.setIcon(get_icon('folder-open'))
+        browse_btn.setIcon(get_icon('folder-open', color=ThemeColors.ICON_DEFAULT))
         browse_btn.clicked.connect(self.browse_output_location)
         browse_btn.setMaximumWidth(100)
 
@@ -225,7 +226,7 @@ class ExportView(QWidget):
         button_layout = QHBoxLayout()
 
         self.preview_btn = QPushButton("Preview Count")
-        self.preview_btn.setIcon(get_icon('search'))
+        self.preview_btn.setIcon(get_icon('search', color=ThemeColors.ICON_DEFAULT))
         self.preview_btn.setObjectName("secondaryButton")
         self.preview_btn.clicked.connect(self.preview_export)
         button_layout.addWidget(self.preview_btn)
@@ -233,7 +234,7 @@ class ExportView(QWidget):
         button_layout.addStretch()
 
         self.export_btn = QPushButton("Export to CSV")
-        self.export_btn.setIcon(get_icon('file-export'))
+        self.export_btn.setIcon(get_icon('file-export', color=ThemeColors.ICON_DEFAULT))
         self.export_btn.setObjectName("primaryButton")
         self.export_btn.setMinimumWidth(150)
         self.export_btn.clicked.connect(self.start_export)

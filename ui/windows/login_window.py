@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
 from ui.workers import AuthenticationWorker
+from ui.theme_colors import ThemeColors
 
 
 class LoginWindow(QWidget):
@@ -132,7 +133,7 @@ class LoginWindow(QWidget):
         container_layout.addStretch()
         version_label = QLabel("Version 2.0.0")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet("color: #95a5a6; font-size: 9pt;")
+        version_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         container_layout.addWidget(version_label)
 
         main_layout.addWidget(container)

@@ -6,6 +6,7 @@ Modern non-blocking notification system with animations.
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QGraphicsOpacityEffect
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint, pyqtProperty
 from PyQt6.QtGui import QFont
+from ui.theme_colors import ThemeColors
 
 
 class ToastNotification(QWidget):
@@ -96,27 +97,28 @@ class ToastNotification(QWidget):
         self.adjustSize()
 
     def apply_styling(self):
-        """Apply styling based on toast type."""
+        """Apply styling based on toast type - dark theme compatible."""
+        # Dark theme colors with visible backgrounds
         colors = {
             self.SUCCESS: {
-                'bg': '#d1fae5',
-                'border': '#10b981',
-                'text': '#065f46'
+                'bg': '#0d2818',
+                'border': ThemeColors.SUCCESS,
+                'text': '#4ade80'
             },
             self.ERROR: {
-                'bg': '#fee2e2',
-                'border': '#ef4444',
-                'text': '#991b1b'
+                'bg': '#2d1518',
+                'border': ThemeColors.DANGER,
+                'text': '#f87171'
             },
             self.WARNING: {
-                'bg': '#fed7aa',
-                'border': '#f97316',
-                'text': '#9a3412'
+                'bg': '#2d2310',
+                'border': ThemeColors.WARNING,
+                'text': '#fbbf24'
             },
             self.INFO: {
-                'bg': '#dbeafe',
-                'border': '#3b82f6',
-                'text': '#1e40af'
+                'bg': '#0d1f2d',
+                'border': ThemeColors.INFO,
+                'text': '#60a5fa'
             }
         }
 

@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QFormLayout, QGroupBox, QLineEdit, QTextEdit)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from ui.theme_colors import ThemeColors
 from datetime import datetime
 
 
@@ -58,7 +59,7 @@ class SystemSettingsView(QWidget):
             "Configure system-wide settings. Changes take effect immediately."
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #666;")
+        info_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY};")
         layout.addWidget(info_label)
 
         # Report Numbering Settings
@@ -80,7 +81,7 @@ class SystemSettingsView(QWidget):
         grace_help = QLabel(
             "<i>Example: Set to 3 means Dec 1st-3rd still use November (2025/11)</i>"
         )
-        grace_help.setStyleSheet("color: #888; font-size: 10px;")
+        grace_help.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 10px;")
 
         numbering_layout.addRow("Month Grace Period:", self.grace_period_input)
         numbering_layout.addRow("", grace_help)
@@ -106,7 +107,7 @@ class SystemSettingsView(QWidget):
         batch_help = QLabel(
             "<i>Higher = faster for concurrent users. Recommended: 10-30</i>"
         )
-        batch_help.setStyleSheet("color: #888; font-size: 10px;")
+        batch_help.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 10px;")
 
         batch_layout.addRow("Batch Pool Size:", self.batch_size_input)
         batch_layout.addRow("", batch_help)
@@ -125,7 +126,7 @@ class SystemSettingsView(QWidget):
         expiry_help = QLabel(
             "<i>Time before reserved numbers expire. Recommended: 5-10 minutes</i>"
         )
-        expiry_help.setStyleSheet("color: #888; font-size: 10px;")
+        expiry_help.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 10px;")
 
         batch_layout.addRow("Reservation Expiry:", self.reservation_expiry_input)
         batch_layout.addRow("", expiry_help)

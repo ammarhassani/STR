@@ -5,6 +5,7 @@ Placeholder view widget for features under development.
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from ui.theme_colors import ThemeColors
 
 
 class PlaceholderView(QWidget):
@@ -38,7 +39,7 @@ class PlaceholderView(QWidget):
 
         # Description
         desc_label = QLabel(description or "This feature is under development.")
-        desc_label.setStyleSheet("color: #7f8c8d; font-size: 11pt;")
+        desc_label.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 11pt;")
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)

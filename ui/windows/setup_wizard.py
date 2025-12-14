@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont, QPixmap
 from pathlib import Path
 from database.init_db import initialize_database
+from ui.theme_colors import ThemeColors
 
 
 class DatabaseCreationWorker(QThread):
@@ -91,7 +92,7 @@ class WelcomePage(QWizardPage):
             "Click 'Next' to continue with the setup."
         )
         description.setWordWrap(True)
-        description.setStyleSheet("color: #5f6368; line-height: 1.6;")
+        description.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; line-height: 1.6;")
         welcome_layout.addWidget(description)
 
         welcome_layout.addStretch()
@@ -125,11 +126,11 @@ class PathConfigurationPage(QWizardPage):
         db_layout.setContentsMargins(20, 20, 20, 20)
 
         db_title = QLabel("Database File Location")
-        db_title.setStyleSheet("font-weight: 600; font-size: 11pt; color: #2c3e50;")
+        db_title.setStyleSheet(f"font-weight: 600; font-size: 11pt; color: {ThemeColors.TEXT_PRIMARY};")
         db_layout.addWidget(db_title)
 
         db_desc = QLabel("Choose where to store the main database file")
-        db_desc.setStyleSheet("color: #7f8c8d; font-size: 9pt;")
+        db_desc.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         db_layout.addWidget(db_desc)
 
         db_input_layout = QHBoxLayout()
@@ -154,11 +155,11 @@ class PathConfigurationPage(QWizardPage):
         backup_layout.setContentsMargins(20, 20, 20, 20)
 
         backup_title = QLabel("Backup Directory")
-        backup_title.setStyleSheet("font-weight: 600; font-size: 11pt; color: #2c3e50;")
+        backup_title.setStyleSheet(f"font-weight: 600; font-size: 11pt; color: {ThemeColors.TEXT_PRIMARY};")
         backup_layout.addWidget(backup_title)
 
         backup_desc = QLabel("Choose where to store automatic backups")
-        backup_desc.setStyleSheet("color: #7f8c8d; font-size: 9pt;")
+        backup_desc.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; font-size: 9pt;")
         backup_layout.addWidget(backup_desc)
 
         backup_input_layout = QHBoxLayout()
@@ -264,7 +265,7 @@ class CreationPage(QWizardPage):
         progress_layout.setSpacing(15)
 
         self.status_label = QLabel("Initializing...")
-        self.status_label.setStyleSheet("font-size: 11pt; color: #2c3e50;")
+        self.status_label.setStyleSheet(f"font-size: 11pt; color: {ThemeColors.TEXT_PRIMARY};")
         progress_layout.addWidget(self.status_label)
 
         self.progress_bar = QProgressBar()
@@ -368,7 +369,7 @@ class CompletionPage(QWizardPage):
         )
         info.setWordWrap(True)
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        info.setStyleSheet("color: #5f6368; line-height: 1.6;")
+        info.setStyleSheet(f"color: {ThemeColors.TEXT_SECONDARY}; line-height: 1.6;")
         success_layout.addWidget(info)
 
         layout.addWidget(success_frame)
