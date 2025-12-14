@@ -6,6 +6,7 @@ import flet as ft
 import asyncio
 import shutil
 import sqlite3
+import threading
 from typing import Any, Callable, Optional
 from pathlib import Path
 from datetime import datetime
@@ -13,6 +14,7 @@ from datetime import datetime
 from theme.theme_manager import theme_manager
 from components.toast import show_success, show_error, show_warning
 from config import Config
+from utils.file_dialog import choose_file, choose_save_file
 
 
 def show_backup_restore_dialog(
@@ -392,47 +394,45 @@ def show_backup_restore_dialog(
             page.update()
 
     async def export_backup(e):
-        """Export selected backup."""
+        """Export selected backup using native OS dialog."""
         if not selected_backup_path:
             return
 
-        # Use FilePicker for save
-        def on_save_result(e: ft.FilePickerResultEvent):
-            if e.path:
+        def run_dialog():
+            default_dir = str(Path.home() / "Downloads")
+            default_name = Path(selected_backup_path).name
+            result = choose_save_file(
+                prompt="Export Backup",
+                default_path=default_dir,
+                default_name=default_name,
+                file_types=["db"]
+            )
+            if result:
                 try:
-                    shutil.copy2(selected_backup_path, e.path)
-                    show_success(page, f"Backup exported to: {Path(e.path).name}")
+                    shutil.copy2(selected_backup_path, result)
+                    show_success(page, f"Backup exported to: {Path(result).name}")
                     if app_state.logging_service:
-                        app_state.logging_service.log_user_action("BACKUP_EXPORTED", {'file_path': e.path})
+                        app_state.logging_service.log_user_action("BACKUP_EXPORTED", {'file_path': result})
                 except Exception as ex:
                     show_error(page, f"Export failed: {str(ex)}")
 
-        file_picker = ft.FilePicker(on_result=on_save_result)
-        page.overlay.append(file_picker)
-        page.update()
-
-        file_picker.save_file(
-            dialog_title="Export Backup",
-            file_name=Path(selected_backup_path).name,
-            allowed_extensions=["db"],
-        )
+        # Run in background thread to avoid blocking UI
+        threading.Thread(target=run_dialog, daemon=True).start()
 
     async def import_backup(e):
-        """Import a backup file."""
-        def on_file_result(e: ft.FilePickerResultEvent):
-            if e.files and len(e.files) > 0:
-                file_path = e.files[0].path
-                page.run_task(lambda: do_import(file_path))
+        """Import a backup file using native OS dialog."""
+        def run_dialog():
+            default_dir = str(Path.home() / "Downloads")
+            result = choose_file(
+                prompt="Import Backup",
+                default_path=default_dir,
+                file_types=["db"]
+            )
+            if result:
+                page.run_task(lambda: do_import(result))
 
-        file_picker = ft.FilePicker(on_result=on_file_result)
-        page.overlay.append(file_picker)
-        page.update()
-
-        file_picker.pick_files(
-            dialog_title="Import Backup",
-            allowed_extensions=["db"],
-            allow_multiple=False,
-        )
+        # Run in background thread to avoid blocking UI
+        threading.Thread(target=run_dialog, daemon=True).start()
 
     async def do_import(file_path: str):
         try:

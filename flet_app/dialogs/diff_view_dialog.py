@@ -20,6 +20,7 @@ FIELD_LABELS = {
     'nationality': 'Nationality',
     'id_cr': 'ID/CR',
     'id_type': 'ID Type',
+    'case_id': 'Case ID',
     'account_membership': 'Account/Membership',
     'relationship': 'Relationship',
     'branch_id': 'Branch ID',
@@ -40,7 +41,6 @@ FIELD_LABELS = {
     'fiu_feedback': 'FIU Feedback',
     'fiu_letter_number': 'FIU Letter Number',
     'fiu_date': 'FIU Date',
-    'status': 'Status',
     'approval_status': 'Approval Status',
 }
 

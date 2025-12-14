@@ -225,7 +225,7 @@ class FletApp:
 
         # Initialize content area
         self.content_area = ft.Container(
-            content=build_dashboard_content(self.page, app_state),
+            content=build_dashboard_content(self.page, app_state, self._handle_navigate),
             expand=True,
             padding=24,
         )
@@ -234,15 +234,15 @@ class FletApp:
         self._build_main_layout()
         self.page.update()
 
+    def _handle_navigate(self, route: str):
+        """Handle navigation to a route."""
+        self.current_route = route
+        self._update_content(route)
+        self._rebuild_sidebar()
+
     def _build_main_layout(self):
         """Build the main application layout with sidebar and content."""
         colors = theme_manager.get_colors()
-
-        # Navigation handler
-        def handle_navigate(route: str):
-            self.current_route = route
-            self._update_content(route)
-            self._rebuild_sidebar()
 
         # Logout handler
         def handle_logout():
@@ -276,7 +276,7 @@ class FletApp:
         # Create sidebar
         self.sidebar = create_sidebar(
             app_state,
-            handle_navigate,
+            self._handle_navigate,
             self.current_route
         )
 
@@ -341,7 +341,7 @@ class FletApp:
     def _get_content_for_route(self, route: str) -> ft.Control:
         """Get content control for a route."""
         route_content = {
-            "/dashboard": lambda: build_dashboard_content(self.page, app_state),
+            "/dashboard": lambda: build_dashboard_content(self.page, app_state, self._handle_navigate),
             "/reports": lambda: build_reports_view(self.page, app_state),
             "/activity": lambda: build_activity_view(self.page, app_state),
             "/export": lambda: build_export_view(self.page, app_state),

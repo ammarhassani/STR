@@ -119,12 +119,13 @@ class AuthService:
             )
             self.current_session_id = session_id_result[0][0] if session_id_result else None
 
-            # Set current user
+            # Set current user (include the last_login we just set)
             self.current_user = {
                 'user_id': user_id,
                 'username': db_username,
                 'full_name': full_name,
-                'role': role
+                'role': role,
+                'last_login': datetime.now().isoformat()
             }
 
             # Update logging service user context

@@ -400,7 +400,7 @@ class ActivityService:
         Convert a timestamp to relative time string.
 
         Args:
-            timestamp_str: ISO format timestamp string
+            timestamp_str: ISO format timestamp string (stored as UTC in database)
 
         Returns:
             Relative time string (e.g., "2 hours ago")
@@ -409,12 +409,15 @@ class ActivityService:
             if not timestamp_str:
                 return "Unknown"
 
-            # Parse timestamp
-            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-            now = datetime.now()
+            # Parse timestamp - SQLite stores UTC time via datetime('now')
+            clean_timestamp = timestamp_str.replace('Z', '').split('+')[0]
+            timestamp_utc = datetime.fromisoformat(clean_timestamp)
+
+            # Use UTC now for comparison since database stores UTC
+            now_utc = datetime.utcnow()
 
             # Calculate difference
-            diff = now - timestamp
+            diff = now_utc - timestamp_utc
 
             seconds = diff.total_seconds()
             minutes = seconds / 60

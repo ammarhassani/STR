@@ -15,6 +15,7 @@ from components.activity_timeline import create_activity_timeline, ACTION_ICONS,
 def build_dashboard_content(
     page: ft.Page,
     app_state: Any,
+    on_navigate: Optional[callable] = None,
 ) -> ft.Column:
     """
     Build the dashboard content with GitHub-style activity feed.
@@ -22,6 +23,7 @@ def build_dashboard_content(
     Args:
         page: Flet page object
         app_state: Application state
+        on_navigate: Optional callback for navigation (route -> None)
 
     Returns:
         Dashboard content column
@@ -286,16 +288,16 @@ def build_dashboard_content(
 
     def navigate_to_activity():
         """Navigate to the activity page."""
-        # This triggers a refresh of the main app with the activity route
-        # The main app handles navigation through the sidebar
-        from main import FletApp
-        # We need to find a way to navigate - for now we'll show a message
-        page.snack_bar = ft.SnackBar(
-            content=ft.Text("Navigate to Activity Log in the sidebar"),
-            bgcolor=colors["info"],
-        )
-        page.snack_bar.open = True
-        page.update()
+        if on_navigate:
+            on_navigate("/activity")
+        else:
+            # Fallback - show a message to use the sidebar
+            page.snack_bar = ft.SnackBar(
+                content=ft.Text("Navigate to Activity Log in the sidebar"),
+                bgcolor=colors["info"],
+            )
+            page.snack_bar.open = True
+            page.update()
 
     def handle_refresh(e):
         """Handle refresh button click."""

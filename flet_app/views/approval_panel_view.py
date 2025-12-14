@@ -10,6 +10,41 @@ from datetime import datetime
 from theme.theme_manager import theme_manager
 from components.toast import show_success, show_error
 
+# Field definitions for the report form
+REPORT_FIELDS = [
+    {'key': 'report_number', 'label': 'Report Number', 'readonly': True},
+    {'key': 'sn', 'label': 'Serial Number', 'readonly': True},
+    {'key': 'report_date', 'label': 'Report Date'},
+    {'key': 'outgoing_letter_number', 'label': 'Outgoing Letter Number'},
+    {'key': 'reported_entity_name', 'label': 'Reported Entity Name'},
+    {'key': 'legal_entity_owner', 'label': 'Legal Entity Owner'},
+    {'key': 'gender', 'label': 'Gender', 'type': 'dropdown', 'options': ['Male', 'Female', 'Other', 'N/A']},
+    {'key': 'nationality', 'label': 'Nationality'},
+    {'key': 'id_type', 'label': 'ID Type'},
+    {'key': 'id_cr', 'label': 'ID/CR'},
+    {'key': 'case_id', 'label': 'Case ID'},
+    {'key': 'relationship', 'label': 'Relationship'},
+    {'key': 'account_membership', 'label': 'Account/Membership'},
+    {'key': 'branch_id', 'label': 'Branch ID'},
+    {'key': 'cic', 'label': 'CIC'},
+    {'key': 'first_reason_for_suspicion', 'label': 'First Reason for Suspicion'},
+    {'key': 'second_reason_for_suspicion', 'label': 'Second Reason for Suspicion'},
+    {'key': 'type_of_suspected_transaction', 'label': 'Type of Suspected Transaction'},
+    {'key': 'arb_staff', 'label': 'ARB Staff'},
+    {'key': 'total_transaction', 'label': 'Total Transaction'},
+    {'key': 'report_classification', 'label': 'Report Classification'},
+    {'key': 'report_source', 'label': 'Report Source'},
+    {'key': 'reporting_entity', 'label': 'Reporting Entity'},
+    {'key': 'reporter_initials', 'label': 'Reporter Initials'},
+    {'key': 'sending_date', 'label': 'Sending Date'},
+    {'key': 'original_copy_confirmation', 'label': 'Original Copy Confirmation'},
+    {'key': 'fiu_number', 'label': 'FIU Number'},
+    {'key': 'fiu_letter_receive_date', 'label': 'FIU Letter Receive Date'},
+    {'key': 'fiu_feedback', 'label': 'FIU Feedback'},
+    {'key': 'fiu_letter_number', 'label': 'FIU Letter Number'},
+    {'key': 'fiu_date', 'label': 'FIU Date'},
+]
+
 
 def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
     """
@@ -176,110 +211,390 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     def handle_review(approval: Dict, idx: int):
         """Handle review button click."""
-        show_approval_decision_dialog(approval)
+        show_full_report_review_dialog(approval)
 
-    def show_approval_decision_dialog(approval: Dict):
-        """Show the approval decision dialog."""
+    def show_full_report_review_dialog(approval: Dict):
+        """Show full report form with review options. Fields locked by default, unlocked only with Edit."""
+        report_id = approval.get('report_id')
+        report_data = {}
+        field_refs = {}
         decision_ref = {"value": "approve"}
+        is_edit_mode = {"value": False}
         comment_ref = ft.Ref[ft.TextField]()
+        form_container_ref = ft.Ref[ft.Container]()
+        loading_ref = ft.Ref[ft.Container]()
+        save_btn_ref = ft.Ref[ft.ElevatedButton]()
+        approve_btn_ref = ft.Ref[ft.ElevatedButton]()
+        edit_mode_label_ref = ft.Ref[ft.Container]()
+        pre_edit_snapshot_created = {"value": False}  # Track if we captured state before edit
+
+        def load_report_data():
+            """Load full report data."""
+            nonlocal report_data
+            try:
+                if app_state.report_service:
+                    report_data = app_state.report_service.get_report(report_id) or {}
+                    build_form()
+            except Exception as e:
+                show_error(page, f"Failed to load report: {str(e)}")
+
+        def build_form():
+            """Build the form fields (all locked by default)."""
+            if loading_ref.current:
+                loading_ref.current.visible = False
+
+            form_fields = []
+
+            # Two-column layout for fields
+            row_fields = []
+            for field in REPORT_FIELDS:
+                key = field['key']
+                label = field['label']
+                always_readonly = field.get('readonly', False)  # SN and Report Number
+                field_type = field.get('type', 'text')
+                value = str(report_data.get(key, '') or '')
+
+                # All fields start as readonly (locked)
+                if field_type == 'dropdown':
+                    options = field.get('options', [])
+                    control = ft.Dropdown(
+                        label=label,
+                        value=value if value in options else '',
+                        options=[ft.dropdown.Option(o) for o in options],
+                        disabled=True,  # Start disabled
+                        text_size=12,
+                        width=280,
+                    )
+                else:
+                    control = ft.TextField(
+                        label=label,
+                        value=value,
+                        read_only=True,  # Start readonly
+                        text_size=12,
+                        width=280,
+                        bgcolor=colors["bg_tertiary"],
+                    )
+
+                field_refs[key] = {'control': control, 'always_readonly': always_readonly, 'type': field_type}
+                row_fields.append(control)
+
+                # Create row every 2 fields
+                if len(row_fields) == 2:
+                    form_fields.append(
+                        ft.Row(controls=row_fields, spacing=16)
+                    )
+                    row_fields = []
+
+            # Add remaining field if odd number
+            if row_fields:
+                form_fields.append(
+                    ft.Row(controls=row_fields, spacing=16)
+                )
+
+            if form_container_ref.current:
+                form_container_ref.current.content = ft.Column(
+                    controls=form_fields,
+                    spacing=12,
+                    scroll=ft.ScrollMode.AUTO,
+                )
+                page.update()
+
+        def toggle_edit_mode(enable: bool):
+            """Enable or disable edit mode for form fields."""
+            is_edit_mode["value"] = enable
+
+            # Create version snapshot BEFORE editing (to capture the pre-edit state for diff)
+            if enable and not pre_edit_snapshot_created["value"] and app_state.version_service:
+                app_state.version_service.create_version_snapshot(
+                    report_id,
+                    f"State before admin review edit"
+                )
+                pre_edit_snapshot_created["value"] = True
+
+            for key, field_info in field_refs.items():
+                control = field_info['control']
+                always_readonly = field_info['always_readonly']
+                field_type = field_info['type']
+
+                if always_readonly:
+                    # SN and Report Number always stay readonly
+                    continue
+
+                if field_type == 'dropdown':
+                    control.disabled = not enable
+                else:
+                    control.read_only = not enable
+                    control.bgcolor = None if enable else colors["bg_tertiary"]
+
+            # Show/hide save button, approve button, and edit mode indicator
+            if save_btn_ref.current:
+                save_btn_ref.current.visible = enable
+            if approve_btn_ref.current:
+                approve_btn_ref.current.visible = enable
+            if edit_mode_label_ref.current:
+                edit_mode_label_ref.current.visible = enable
+
+            page.update()
+
+        def get_form_data() -> Dict:
+            """Get current form data."""
+            data = {}
+            for key, field_info in field_refs.items():
+                control = field_info['control']
+                if isinstance(control, ft.Dropdown):
+                    data[key] = control.value or ''
+                else:
+                    data[key] = control.value or ''
+            return data
+
+        def save_changes(e):
+            """Save any edits made to the report."""
+            if not is_edit_mode["value"]:
+                return
+
+            form_data = get_form_data()
+            try:
+                success, message = app_state.report_service.update_report(report_id, form_data)
+                if success:
+                    show_success(page, "Report updated successfully")
+                    # Create version snapshot
+                    if app_state.version_service:
+                        app_state.version_service.create_version_snapshot(
+                            report_id,
+                            f"Modified by admin during approval review"
+                        )
+                else:
+                    show_error(page, message)
+            except Exception as ex:
+                show_error(page, f"Failed to save changes: {str(ex)}")
+
+        def approve_after_edit(e):
+            """Approve the report after editing."""
+            # First save any pending changes
+            if is_edit_mode["value"]:
+                form_data = get_form_data()
+                try:
+                    success, message = app_state.report_service.update_report(report_id, form_data)
+                    if success:
+                        # Create version snapshot
+                        if app_state.version_service:
+                            app_state.version_service.create_version_snapshot(
+                                report_id,
+                                f"Modified by admin during approval review"
+                            )
+                    else:
+                        show_error(page, f"Failed to save changes: {message}")
+                        return
+                except Exception as ex:
+                    show_error(page, f"Failed to save changes: {str(ex)}")
+                    return
+
+            # Now approve the report
+            review_dialog.open = False
+            page.update()
+            comment = comment_ref.current.value.strip() if comment_ref.current else ""
+            process_decision(approval, "approve", comment or "Approved after admin edit")
 
         def submit_decision(e):
+            """Submit the approval decision."""
             comment = comment_ref.current.value.strip() if comment_ref.current else ""
             decision = decision_ref["value"]
+
+            # Handle Edit action - just enable edit mode, don't close dialog
+            if decision == "edit":
+                toggle_edit_mode(True)
+                show_success(page, "Edit mode enabled. You can now modify the form fields.")
+                return
 
             # Validate comment for reject/rework
             if decision in ["reject", "rework"] and not comment:
                 show_error(page, "Please provide feedback for rejection or rework request.")
                 return
 
-            decision_dialog.open = False
+            review_dialog.open = False
             page.update()
-
             process_decision(approval, decision, comment)
 
-        def cancel_decision(e):
-            decision_dialog.open = False
+        def cancel_review(e):
+            review_dialog.open = False
             page.update()
 
         def on_decision_change(e):
             decision_ref["value"] = e.control.value
 
-        decision_dialog = ft.AlertDialog(
+        # Build the dialog content
+        review_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Review Approval Request"),
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.RATE_REVIEW, color=colors["primary"]),
+                    ft.Text(f"Review Report #{approval.get('report_number', '')}", weight=ft.FontWeight.BOLD),
+                ],
+                spacing=8,
+            ),
             content=ft.Container(
                 content=ft.Column(
                     controls=[
-                        # Report details
+                        # Request info banner
                         ft.Container(
-                            content=ft.Column(
+                            content=ft.Row(
                                 controls=[
-                                    ft.Text(f"Report Number: {approval.get('report_number', '')}", size=13),
-                                    ft.Text(f"Entity: {approval.get('reported_entity_name', '')}", size=13),
-                                    ft.Text(f"Requested By: {approval.get('requested_by', '')}", size=13),
-                                    ft.Text(f"Requested At: {approval.get('requested_at', '')}", size=13),
+                                    ft.Icon(ft.Icons.INFO_OUTLINE, color=colors["info"], size=20),
                                     ft.Text(
-                                        f"Request Comment: {approval.get('comment', 'None')}",
-                                        size=13,
+                                        f"Requested by {approval.get('requested_by', '')} on {approval.get('requested_at', '')[:16] if approval.get('requested_at') else ''}",
+                                        size=12,
                                         color=colors["text_secondary"],
-                                    ) if approval.get('comment') else ft.Container(),
+                                    ),
+                                    ft.Container(expand=True),
+                                    ft.Container(
+                                        content=ft.Text("Pending Review", size=11, color=ft.Colors.WHITE),
+                                        bgcolor=colors["warning"],
+                                        border_radius=10,
+                                        padding=ft.padding.symmetric(horizontal=8, vertical=2),
+                                    ),
                                 ],
-                                spacing=4,
+                                spacing=8,
                             ),
                             bgcolor=colors["bg_tertiary"],
                             border_radius=8,
-                            padding=16,
+                            padding=12,
                         ),
 
-                        ft.Container(height=16),
+                        # Request comment if any
+                        ft.Container(
+                            content=ft.Row(
+                                controls=[
+                                    ft.Icon(ft.Icons.COMMENT, color=colors["text_secondary"], size=16),
+                                    ft.Text(
+                                        f"Request Comment: {approval.get('comment', 'No comment provided')}",
+                                        size=12,
+                                        color=colors["text_secondary"],
+                                        italic=True,
+                                    ),
+                                ],
+                                spacing=8,
+                            ),
+                            padding=ft.padding.only(top=8, bottom=8),
+                        ) if approval.get('comment') else ft.Container(),
 
-                        # Decision options
-                        ft.Text("Your Decision:", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+                        ft.Divider(height=1, color=colors["border"]),
+
+                        # Form section header
+                        ft.Row(
+                            controls=[
+                                ft.Text("Report Details", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+                                ft.Text("(Read-only - select 'Edit' below to modify)", size=11, color=colors["text_secondary"]),
+                                ft.Container(expand=True),
+                                # Edit mode indicator (hidden by default)
+                                ft.Container(
+                                    ref=edit_mode_label_ref,
+                                    content=ft.Row(
+                                        controls=[
+                                            ft.Icon(ft.Icons.EDIT, color=colors["warning"], size=16),
+                                            ft.Text("EDIT MODE", size=11, color=colors["warning"], weight=ft.FontWeight.BOLD),
+                                        ],
+                                        spacing=4,
+                                    ),
+                                    visible=False,
+                                ),
+                                # Save button (hidden by default, shown in edit mode)
+                                ft.ElevatedButton(
+                                    ref=save_btn_ref,
+                                    text="Save Changes",
+                                    icon=ft.Icons.SAVE,
+                                    bgcolor=colors["primary"],
+                                    color=ft.Colors.WHITE,
+                                    on_click=save_changes,
+                                    visible=False,
+                                ),
+                                # Approve button (hidden by default, shown in edit mode)
+                                ft.ElevatedButton(
+                                    ref=approve_btn_ref,
+                                    text="Approve Report",
+                                    icon=ft.Icons.CHECK_CIRCLE,
+                                    bgcolor=colors["success"],
+                                    color=ft.Colors.WHITE,
+                                    on_click=approve_after_edit,
+                                    visible=False,
+                                ),
+                            ],
+                            spacing=8,
+                        ),
+
+                        # Loading indicator
+                        ft.Container(
+                            ref=loading_ref,
+                            content=ft.Row(
+                                controls=[
+                                    ft.ProgressRing(width=20, height=20),
+                                    ft.Text("Loading report data...", size=12),
+                                ],
+                                spacing=8,
+                            ),
+                            padding=20,
+                            visible=True,
+                        ),
+
+                        # Form container (populated after load)
+                        ft.Container(
+                            ref=form_container_ref,
+                            content=ft.Text("Loading..."),
+                            height=280,
+                        ),
+
+                        ft.Divider(height=1, color=colors["border"]),
+
+                        # Decision section
+                        ft.Text("Your Decision", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
                         ft.RadioGroup(
                             value="approve",
                             on_change=on_decision_change,
                             content=ft.Column(
                                 controls=[
                                     ft.Radio(value="approve", label="Approve - Report is accurate and complete"),
-                                    ft.Radio(value="rework", label="Request Rework - Report needs corrections"),
+                                    ft.Radio(value="rework", label="Request Rework - Send back for corrections"),
                                     ft.Radio(value="reject", label="Reject - Report is invalid"),
+                                    ft.Radio(value="edit", label="Edit - Modify report fields yourself"),
                                 ],
-                                spacing=8,
+                                spacing=4,
                             ),
                         ),
 
-                        ft.Container(height=16),
-
-                        # Comment field
-                        ft.Text("Comment (optional but recommended):", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
                         ft.TextField(
                             ref=comment_ref,
-                            hint_text="Enter your feedback, suggestions, or reasons for this decision...",
+                            label="Decision Comment (required for Rework/Reject)",
+                            hint_text="Enter feedback or reasons for this decision...",
                             multiline=True,
-                            min_lines=3,
-                            max_lines=5,
-                            text_size=13,
-                            border_radius=8,
+                            min_lines=2,
+                            max_lines=3,
+                            text_size=12,
                         ),
                     ],
-                    spacing=8,
+                    spacing=10,
+                    scroll=ft.ScrollMode.AUTO,
                 ),
-                width=500,
+                width=650,
+                height=520,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=cancel_decision),
+                ft.TextButton("Cancel", on_click=cancel_review),
                 ft.ElevatedButton(
                     "Submit Decision",
-                    bgcolor=colors["primary"],
+                    icon=ft.Icons.GAVEL,
+                    bgcolor=colors["success"],
                     color=ft.Colors.WHITE,
                     on_click=submit_decision,
                 ),
             ],
+            actions_alignment=ft.MainAxisAlignment.END,
         )
 
-        page.overlay.append(decision_dialog)
-        decision_dialog.open = True
+        page.overlay.append(review_dialog)
+        review_dialog.open = True
         page.update()
+
+        # Load report data after dialog is shown
+        load_report_data()
 
     def process_decision(approval: Dict, decision: str, comment: str):
         """Process the approval decision."""

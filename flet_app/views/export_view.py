@@ -4,12 +4,14 @@ Export reports to CSV with filtering and customization options.
 """
 import flet as ft
 import asyncio
+import threading
 from typing import Any, Dict
 from pathlib import Path
 from datetime import datetime, timedelta
 
 from theme.theme_manager import theme_manager
 from components.toast import show_success, show_error
+from utils.file_dialog import choose_directory
 
 
 def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
@@ -262,20 +264,20 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
             page.update()
 
     def handle_browse(e):
-        """Browse for output directory."""
-        def on_result(result: ft.FilePickerResultEvent):
-            if result.path:
+        """Browse for output directory using native OS dialog."""
+        def run_dialog():
+            current_path = output_path_ref.current.value if output_path_ref.current else default_path
+            result = choose_directory(
+                prompt="Select Output Directory",
+                default_path=current_path
+            )
+            if result:
                 if output_path_ref.current:
-                    output_path_ref.current.value = result.path
+                    output_path_ref.current.value = result
                 page.update()
 
-        file_picker = ft.FilePicker(on_result=on_result)
-        page.overlay.append(file_picker)
-        page.update()
-        file_picker.get_directory_path(
-            dialog_title="Select Output Directory",
-            initial_directory=output_path_ref.current.value if output_path_ref.current else default_path,
-        )
+        # Run in background thread to avoid blocking UI
+        threading.Thread(target=run_dialog, daemon=True).start()
 
     # Header
     header_row = ft.Row(
@@ -326,7 +328,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.Dropdown(
                             ref=status_ref,
                             value="All Statuses",
-                            options=[ft.dropdown.Option(s) for s in status_options],
+                            options=[ft.dropdown.Option(key=s, text=s) for s in status_options],
                             width=250,
                             text_size=13,
                         ),

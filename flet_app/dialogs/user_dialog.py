@@ -6,6 +6,7 @@ import flet as ft
 from typing import Optional, Any, Callable
 
 from theme.theme_manager import theme_manager
+from services.security_service import SecurityService
 
 
 def show_user_dialog(
@@ -83,8 +84,8 @@ def show_user_dialog(
                 user_id = user_data['user_id']
 
                 if password:
-                    # Hash the new password
-                    hashed_password = auth_service.hash_password(password) if auth_service else password
+                    # Hash the new password using SecurityService
+                    hashed_password = SecurityService.hash_password(password)
                     query = """
                         UPDATE users
                         SET password = ?, full_name = ?, role = ?, is_active = ?,
@@ -106,8 +107,8 @@ def show_user_dialog(
                 logging_service.log_user_action("USER_UPDATED", {"user_id": user_id})
 
             else:
-                # Create new user - hash password
-                hashed_password = auth_service.hash_password(password) if auth_service else password
+                # Create new user - hash password using SecurityService
+                hashed_password = SecurityService.hash_password(password)
                 query = """
                     INSERT INTO users (username, password, full_name, role, is_active,
                                      created_at, created_by)
@@ -220,9 +221,9 @@ def show_user_dialog(
                             ref=role_ref,
                             value=user_data.get('role', 'reporter') if is_edit_mode else "reporter",
                             options=[
-                                ft.dropdown.Option("admin"),
-                                ft.dropdown.Option("agent"),
-                                ft.dropdown.Option("reporter"),
+                                ft.dropdown.Option(key="admin", text="admin"),
+                                ft.dropdown.Option(key="agent", text="agent"),
+                                ft.dropdown.Option(key="reporter", text="reporter"),
                             ],
                             text_size=13,
                             border_radius=8,
@@ -238,8 +239,8 @@ def show_user_dialog(
                             ref=status_ref,
                             value="Active" if (not is_edit_mode or user_data.get('is_active', 1)) else "Inactive",
                             options=[
-                                ft.dropdown.Option("Active"),
-                                ft.dropdown.Option("Inactive"),
+                                ft.dropdown.Option(key="Active", text="Active"),
+                                ft.dropdown.Option(key="Inactive", text="Inactive"),
                             ],
                             text_size=13,
                             border_radius=8,
@@ -267,6 +268,7 @@ def show_user_dialog(
                 ),
             ],
             spacing=16,
+            scroll=ft.ScrollMode.AUTO,
         ),
         width=450,
         padding=24,

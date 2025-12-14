@@ -192,17 +192,18 @@ def show_version_history_dialog(
 
         is_selected = version_id in state["selected_versions"]
 
-        def toggle_selection(e):
+        def toggle_selection(e, vid=version_id):
+            """Toggle version selection for comparison."""
             if is_deleted:
                 return  # Can't select deleted versions for comparison
 
-            if version_id in state["selected_versions"]:
-                state["selected_versions"].remove(version_id)
+            if vid in state["selected_versions"]:
+                state["selected_versions"].remove(vid)
             else:
                 if len(state["selected_versions"]) >= 2:
                     # Remove oldest selection
                     state["selected_versions"].pop(0)
-                state["selected_versions"].append(version_id)
+                state["selected_versions"].append(vid)
             update_version_list()
 
         def handle_restore_version(e):
@@ -260,7 +261,7 @@ def show_version_history_dialog(
                     # Selection checkbox (for comparison)
                     ft.Checkbox(
                         value=is_selected,
-                        on_change=lambda e: toggle_selection(e),
+                        on_change=toggle_selection,
                         disabled=is_deleted,
                         active_color=colors["primary"],
                     ) if not is_deleted else ft.Container(width=48),
@@ -288,7 +289,7 @@ def show_version_history_dialog(
                                         size=14,
                                         weight=ft.FontWeight.W_500,
                                         color=colors["text_muted"] if is_deleted else colors["text_primary"],
-                                        text_decoration=ft.TextDecoration.LINE_THROUGH if is_deleted else None,
+                                        style=ft.TextStyle(decoration=ft.TextDecoration.LINE_THROUGH) if is_deleted else None,
                                     ),
                                     ft.Container(
                                         content=ft.Text(
@@ -512,8 +513,11 @@ def show_version_history_dialog(
         activity_tab_btn.bgcolor = colors["primary"] if tab == "activity" else colors["bg_tertiary"]
         activity_tab_btn.color = ft.Colors.WHITE if tab == "activity" else colors["text_primary"]
 
-        version_list.visible = tab == "versions"
-        activity_list.visible = tab == "activity"
+        # Control container visibility (not just list visibility)
+        if version_container_ref.current:
+            version_container_ref.current.visible = tab == "versions"
+        if activity_container_ref.current:
+            activity_container_ref.current.visible = tab == "activity"
         version_controls.visible = tab == "versions"
 
         if tab == "activity" and not state["activities"]:
@@ -571,6 +575,10 @@ def show_version_history_dialog(
         on_click=compare_versions,
     )
 
+    # Refs for container visibility control
+    version_container_ref = ft.Ref[ft.Container]()
+    activity_container_ref = ft.Ref[ft.Container]()
+
     # Build version list
     version_list = ft.Column(
         controls=[
@@ -591,7 +599,6 @@ def show_version_history_dialog(
         spacing=0,
         scroll=ft.ScrollMode.AUTO,
         expand=True,
-        visible=False,
     )
 
     # Version controls (show deleted toggle, compare button)
@@ -643,21 +650,28 @@ def show_version_history_dialog(
                 ft.Divider(color=colors["border"]),
                 # Version controls
                 version_controls,
-                # Content area
+                # Content area - use Column with visibility instead of Stack to avoid click blocking
                 ft.Container(
-                    content=ft.Stack(
+                    content=ft.Column(
                         controls=[
                             ft.Container(
+                                ref=version_container_ref,
                                 content=version_list,
                                 border=ft.border.all(1, colors["border"]),
                                 border_radius=8,
+                                expand=True,
+                                visible=True,  # Controlled by switch_tab
                             ),
                             ft.Container(
+                                ref=activity_container_ref,
                                 content=activity_list,
                                 border=ft.border.all(1, colors["border"]),
                                 border_radius=8,
+                                expand=True,
+                                visible=False,  # Controlled by switch_tab
                             ),
                         ],
+                        expand=True,
                     ),
                     expand=True,
                 ),

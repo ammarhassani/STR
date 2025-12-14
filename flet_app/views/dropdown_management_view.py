@@ -55,11 +55,11 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             categories = await loop.run_in_executor(None, fetch_categories)
 
             if category_ref.current:
-                options = [ft.dropdown.Option("-- Select Category --", "")]
+                options = [ft.dropdown.Option(key="", text="-- Select Category --")]
                 for cat in categories:
                     # Mark admin-manageable with icon
                     display = f"[Editable] {cat}" if cat in admin_manageable else cat
-                    options.append(ft.dropdown.Option(display, cat))
+                    options.append(ft.dropdown.Option(key=cat, text=display))
                 category_ref.current.options = options
                 category_ref.current.value = ""
 
@@ -249,6 +249,13 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Show dialog to add/edit dropdown value."""
         is_edit = value_data is not None
 
+        # Calculate next available order (max + 1) for new values
+        if dropdown_values:
+            max_order = max(v.get('display_order', 0) for v in dropdown_values)
+            next_order = max_order + 1
+        else:
+            next_order = 0
+
         value_input = ft.TextField(
             label="Value",
             value=value_data.get('value', '') if value_data else '',
@@ -256,7 +263,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         )
         order_input = ft.TextField(
             label="Display Order",
-            value=str(value_data.get('display_order', len(dropdown_values))) if value_data else str(len(dropdown_values)),
+            value=str(value_data.get('display_order', next_order)) if value_data else str(next_order),
             keyboard_type=ft.KeyboardType.NUMBER,
             width=100,
         )

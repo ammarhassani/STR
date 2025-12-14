@@ -867,6 +867,197 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             except sqlite3.OperationalError:
                 pass
 
+        # Migration 24: Fix approval workflow for existing reports
+        # - Admin-created reports should be 'approved'
+        # - Non-admin reports need entries in report_approvals to appear in approval panel
+        try:
+            # First, auto-approve all admin-created reports that aren't already approved
+            cursor.execute("""
+                UPDATE reports
+                SET approval_status = 'approved', updated_at = datetime('now')
+                WHERE created_by IN (SELECT username FROM users WHERE role = 'admin')
+                AND (approval_status IS NULL OR approval_status != 'approved')
+                AND is_deleted = 0
+            """)
+            admin_reports_fixed = cursor.rowcount
+            conn.commit()
+
+            if admin_reports_fixed > 0:
+                messages.append(f"Auto-approved {admin_reports_fixed} admin-created reports")
+
+            # Now handle non-admin reports that are in draft/pending but have no approval request
+            cursor.execute("""
+                SELECT r.report_id, r.created_by
+                FROM reports r
+                LEFT JOIN report_approvals ra ON r.report_id = ra.report_id
+                WHERE r.created_by NOT IN (SELECT username FROM users WHERE role = 'admin')
+                AND (r.approval_status IS NULL OR r.approval_status IN ('draft', ''))
+                AND ra.approval_id IS NULL
+                AND r.is_deleted = 0
+            """)
+            reports_needing_approval = cursor.fetchall()
+
+            for report_id, created_by in reports_needing_approval:
+                # Update report status to pending_approval
+                cursor.execute("""
+                    UPDATE reports
+                    SET approval_status = 'pending_approval', updated_at = datetime('now')
+                    WHERE report_id = ?
+                """, (report_id,))
+
+                # Create approval request
+                cursor.execute("""
+                    INSERT INTO report_approvals (report_id, approval_status, requested_by, approval_comment, requested_at)
+                    VALUES (?, 'pending', ?, 'Auto-submitted by migration', datetime('now'))
+                """, (report_id, created_by))
+
+            conn.commit()
+
+            if reports_needing_approval:
+                messages.append(f"Created approval requests for {len(reports_needing_approval)} non-admin reports")
+
+        except Exception as e:
+            messages.append(f"Approval workflow migration skipped: {str(e)}")
+
+        # Migration 25: Drop status column from reports table (no longer used)
+        try:
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='reports'")
+            result = cursor.fetchone()
+            if result:
+                table_sql = result[0]
+
+                # Check if status column exists
+                if "status TEXT" in table_sql:
+                    # Backup existing data
+                    cursor.execute("SELECT COUNT(*) FROM reports")
+                    report_count = cursor.fetchone()[0]
+
+                    # Drop views that depend on reports table first
+                    cursor.execute("DROP VIEW IF EXISTS v_active_reports")
+                    cursor.execute("DROP VIEW IF EXISTS v_reports_with_history")
+
+                    # Create temporary table without status column
+                    cursor.execute("""
+                        CREATE TABLE reports_new (
+                            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            sn INTEGER UNIQUE NOT NULL,
+                            report_number TEXT UNIQUE NOT NULL,
+                            report_date TEXT NOT NULL,
+                            outgoing_letter_number TEXT,
+                            reported_entity_name TEXT NOT NULL,
+                            legal_entity_owner TEXT,
+                            gender TEXT,
+                            nationality TEXT,
+                            id_cr TEXT,
+                            account_membership TEXT,
+                            branch_id TEXT,
+                            cic TEXT,
+                            first_reason_for_suspicion TEXT,
+                            second_reason_for_suspicion TEXT,
+                            type_of_suspected_transaction TEXT,
+                            arb_staff TEXT,
+                            total_transaction TEXT,
+                            report_classification TEXT,
+                            report_source TEXT,
+                            reporting_entity TEXT,
+                            reporter_initials TEXT,
+                            sending_date TEXT,
+                            original_copy_confirmation TEXT,
+                            fiu_number TEXT,
+                            fiu_letter_receive_date TEXT,
+                            fiu_feedback TEXT,
+                            fiu_letter_number TEXT,
+                            fiu_date TEXT,
+                            is_deleted INTEGER DEFAULT 0,
+                            created_at TEXT DEFAULT (datetime('now')),
+                            created_by TEXT NOT NULL,
+                            updated_at TEXT,
+                            updated_by TEXT,
+                            current_version INTEGER DEFAULT 1,
+                            approval_status TEXT DEFAULT 'draft',
+                            legal_entity_owner_checkbox INTEGER DEFAULT 0,
+                            acc_membership_checkbox INTEGER DEFAULT 0,
+                            relationship TEXT,
+                            id_type TEXT,
+                            deleted_at TEXT,
+                            deleted_by TEXT
+                        )
+                    """)
+
+                    # Copy data from old table (excluding status column)
+                    cursor.execute("""
+                        INSERT INTO reports_new (
+                            report_id, sn, report_number, report_date, outgoing_letter_number,
+                            reported_entity_name, legal_entity_owner, gender, nationality, id_cr,
+                            account_membership, branch_id, cic, first_reason_for_suspicion,
+                            second_reason_for_suspicion, type_of_suspected_transaction, arb_staff,
+                            total_transaction, report_classification, report_source, reporting_entity,
+                            reporter_initials, sending_date, original_copy_confirmation, fiu_number,
+                            fiu_letter_receive_date, fiu_feedback, fiu_letter_number, fiu_date,
+                            is_deleted, created_at, created_by, updated_at, updated_by,
+                            current_version, approval_status, legal_entity_owner_checkbox,
+                            acc_membership_checkbox, relationship, id_type, deleted_at, deleted_by
+                        )
+                        SELECT
+                            report_id, sn, report_number, report_date, outgoing_letter_number,
+                            reported_entity_name, legal_entity_owner, gender, nationality, id_cr,
+                            account_membership, branch_id, cic, first_reason_for_suspicion,
+                            second_reason_for_suspicion, type_of_suspected_transaction, arb_staff,
+                            total_transaction, report_classification, report_source, reporting_entity,
+                            reporter_initials, sending_date, original_copy_confirmation, fiu_number,
+                            fiu_letter_receive_date, fiu_feedback, fiu_letter_number, fiu_date,
+                            is_deleted, created_at, created_by, updated_at, updated_by,
+                            current_version, approval_status, legal_entity_owner_checkbox,
+                            acc_membership_checkbox, relationship, id_type, deleted_at, deleted_by
+                        FROM reports
+                    """)
+
+                    # Drop old table
+                    cursor.execute("DROP TABLE reports")
+
+                    # Rename new table
+                    cursor.execute("ALTER TABLE reports_new RENAME TO reports")
+
+                    # Recreate indexes
+                    cursor.execute("CREATE INDEX idx_reports_number ON reports(report_number)")
+                    cursor.execute("CREATE INDEX idx_reports_date ON reports(report_date)")
+                    cursor.execute("CREATE INDEX idx_reports_entity ON reports(reported_entity_name)")
+                    cursor.execute("CREATE INDEX idx_reports_approval_status ON reports(approval_status)")
+
+                    # Recreate views
+                    cursor.execute("""
+                        CREATE VIEW IF NOT EXISTS v_active_reports AS
+                        SELECT * FROM reports WHERE is_deleted = 0
+                    """)
+                    cursor.execute("""
+                        CREATE VIEW IF NOT EXISTS v_reports_with_history AS
+                        SELECT
+                            r.*,
+                            COUNT(DISTINCT ch.change_id) as change_count,
+                            MAX(ch.changed_at) as last_modified
+                        FROM reports r
+                        LEFT JOIN change_history ch ON r.report_id = ch.record_id AND ch.table_name = 'reports'
+                        WHERE r.is_deleted = 0
+                        GROUP BY r.report_id
+                    """)
+
+                    conn.commit()
+                    messages.append(f"Dropped status column from reports table ({report_count} reports migrated)")
+
+        except Exception as e:
+            messages.append(f"Status column migration skipped: {str(e)}")
+
+        # Migration 26: Add case_id column to reports table
+        try:
+            cursor.execute("SELECT case_id FROM reports LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("""
+                ALTER TABLE reports
+                ADD COLUMN case_id TEXT
+            """)
+            conn.commit()
+            messages.append("Added case_id column to reports table")
+
         conn.close()
 
         if messages:

@@ -172,14 +172,16 @@ def build_activity_view(
 
         def open_report(e):
             if report_id:
-                # Navigate to report
+                # Fetch report data and open dialog
                 from dialogs.report_dialog import show_report_dialog
-                show_report_dialog(
-                    page=page,
-                    app_state=app_state,
-                    report_id=report_id,
-                    on_save=lambda: page.run_task(load_activities),
-                )
+                report_data = app_state.report_service.get_report(report_id) if app_state.report_service else None
+                if report_data:
+                    show_report_dialog(
+                        page=page,
+                        app_state=app_state,
+                        report_data=report_data,
+                        on_save=lambda: page.run_task(load_activities),
+                    )
 
         # Build metadata display
         metadata_text = ""
@@ -356,7 +358,7 @@ def build_activity_view(
                         ft.Dropdown(
                             label="Action Type",
                             width=180,
-                            options=[ft.dropdown.Option(label) for label, _ in ACTION_TYPE_OPTIONS],
+                            options=[ft.dropdown.Option(key=label, text=label) for label, _ in ACTION_TYPE_OPTIONS],
                             value="All",
                             on_change=handle_action_filter_change,
                             border_color=colors["border"],

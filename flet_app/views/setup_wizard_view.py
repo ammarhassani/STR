@@ -4,11 +4,13 @@ Multi-step wizard for first-time setup.
 """
 import flet as ft
 import asyncio
+import threading
 from typing import Any, Callable, Optional
 from pathlib import Path
 
 from theme.colors import Colors
 from database.init_db import initialize_database
+from utils.file_dialog import choose_directory
 
 
 def build_setup_wizard(
@@ -177,32 +179,36 @@ def build_setup_wizard(
     def build_paths_step() -> ft.Container:
         """Build path configuration step content."""
         def browse_db(e):
-            def on_result(e: ft.FilePickerResultEvent):
-                if e.path:
-                    db_path_input.value = e.path
+            """Browse for database directory using native OS dialog."""
+            def run_dialog():
+                current_path = db_path_input.value
+                default_dir = str(Path(current_path).parent) if current_path else str(Path.home())
+                result = choose_directory(
+                    prompt="Select Database Directory",
+                    default_path=default_dir
+                )
+                if result:
+                    db_path_input.value = str(Path(result) / "fiu_reports.db")
                     page.update()
 
-            picker = ft.FilePicker(on_result=on_result)
-            page.overlay.append(picker)
-            page.update()
-            picker.save_file(
-                dialog_title="Select Database Location",
-                file_name="fiu_reports.db",
-                allowed_extensions=["db"],
-            )
+            # Run in background thread to avoid blocking UI
+            threading.Thread(target=run_dialog, daemon=True).start()
 
         def browse_backup(e):
-            def on_result(e: ft.FilePickerResultEvent):
-                if e.path:
-                    backup_path_input.value = e.path
+            """Browse for backup directory using native OS dialog."""
+            def run_dialog():
+                current_path = backup_path_input.value
+                default_dir = current_path if current_path else str(Path.home())
+                result = choose_directory(
+                    prompt="Select Backup Directory",
+                    default_path=default_dir
+                )
+                if result:
+                    backup_path_input.value = result
                     page.update()
 
-            picker = ft.FilePicker(on_result=on_result)
-            page.overlay.append(picker)
-            page.update()
-            picker.get_directory_path(
-                dialog_title="Select Backup Directory",
-            )
+            # Run in background thread to avoid blocking UI
+            threading.Thread(target=run_dialog, daemon=True).start()
 
         return ft.Container(
             content=ft.Column(

@@ -21,9 +21,9 @@ class ReportService:
         'report_classification', 'report_source', 'reporting_entity',
         'reporter_initials', 'sending_date', 'original_copy_confirmation',
         'fiu_number', 'fiu_letter_receive_date', 'fiu_feedback',
-        'fiu_letter_number', 'fiu_date', 'status', 'current_version',
+        'fiu_letter_number', 'fiu_date', 'current_version',
         'approval_status', 'legal_entity_owner_checkbox', 'acc_membership_checkbox',
-        'relationship', 'id_type'
+        'relationship', 'id_type', 'case_id'
     }
 
     def __init__(self, db_manager, logging_service, auth_service, activity_service=None):
@@ -101,8 +101,12 @@ class ReportService:
             query = f"INSERT INTO reports ({field_names}) VALUES ({placeholders})"
             self.db_manager.execute_with_retry(query, values)
 
-            # Get the inserted report ID
-            result = self.db_manager.execute_with_retry("SELECT last_insert_rowid()")
+            # Get the inserted report ID by querying with unique report_number
+            # Note: last_insert_rowid() doesn't work across different connections
+            result = self.db_manager.execute_with_retry(
+                "SELECT report_id FROM reports WHERE report_number = ?",
+                (report_data['report_number'],)
+            )
             report_id = result[0][0] if result else None
 
             # Log the creation in change history
@@ -133,6 +137,78 @@ class ReportService:
                     }
                 )
 
+            # Handle approval workflow based on user role
+            if not report_id:
+                self.logger.error("Failed to get report_id after insert")
+                return False, None, "Failed to get report ID after creation"
+
+            user_role = current_user.get('role', '')
+            print(f"[DEBUG] Report {report_id} created by '{current_user['username']}' with role: '{user_role}'")
+            self.logger.info(f"Report {report_id} approval workflow - user role: '{user_role}'")
+
+            if user_role == 'admin':
+                # Admin-created reports are auto-approved
+                approval_query = """
+                    UPDATE reports
+                    SET approval_status = 'approved', updated_by = ?, updated_at = ?
+                    WHERE report_id = ?
+                """
+                self.db_manager.execute_with_retry(
+                    approval_query,
+                    (current_user['username'], datetime.now().isoformat(), report_id)
+                )
+                self.logger.info(f"Report {report_id} auto-approved (created by admin)")
+
+            else:
+                # Non-admin reports: auto-submit for approval
+                # Set report status to pending_approval
+                approval_query = """
+                    UPDATE reports
+                    SET approval_status = 'pending_approval', updated_by = ?, updated_at = ?
+                    WHERE report_id = ?
+                """
+                self.db_manager.execute_with_retry(
+                    approval_query,
+                    (current_user['username'], datetime.now().isoformat(), report_id)
+                )
+
+                # Create approval request in report_approvals table
+                insert_approval = """
+                    INSERT INTO report_approvals (report_id, version_id, approval_status, requested_by, approval_comment, requested_at)
+                    VALUES (?, NULL, 'pending', ?, 'Auto-submitted on creation', datetime('now'))
+                """
+                self.db_manager.execute_with_retry(
+                    insert_approval,
+                    (report_id, current_user['username'])
+                )
+
+                self.logger.info(f"Report {report_id} auto-submitted for approval (created by {user_role})")
+
+            # Create initial version snapshot (v1) for the newly created report
+            try:
+                # Get the report data we just created for the snapshot
+                report_for_snapshot = self.get_report(report_id)
+                if report_for_snapshot:
+                    snapshot_data = json.dumps(report_for_snapshot, default=str)
+                    version_insert = """
+                        INSERT INTO report_versions (report_id, version_number, snapshot_data, change_summary, created_by)
+                        VALUES (?, 1, ?, 'Initial creation', ?)
+                    """
+                    self.db_manager.execute_with_retry(
+                        version_insert,
+                        (report_id, snapshot_data, current_user['username'])
+                    )
+
+                    # Update report's current_version to 1
+                    self.db_manager.execute_with_retry(
+                        "UPDATE reports SET current_version = 1 WHERE report_id = ?",
+                        (report_id,)
+                    )
+                    self.logger.info(f"Created initial version (v1) for report {report_id}")
+            except Exception as ve:
+                # Don't fail the entire operation if version creation fails
+                self.logger.warning(f"Failed to create initial version for report {report_id}: {ve}")
+
             return True, report_id, "Report created successfully"
 
         except Exception as e:
@@ -156,10 +232,8 @@ class ReportService:
                 return False, "User not authenticated"
 
             # Get existing report data for change tracking
-            old_data_query = "SELECT * FROM reports WHERE report_id = ?"
-            old_result = self.db_manager.execute_with_retry(old_data_query, (report_id,))
-
-            if not old_result:
+            old_report = self.get_report(report_id)
+            if not old_report:
                 return False, "Report not found"
 
             # Security: Filter fields against whitelist to prevent SQL injection
@@ -168,13 +242,23 @@ class ReportService:
             if invalid_fields:
                 self.logger.warning(f"Ignored invalid fields in update_report: {invalid_fields}")
 
-            # Build update query
-            fields = list(allowed_data.keys())
+            # Only include fields that actually changed
+            changed_data = {}
+            for field, new_value in allowed_data.items():
+                old_value = old_report.get(field)
+                # Compare values (handle None vs empty string)
+                old_str = str(old_value) if old_value is not None else ''
+                new_str = str(new_value) if new_value is not None else ''
+                if old_str != new_str:
+                    changed_data[field] = new_value
+
+            # Build update query with only changed fields
+            fields = list(changed_data.keys())
             if not fields:
-                return False, "No valid fields to update"
+                return True, "No changes detected"  # Not an error, just nothing to update
 
             set_clause = ', '.join([f"{field} = ?" for field in fields])
-            values = list(allowed_data.values())
+            values = list(changed_data.values())
             values.extend([current_user['username'], datetime.now().isoformat(), report_id])
 
             query = f"""

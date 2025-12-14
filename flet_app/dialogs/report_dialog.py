@@ -49,6 +49,9 @@ def show_report_dialog(
     # State
     reservation_info = {"value": None}
 
+    # Error banner ref (for inline error display)
+    error_banner_ref = ft.Ref[ft.Container]()
+
     # Load dropdown values
     genders = dropdown_service.get_active_dropdown_values('gender') if dropdown_service else []
     nationalities = dropdown_service.get_active_dropdown_values('nationality') if dropdown_service else []
@@ -90,6 +93,7 @@ def show_report_dialog(
     fiu_receive_date_ref = ft.Ref[ft.TextField]()
     fiu_feedback_ref = ft.Ref[ft.Dropdown]()
     fiu_letter_number_ref = ft.Ref[ft.TextField]()
+    case_id_ref = ft.Ref[ft.TextField]()
 
     def update_id_type_display(e):
         """Update ID type display based on checkbox."""
@@ -237,6 +241,7 @@ def show_report_dialog(
         return {
             'sn': int(get_value(sn_ref, "0")),
             'report_number': get_value(report_number_ref),
+            'case_id': get_value(case_id_ref) or None,
             'report_date': get_value(report_date_ref),
             'reported_entity_name': get_value(entity_name_ref),
             'legal_entity_owner_checkbox': get_checkbox_value(legal_owner_ref),
@@ -281,14 +286,14 @@ def show_report_dialog(
                     show_error_dialog("Report ID not found")
                     return
 
-                # Create version snapshot before updating
-                if version_service:
+                success, message = report_service.update_report(report_id, form_data)
+
+                # Create version snapshot AFTER updating (captures new state)
+                if success and version_service:
                     version_service.create_version_snapshot(
                         report_id,
                         f"Modified by {current_user['username']}"
                     )
-
-                success, message = report_service.update_report(report_id, form_data)
             else:
                 success, report_id, message = report_service.create_report(form_data)
 
@@ -373,23 +378,18 @@ def show_report_dialog(
         page.update()
 
     def show_error_dialog(message: str):
-        """Show error dialog."""
-        error_dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Validation Error", color=colors["danger"]),
-            content=ft.Text(message),
-            actions=[
-                ft.TextButton("OK", on_click=lambda e: close_error_dialog()),
-            ],
-        )
-
-        def close_error_dialog():
-            error_dialog.open = False
+        """Show error as inline banner within the dialog (no separate overlay)."""
+        if error_banner_ref.current:
+            # Update error message and show banner
+            error_banner_ref.current.content.controls[1].value = message
+            error_banner_ref.current.visible = True
             page.update()
 
-        page.overlay.append(error_dialog)
-        error_dialog.open = True
-        page.update()
+    def hide_error_banner():
+        """Hide the error banner."""
+        if error_banner_ref.current:
+            error_banner_ref.current.visible = False
+            page.update()
 
     def show_success_dialog(message: str):
         """Show success dialog."""
@@ -450,6 +450,8 @@ def show_report_dialog(
         if report_number_ref.current:
             report_number_ref.current.value = report_data.get('report_number', '')
             report_number_ref.current.read_only = True
+        if case_id_ref.current:
+            case_id_ref.current.value = report_data.get('case_id', '') or ''
         if report_date_ref.current:
             report_date_ref.current.value = report_data.get('report_date', '')
 
@@ -612,6 +614,18 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
+                            ft.Text("Case ID", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.TextField(
+                                ref=case_id_ref,
+                                hint_text="Enter Case ID (optional)",
+                                text_size=13,
+                                border_radius=8,
+                            ),
+                        ],
+                        spacing=4,
+                    ),
+                    ft.Column(
+                        controls=[
                             ft.Text("Report Date *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=report_date_ref,
@@ -658,7 +672,7 @@ def show_report_dialog(
                             ft.Text("Gender", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=gender_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(g) for g in genders],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=g, text=g) for g in genders],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -670,7 +684,7 @@ def show_report_dialog(
                             ft.Text("Nationality", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=nationality_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(n) for n in nationalities],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=n, text=n) for n in nationalities],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -798,7 +812,7 @@ def show_report_dialog(
                             ft.Text("Second Reason for Suspicion", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=second_reason_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(r) for r in second_reasons],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=r, text=r) for r in second_reasons],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -810,7 +824,7 @@ def show_report_dialog(
                             ft.Text("Type of Suspected Transaction", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=transaction_type_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(t) for t in transaction_types],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=t, text=t) for t in transaction_types],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -822,7 +836,7 @@ def show_report_dialog(
                             ft.Text("ARB Staff", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=arb_staff_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(a) for a in arb_staff_values],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=a, text=a) for a in arb_staff_values],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -858,7 +872,7 @@ def show_report_dialog(
                             ft.Text("Report Classification", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=classification_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(c) for c in classifications],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=c, text=c) for c in classifications],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -870,7 +884,7 @@ def show_report_dialog(
                             ft.Text("Report Source", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=report_source_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(s) for s in report_sources],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=s, text=s) for s in report_sources],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -882,7 +896,7 @@ def show_report_dialog(
                             ft.Text("Reporting Entity", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=reporting_entity_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(e) for e in reporting_entities],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=val, text=val) for val in reporting_entities],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -956,7 +970,7 @@ def show_report_dialog(
                             ft.Text("FIU Feedback", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.Dropdown(
                                 ref=fiu_feedback_ref,
-                                options=[ft.dropdown.Option("")] + [ft.dropdown.Option(f) for f in fiu_feedbacks],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=f, text=f) for f in fiu_feedbacks],
                                 text_size=13,
                                 border_radius=8,
                             ),
@@ -1084,10 +1098,12 @@ def show_report_dialog(
         )
     )
 
-    # Submit for approval button
+    # Submit for approval button (only for non-admin users)
+    # Admins don't need approval - their changes are auto-trusted
     if is_edit_mode and report_data:
         approval_status = report_data.get('approval_status', 'draft')
-        if approval_status not in ['pending_approval', 'approved']:
+        is_admin = current_user and current_user.get('role') == 'admin'
+        if not is_admin and approval_status not in ['pending_approval', 'approved']:
             action_buttons.append(
                 ft.ElevatedButton(
                     "Submit for Approval",
@@ -1098,10 +1114,34 @@ def show_report_dialog(
                 )
             )
 
+    # Create error banner (hidden by default)
+    error_banner = ft.Container(
+        ref=error_banner_ref,
+        content=ft.Row(
+            controls=[
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.WHITE, size=20),
+                ft.Text("", color=ft.Colors.WHITE, expand=True, size=13),
+                ft.IconButton(
+                    icon=ft.Icons.CLOSE,
+                    icon_color=ft.Colors.WHITE,
+                    icon_size=16,
+                    on_click=lambda e: hide_error_banner(),
+                ),
+            ],
+            spacing=8,
+        ),
+        bgcolor=colors["danger"],
+        padding=ft.padding.symmetric(horizontal=16, vertical=8),
+        border_radius=8,
+        visible=False,
+    )
+
     # Create dialog content
     dialog_content = ft.Container(
         content=ft.Column(
             controls=[
+                # Error banner (shown when validation fails)
+                error_banner,
                 # Header
                 ft.Row(controls=header_controls, spacing=12),
                 ft.Divider(color=colors["border"]),

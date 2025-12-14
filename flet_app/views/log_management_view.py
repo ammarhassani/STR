@@ -277,7 +277,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Dropdown(
                     ref=level_ref,
                     value="All",
-                    options=[ft.dropdown.Option(l) for l in LOG_LEVELS],
+                    options=[ft.dropdown.Option(key=lvl, text=lvl) for lvl in LOG_LEVELS],
                     width=120,
                     text_size=13,
                 ),

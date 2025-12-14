@@ -317,7 +317,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             ft.Dropdown(
                 ref=role_filter_ref,
                 value="All Roles",
-                options=[ft.dropdown.Option(r) for r in ROLE_OPTIONS],
+                options=[ft.dropdown.Option(key=r, text=r) for r in ROLE_OPTIONS],
                 width=150,
                 text_size=13,
                 on_change=handle_role_filter_change,
@@ -326,7 +326,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             ft.Dropdown(
                 ref=status_filter_ref,
                 value="All",
-                options=[ft.dropdown.Option(s) for s in STATUS_OPTIONS],
+                options=[ft.dropdown.Option(key=s, text=s) for s in STATUS_OPTIONS],
                 width=120,
                 text_size=13,
                 on_change=handle_status_filter_change,

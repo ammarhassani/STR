@@ -113,7 +113,7 @@ def create_dropdown(
     dropdown = ft.Dropdown(
         ref=ref,
         value=value,
-        options=[ft.dropdown.Option(opt) for opt in options],
+        options=[ft.dropdown.Option(key=opt, text=opt) for opt in options],
         width=width,
         text_size=13,
         content_padding=ft.padding.symmetric(horizontal=12, vertical=0),
