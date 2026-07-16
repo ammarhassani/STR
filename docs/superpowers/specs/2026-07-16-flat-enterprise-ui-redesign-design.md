@@ -26,8 +26,11 @@ theme plus a few bespoke primitives where Material still leaks through.
 Chosen over theme-only (buttons/inputs still look Material) and full-rebuild
 (rewrites every view — cost not justified since the palette is already close).
 
-## Aesthetic: Flat / minimal enterprise, teal accent retained
+## Aesthetic: Flat / minimal enterprise, teal accent retained, LIGHT ONLY
 
+- **Light mode only.** Dark mode is removed from scope: force light, drop the
+  header theme-toggle control, and the dark palette is no longer used. The
+  redesign styles the light theme exclusively.
 - Depth via **1px hairline borders**, never shadows.
 - Corner radius **4px** everywhere (crisp, not pill; down from current 8–12).
 - **Teal accent kept** (`primary #0d7377`) for primary actions + focus rings,
@@ -36,37 +39,47 @@ Chosen over theme-only (buttons/inputs still look Material) and full-rebuild
   approved/success `#2f855a`, pending/warning `#b7791f`, rejected/danger
   `#c53030`, rework `#c05621`, info `#3b5bdb`. Draft/open = neutral gray.
 - Denser layout (compact visual density).
-- Both light and dark modes retained.
 - System font retained (no bundled font files); sizes/weights retuned for a
   clear 20 / 16 / 13 / 11 hierarchy.
 
 ## Components / units
 
 ### Unit A — Design tokens (`theme/colors.py`)
-Rewrite the `DARK` / `LIGHT` value maps. **Keep every existing key** (`card_bg`,
-`sidebar_*`, `hover`, `border`, `*_bg`, etc.) so all `colors["…"]` consumers
-keep working — only the values change (flatter neutrals, muted status, teal
-kept). Add one token: `radius` = 4 (consumed by primitives/theme).
+Rewrite the `LIGHT` value map (flat neutrals, muted status, teal kept).
+**Keep every existing key** (`card_bg`, `sidebar_*`, `hover`, `border`, `*_bg`,
+etc.) so all `colors["…"]` consumers keep working — only values change. Add one
+token: `radius` = 4. The `DARK` map is left in place but unused (light is
+forced in Unit B); no view reads it once the toggle is gone.
 
-- *Does:* single source of truth for palette + radius.
+- *Does:* single source of truth for the light palette + radius.
 - *Depends on:* nothing.
 - *Consumers unchanged:* every view reads the same keys.
 
-### Unit B — Global flat theme (`theme/theme_manager.py::_apply_theme`)
-Extend the `ft.Theme` construction to strip Material signatures app-wide:
-- `visual_density = ft.VisualDensity.COMPACT`
-- transparent splash + highlight (no ripple)
-- `page_transitions = ft.PageTransitionsTheme(...)` set to no-transition on all
-  platforms (no Material slide)
-- `input_decoration_theme`: box border, no fill, hairline, teal focus border
-- dialog/card/divider sub-themes: 0 elevation, hairline border
-- drop `color_scheme_seed` reliance (keep explicit `color_scheme` values)
+### Unit B — Global flat theme + force light (`theme/theme_manager.py`)
+- `_apply_theme`: build the light `ft.Theme` only; set `theme_mode` to LIGHT.
+  Strip Material signatures app-wide:
+  - `visual_density = ft.VisualDensity.COMPACT`
+  - `splash_color` / `highlight_color` = transparent (no ripple)
+  - `page_transitions = ft.PageTransitionsTheme(...)` with
+    `ft.PageTransitionTheme.NONE` on all five platforms (no slide)
+  - `dialog_theme=ft.DialogTheme(elevation=0, shape=RoundedRectangleBorder(4))`,
+    `card_theme=ft.CardTheme(elevation=0, shape=…)`,
+    `divider_theme=ft.DividerTheme(thickness=1, color=border)`,
+    `data_table_theme=ft.DataTableTheme(divider_thickness=1, compact heights)`
+  - keep explicit `color_scheme`; drop `color_scheme_seed`
+- `set_theme` / `toggle_theme` become no-ops that keep light (defensive; any
+  stored `theme='dark'` setting resolves to light). Inputs styled per-field in
+  Unit C (Flet 0.28.3 has no `InputDecorationTheme`).
 
-Verify each `ft.Theme` field name against installed Flet (0.28.3) before use;
-skip any not supported by that version rather than guessing.
-
-- *Does:* makes all inherited Material widgets render flat.
+- *Does:* makes all inherited Material widgets render flat, in light only.
 - *Depends on:* Unit A.
+
+### Unit B2 — Remove the theme toggle control (`components/header.py`)
+Remove the light/dark toggle button from the header (light-only). Any other
+toggle entry point (e.g. a settings switch) is removed or hidden.
+
+- *Does:* no user-facing dark-mode switch.
+- *Depends on:* Unit B.
 
 ### Unit C — Flat primitives (`components/app_button.py`, `components/app_input.py`)
 - `AppButton(text, on_click, variant="primary|secondary|danger", icon=None,
