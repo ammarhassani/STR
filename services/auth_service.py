@@ -193,8 +193,8 @@ class AuthService:
         return has_permission(
             self.current_user['role'],
             permission,
-            self.current_user['username'],
-            resource_owner
+            resource_owner=resource_owner,
+            current_user=self.current_user['username']
         )
 
     def create_user(self, username: str, password: str, full_name: str, role: str) -> Tuple[bool, str]:
