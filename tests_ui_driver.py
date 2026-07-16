@@ -207,6 +207,9 @@ def run():
     rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py')).read()
     finding(E, 'report dialog missing edit-lock acquire/release',
             'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)
+    hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py')).read()
+    finding(E, 'header still has a theme toggle (dark mode removed)',
+            'toggle_theme' in hdr_src or 'theme_button' in hdr_src)
 
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')

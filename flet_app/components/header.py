@@ -41,12 +41,6 @@ def create_header(
     """
     colors = theme_manager.get_colors()
 
-    def toggle_theme(e):
-        """Toggle between light and dark theme."""
-        theme_manager.toggle_theme()
-        # Rebuild the page to reflect theme changes
-        page.update()
-
     def handle_logout(e):
         """Handle logout click."""
         if on_logout:
@@ -156,14 +150,6 @@ def create_header(
         )
         toolbar_buttons.append(admin_menu)
 
-    # Theme toggle button
-    theme_button = ft.IconButton(
-        icon=ft.Icons.LIGHT_MODE if theme_manager.is_dark else ft.Icons.DARK_MODE,
-        icon_color=colors["text_secondary"],
-        tooltip="Toggle theme",
-        on_click=toggle_theme,
-    )
-
     # Notification button (placeholder)
     notification_button = ft.IconButton(
         icon=ft.Icons.NOTIFICATIONS_OUTLINED,
@@ -245,7 +231,6 @@ def create_header(
                 # Actions
                 ft.Row(
                     controls=[
-                        theme_button,
                         notification_button,
                         ft.VerticalDivider(width=1, color=colors["border"]),
                         user_menu,
