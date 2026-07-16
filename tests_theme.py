@@ -27,7 +27,26 @@ def test_tokens():
     check('T1 light background is light', p['bg_primary'].lower() in ('#ffffff', '#f7f8fa'), p['bg_primary'])
     check('T1 muted approved green', p['success'] == '#2f855a', p['success'])
 
+class FakePage:
+    def __init__(self):
+        self.theme = None; self.dark_theme = None
+        self.theme_mode = None
+    def update(self): pass
+
+def test_flat_theme():
+    import flet as ft
+    from theme.theme_manager import ThemeManager
+    tm = ThemeManager(); tm._page = FakePage(); tm._current_theme = 'dark'  # even if 'dark' stored...
+    tm._apply_theme()
+    pg = tm._page
+    check('T2 forced light mode', pg.theme_mode == ft.ThemeMode.LIGHT, pg.theme_mode)
+    check('T2 compact density', pg.theme.visual_density == ft.VisualDensity.COMPACT)
+    check('T2 no ripple splash', pg.theme.splash_color == ft.Colors.TRANSPARENT)
+    check('T2 no page transitions', pg.theme.page_transitions is not None)
+    check('T2 is_dark always False', tm.is_dark is False)
+
 if __name__ == '__main__':
     test_tokens()
+    test_flat_theme()
     print(f"\nTHEME FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

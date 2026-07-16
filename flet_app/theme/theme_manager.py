@@ -62,82 +62,64 @@ class ThemeManager:
         self._apply_theme()
 
     def toggle_theme(self):
-        """Toggle between light and dark themes."""
-        self._current_theme = "light" if self._current_theme == "dark" else "dark"
-        self._apply_theme()
-        self._persist_preference()
-        self._notify_listeners()
+        """Dark mode removed — always light."""
+        self.set_theme("light")
 
     def set_theme(self, theme_name: str):
-        """
-        Set a specific theme.
-
-        Args:
-            theme_name: 'dark' or 'light'
-        """
-        if theme_name not in ["light", "dark"]:
-            return
-
-        if self._current_theme == theme_name:
-            return
-
-        self._current_theme = theme_name
+        """Dark mode removed — force light regardless of the request."""
+        self._current_theme = "light"
         self._apply_theme()
-        self._persist_preference()
-        self._notify_listeners()
+        for cb in self._listeners:
+            try:
+                cb("light")
+            except Exception:
+                pass
 
     def _apply_theme(self):
-        """Apply the current theme to the Flet page."""
+        """Apply the flat, light-only enterprise theme."""
         if not self._page:
             return
-
-        # Set theme mode
-        self._page.theme_mode = (
-            ft.ThemeMode.DARK if self._current_theme == "dark"
-            else ft.ThemeMode.LIGHT
+        self._current_theme = "light"
+        self._page.theme_mode = ft.ThemeMode.LIGHT
+        colors = Colors.get_palette("light")
+        r = colors.get("radius", 4)
+        none_tx = ft.PageTransitionsTheme(
+            android=ft.PageTransitionTheme.NONE, ios=ft.PageTransitionTheme.NONE,
+            macos=ft.PageTransitionTheme.NONE, windows=ft.PageTransitionTheme.NONE,
+            linux=ft.PageTransitionTheme.NONE,
         )
-
-        # Get color palette
-        colors = Colors.get_palette(self._current_theme)
-
-        # Configure theme
-        if self._current_theme == "dark":
-            self._page.theme = ft.Theme(
-                color_scheme_seed=ft.Colors.TEAL,
-                color_scheme=ft.ColorScheme(
-                    primary=colors["primary"],
-                    secondary=colors["accent"],
-                    surface=colors["bg_secondary"],
-                    background=colors["bg_primary"],
-                    error=colors["danger"],
-                    on_primary=ft.Colors.WHITE,
-                    on_secondary=ft.Colors.WHITE,
-                    on_surface=colors["text_primary"],
-                    on_background=colors["text_primary"],
-                    surface_variant=colors["bg_tertiary"],
-                    outline=colors["border"],
-                )
-            )
-            self._page.dark_theme = self._page.theme
-        else:
-            self._page.theme = ft.Theme(
-                color_scheme_seed=ft.Colors.TEAL,
-                color_scheme=ft.ColorScheme(
-                    primary=colors["primary"],
-                    secondary=colors["accent"],
-                    surface=colors["bg_secondary"],
-                    background=colors["bg_primary"],
-                    error=colors["danger"],
-                    on_primary=ft.Colors.WHITE,
-                    on_secondary=ft.Colors.BLACK,
-                    on_surface=colors["text_primary"],
-                    on_background=colors["text_primary"],
-                    surface_variant=colors["bg_tertiary"],
-                    outline=colors["border"],
-                )
-            )
-
-        # Update page
+        self._page.theme = ft.Theme(
+            use_material3=True,
+            visual_density=ft.VisualDensity.COMPACT,
+            splash_color=ft.Colors.TRANSPARENT,
+            highlight_color=ft.Colors.TRANSPARENT,
+            hover_color=colors["hover"],
+            page_transitions=none_tx,
+            color_scheme=ft.ColorScheme(
+                primary=colors["primary"],
+                secondary=colors["accent"],
+                surface=colors["bg_secondary"],
+                background=colors["bg_primary"],
+                error=colors["danger"],
+                on_primary=ft.Colors.WHITE,
+                on_secondary=ft.Colors.WHITE,
+                on_surface=colors["text_primary"],
+                on_background=colors["text_primary"],
+                surface_variant=colors["bg_tertiary"],
+                outline=colors["border"],
+            ),
+            divider_theme=ft.DividerTheme(thickness=1, color=colors["border"]),
+            dialog_theme=ft.DialogTheme(
+                elevation=0, shadow_color=ft.Colors.TRANSPARENT,
+                shape=ft.RoundedRectangleBorder(radius=r)),
+            card_theme=ft.CardTheme(
+                elevation=0, shadow_color=ft.Colors.TRANSPARENT,
+                shape=ft.RoundedRectangleBorder(radius=r)),
+            data_table_theme=ft.DataTableTheme(
+                divider_thickness=1, heading_row_height=40,
+                data_row_min_height=34, data_row_max_height=44),
+        )
+        self._page.dark_theme = self._page.theme
         self._page.update()
 
     def add_listener(self, callback: Callable[[str], None]):
