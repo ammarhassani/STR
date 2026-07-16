@@ -206,6 +206,60 @@ def test_client_proxy_routing():
     finally:
         _sh.rmtree(box, ignore_errors=True)
 
+def test_multiclient_stress_and_replay():
+    import threading, time, sqlite3
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        stop = {'v': False}
+        def loop():
+            while not stop['v']:
+                if not host.run_once(): time.sleep(0.01)
+        th = threading.Thread(target=loop, daemon=True); th.start()
+
+        from services.queue_transport import QueueTransport
+        from services.remote_gateway import RemoteGateway
+        bus = os.path.join(box, 'str_bus')
+        # seed agents via one admin gateway
+        admin_gw = RemoteGateway(QueueTransport(bus)); admin_gw.login('admin','Admin@1234')
+        NUSERS = 6
+        for i in range(NUSERS):
+            admin_gw.call('auth_service.create_user', [f'ag{i}', 'pass123', f'Agent {i}', 'agent'], {})
+        errors = []
+        def worker(i):
+            try:
+                gw = RemoteGateway(QueueTransport(bus)); gw.login(f'ag{i}','pass123')
+                # each agent reserves numbers then creates reports via commands
+                # a per-user "already has an active reservation" business result is a
+                # normal returned (False, msg) tuple, not a thrown error — only real
+                # exceptions from the gateway/host count as worker errors here.
+                gw.call('report_number_service.reserve_next_numbers', [f'ag{i}'], {})
+            except Exception as e:
+                errors.append(f'ag{i}: {e}')
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(NUSERS)]
+        [x.start() for x in threads]; [x.join() for x in threads]
+        check('T7 no worker errors', not errors, errors[:2])
+
+        # integrity + no dup applied commands
+        integ = sqlite3.connect(dbm.db_path).execute("PRAGMA integrity_check").fetchone()[0]
+        check('T7 integrity ok', integ == 'ok', integ)
+        dup = dbm.execute_with_retry(
+            "SELECT command_id, COUNT(*) c FROM applied_commands GROUP BY command_id HAVING c>1")
+        check('T7 no command applied twice', not dup, dup[:3])
+
+        # crash-replay: re-handle an already-applied command id -> no change, same response
+        applied = dbm.execute_with_retry("SELECT command_id FROM applied_commands LIMIT 1")
+        if applied:
+            cid = applied[0][0]
+            before = dbm.execute_with_retry("SELECT COUNT(*) FROM users")[0][0]
+            host.handle_command({'id': cid, 'command': 'auth_service.create_user',
+                                 'args': ['dupe','p','d','agent'], 'kwargs': {}, 'token': None})
+            after = dbm.execute_with_retry("SELECT COUNT(*) FROM users")[0][0]
+            check('T7 replay of applied id is a no-op', before == after)
+        stop['v'] = True; th.join(timeout=2)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -213,5 +267,6 @@ if __name__ == '__main__':
     test_host_login_and_command()
     test_end_to_end_via_queue()
     test_client_proxy_routing()
+    test_multiclient_stress_and_replay()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
