@@ -56,49 +56,52 @@ class Colors:
 
     # Light Theme Colors
     LIGHT = {
-        # Backgrounds
-        "bg_primary": "#f5f7fa",
+        # Backgrounds — flat neutrals
+        "bg_primary": "#f7f8fa",
         "bg_secondary": "#ffffff",
-        "bg_tertiary": "#e8eaed",
+        "bg_tertiary": "#eef0f3",
         "bg_elevated": "#ffffff",
 
         # Text
-        "text_primary": "#212121",
-        "text_secondary": "#757575",
-        "text_muted": "#9e9e9e",
+        "text_primary": "#1a1d21",
+        "text_secondary": "#5b6470",
+        "text_muted": "#8a929c",
 
-        # Brand / Accent
+        # Brand / Accent — teal kept, flattened
         "primary": "#0d7377",
         "primary_light": "#14919b",
-        "accent": "#14919b",
+        "accent": "#0d7377",
 
-        # Status Colors
-        "success": "#4caf50",
-        "success_bg": "rgba(76, 175, 80, 0.1)",
-        "warning": "#ff9800",
-        "warning_bg": "rgba(255, 152, 0, 0.1)",
-        "danger": "#f44336",
-        "danger_bg": "rgba(244, 67, 54, 0.1)",
-        "info": "#2196f3",
-        "info_bg": "rgba(33, 150, 243, 0.1)",
+        # Status — muted (no neon)
+        "success": "#2f855a",
+        "success_bg": "#e8f3ec",
+        "warning": "#b7791f",
+        "warning_bg": "#f6efe1",
+        "danger": "#c53030",
+        "danger_bg": "#f7e8e8",
+        "info": "#3b5bdb",
+        "info_bg": "#e8ecfb",
 
-        # Borders
-        "border": "#e0e0e0",
-        "border_light": "#eeeeee",
+        # Borders — hairline
+        "border": "#e2e5e9",
+        "border_light": "#eef0f3",
 
         # Interactive
-        "hover": "#f0f0f0",
+        "hover": "#eef0f3",
         "active": "#0d7377",
-        "disabled": "#bdbdbd",
+        "disabled": "#c2c8d0",
 
         # Cards
         "card_bg": "#ffffff",
-        "card_border": "#e0e0e0",
+        "card_border": "#e2e5e9",
 
         # Sidebar
         "sidebar_bg": "#ffffff",
-        "sidebar_item_hover": "#f5f5f5",
+        "sidebar_item_hover": "#eef0f3",
         "sidebar_item_active": "#0d7377",
+
+        # Design tokens
+        "radius": 4,
     }
 
     @classmethod
