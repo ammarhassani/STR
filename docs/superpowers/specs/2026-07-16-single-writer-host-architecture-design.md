@@ -30,7 +30,11 @@ defense.
 
 ## 2. Architecture overview
 
-Two run modes of the same application:
+Three entry points of the same application (one codebase, `main.py` mode flag):
+`--panel` (operator control panel, §3.5a), `--host` (host loop), default (client UI).
+The first two are the operator/deployment plane; the default is the user plane.
+
+The two data-path run modes:
 
 - **HOST mode** — runs on ONE teammate's PC. Owns `fiu_reports.db` on that PC's
   **local disk**. Runs the full service stack. Consumes a command queue from the
@@ -169,6 +173,33 @@ users, **manual confirmed promotion** is simpler AND safer:
 - (Optional later: auto-promote a single pre-designated backup after a long,
   human-tunable timeout — same mechanism, guarded by term numbers.)
 
+### 3.5a Control Panel — the operator plane (`panel/control_panel.py`, new; `--panel`)
+A separate local entry point of the same app (a **different script on the same
+PC**, not network-remote), for whoever operates the deployment. It never talks to
+another PC directly; it manages the machine it runs on + shared config/state on the
+folder. Responsibilities:
+- **Setup wizard:** choose share path; register this machine; pick run mode
+  (client / host); (host) pick local DB path; first-run seeds `str_bus/config.json`.
+- **Host designation (cooperative):** edit `config.json.designated_host = <machine>`.
+  A machine self-selects host role at launch by reading this + checking no live
+  heartbeat exists. The panel **cannot remote-start** a host on another PC (locked
+  network, no agents); it sets intent + shows reality (who is actually hosting per
+  heartbeat) and can start/stop host mode **on its own machine**.
+- **Monitoring:** live view of heartbeat (who's host, alive/stale), queue depth
+  (pending/processing backlog), last replica version + age, last backup, DB size,
+  connected clients seen.
+- **Failover:** "Become Host" (promote this machine — §3.5) and "Step Down."
+- **Config management:** share path, backup interval/retention, replica publish
+  interval, reserve default N, session timeout, `done/` retention — all persisted to
+  `config.json` and honored by every instance.
+- **Maintenance:** run `PRAGMA integrity_check`, trigger a manual backup, restore a
+  chosen backup, prune old `done/` commands, view logs.
+
+**`str_bus/config.json` is the single source of deployment truth** (on the share):
+designated host, paths, intervals, retention, defaults. Every app instance
+(client/host/panel) reads it; the panel is the only writer of it. It contains **no
+secrets** (auth stays host-side, §3.2).
+
 ### 3.6 Report-number reservation, redesigned (rides on the host)
 Because the host serializes everything, numbering is trivially safe:
 - `reserved_numbers(report_number, serial_number, owned_by, status[available|used],
@@ -223,9 +254,12 @@ Because the host serializes everything, numbering is trivially safe:
    Replaces direct-DB access. All existing service logic reused unchanged.
 2. **Phase 2 — Reservation redesign.** `reserved_numbers`, reserve/transfer/gate
    commands, drop old numbering logic.
-3. **Phase 3 — Resilience.** Heartbeat + host-offline UX, manual failover
-   ("Become Host") + term/lease, backups + integrity-check-on-start, sleep-guard,
-   autostart, setup-wizard mode selection.
+3. **Phase 3 — Resilience + Control Panel.** Heartbeat + host-offline UX, manual
+   failover ("Become Host") + term/lease, backups + integrity-check-on-start,
+   sleep-guard, autostart. The **Control Panel** (`--panel`, §3.5a) is delivered
+   here as the operator surface for setup, host designation, monitoring, failover,
+   config (`str_bus/config.json`), and maintenance. `docs/HOST_RUNBOOK.md` ships
+   with it.
 
 ## 7. Testing
 
