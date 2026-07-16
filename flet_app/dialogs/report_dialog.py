@@ -1256,8 +1256,10 @@ def show_report_dialog(
 
     # Compact, flat, content-first dialog. Header thin, form content prominent,
     # inline (bg-less) error + a plain button row at the bottom.
-    # Glassmorphism panel: translucent, blurred surface so the page shows
-    # through and the floating buttons don't sit on a solid box.
+    # Clean solid full-bleed form surface. Big enough to read as a page (not a
+    # small box floating on the dashboard); the app chrome behind is fully
+    # covered by an opaque barrier, so nothing bleeds through. Buttons/header
+    # sit directly on the one flat white surface — no separate header/footer bars.
     dialog_content = ft.Container(
         content=ft.Column(
             controls=[
@@ -1266,31 +1268,24 @@ def show_report_dialog(
                 error_banner,
                 ft.Row(controls=action_buttons, spacing=8),
             ],
-            spacing=12,
+            spacing=14,
             tight=True,
         ),
-        width=760,
-        height=620,
-        padding=20,
-        # strong glass: mostly see-through + heavy blur so the app content
-        # behind reads through it — the elements float, not sit on a box
-        bgcolor=ft.Colors.with_opacity(0.35, colors["bg_secondary"]),
-        blur=ft.Blur(40, 40, ft.BlurTileMode.MIRROR),
-        border=ft.border.all(1, ft.Colors.with_opacity(0.4, colors["border"])),
-        border_radius=12,
+        width=1080,
+        height=740,
+        padding=28,
+        bgcolor=colors["bg_secondary"],
+        border_radius=6,
     )
 
-    # Create dialog — transparent surface + translucent barrier so the page
-    # content (not a grey scrim) is visible behind the glass panel.
+    # Opaque scrim so the app header/footer behind does NOT show through
     dialog = ft.AlertDialog(
         modal=True,
         content=dialog_content,
         content_padding=0,
-        bgcolor=ft.Colors.TRANSPARENT,
-        barrier_color=ft.Colors.with_opacity(0.12, "#000000"),
-        shadow_color=ft.Colors.TRANSPARENT,
-        elevation=0,
-        shape=ft.RoundedRectangleBorder(radius=12),
+        bgcolor=colors["bg_secondary"],
+        barrier_color=ft.Colors.with_opacity(0.55, "#000000"),
+        shape=ft.RoundedRectangleBorder(radius=6),
     )
 
     # Record-edit lock (R28): one editor per report. Acquire before opening in
