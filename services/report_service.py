@@ -610,7 +610,7 @@ class ReportService:
             self.logger.error(f"Error fetching report history: {str(e)}", exc_info=True)
             return []
 
-    def hard_delete_report(self, report_id: int, reason: str = "") -> Tuple[bool, str]:
+    def hard_delete_report(self, report_id: int, reason: str = "", system: bool = False) -> Tuple[bool, str]:
         """
         Permanently delete a report (admin only). Cascades to versions, approvals, etc.
 
@@ -622,13 +622,14 @@ class ReportService:
             Tuple of (success, message)
         """
         try:
-            current_user = self.auth_service.get_current_user()
-            if not current_user:
-                return False, "User not authenticated"
-
-            # Check if user is admin
-            if current_user.get('role') != 'admin':
-                return False, "Only administrators can permanently delete reports"
+            # system=True is the scheduler's auto-purge path (no interactive
+            # user); interactive callers still require admin.
+            if not system:
+                current_user = self.auth_service.get_current_user()
+                if not current_user:
+                    return False, "User not authenticated"
+                if current_user.get('role') != 'admin':
+                    return False, "Only administrators can permanently delete reports"
 
             # Get report info for logging
             check_query = "SELECT report_number, reported_entity_name FROM reports WHERE report_id = ?"
@@ -682,10 +683,11 @@ class ReportService:
             )
 
             # Log to activity service if available
+            actor = 'SYSTEM' if system else self.auth_service.get_current_user()['username']
             if self.activity_service:
                 self.activity_service.log_activity(
                     action_type='HARD_DELETE',
-                    description=f"{current_user['username']} permanently deleted Report #{report_number}",
+                    description=f"{actor} permanently deleted Report #{report_number}",
                     report_id=None,  # Report no longer exists
                     report_number=report_number,
                     metadata={
@@ -814,3 +816,94 @@ class ReportService:
         except Exception as e:
             self.logger.error(f"Error getting report impact: {str(e)}", exc_info=True)
             return {'versions': 0, 'approvals': 0, 'pending_approvals': 0}
+
+    # ---- Record-edit locking (R28) -------------------------------------
+    # One editor per report at a time. Locks auto-expire after the session
+    # window so a crashed/closed client never leaves a report stuck.
+    LOCK_MINUTES = 30
+
+    def acquire_edit_lock(self, report_id: int) -> Tuple[bool, Optional[str], str]:
+        """Try to lock a report for editing by the current user.
+        Returns (acquired, holder_display_name, message). If already held by
+        someone else, acquired=False and holder_display_name names them."""
+        try:
+            user = self.auth_service.get_current_user()
+            if not user:
+                return False, None, "Not authenticated"
+            username = user['username']
+            display = user.get('full_name') or username
+
+            # drop expired locks first
+            self.db_manager.execute_write(
+                "DELETE FROM report_locks WHERE expires_at < datetime('now')")
+            # the INSERT is the atomic decision point (report_id is PK)
+            n = self.db_manager.execute_write(
+                "INSERT OR IGNORE INTO report_locks "
+                "(report_id, locked_by, locked_by_name, expires_at) "
+                "VALUES (?, ?, ?, datetime('now', '+' || ? || ' minutes'))",
+                (report_id, username, display, self.LOCK_MINUTES))
+            if n == 1:
+                return True, None, "Lock acquired"
+            # already locked — is it mine?
+            holder = self.db_manager.execute_with_retry(
+                "SELECT locked_by, locked_by_name FROM report_locks WHERE report_id = ?",
+                (report_id,))
+            if holder and holder[0][0] == username:
+                self.db_manager.execute_write(
+                    "UPDATE report_locks SET expires_at = datetime('now', '+' || ? || ' minutes') "
+                    "WHERE report_id = ?", (self.LOCK_MINUTES, report_id))
+                return True, None, "Lock refreshed"
+            holder_name = holder[0][1] if holder else "another user"
+            return False, holder_name, f"This report is currently being edited by {holder_name}"
+        except Exception as e:
+            self.logger.error(f"Error acquiring edit lock: {str(e)}", exc_info=True)
+            # fail-open would allow concurrent edits; fail-closed is safer
+            return False, None, "Could not acquire edit lock"
+
+    def release_edit_lock(self, report_id: int) -> bool:
+        """Release the current user's lock on a report (no-op if not held)."""
+        try:
+            user = self.auth_service.get_current_user()
+            if not user:
+                return False
+            self.db_manager.execute_write(
+                "DELETE FROM report_locks WHERE report_id = ? AND locked_by = ?",
+                (report_id, user['username']))
+            return True
+        except Exception as e:
+            self.logger.error(f"Error releasing edit lock: {str(e)}", exc_info=True)
+            return False
+
+    def get_lock_holder(self, report_id: int) -> Optional[str]:
+        """Return the display name currently holding an unexpired lock, else None."""
+        try:
+            self.db_manager.execute_write(
+                "DELETE FROM report_locks WHERE expires_at < datetime('now')")
+            r = self.db_manager.execute_with_retry(
+                "SELECT locked_by_name FROM report_locks WHERE report_id = ?", (report_id,))
+            return r[0][0] if r else None
+        except Exception:
+            return None
+
+    def purge_expired_deleted_reports(self, retention_days: int = 30) -> Tuple[int, str]:
+        """Hard-delete reports soft-deleted longer than retention_days (R80).
+        Returns (count_purged, message). Meant to be called by the scheduler."""
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT report_id FROM reports WHERE is_deleted = 1 "
+                "AND deleted_at IS NOT NULL "
+                "AND deleted_at < datetime('now', '-' || ? || ' days')",
+                (retention_days,))
+            ids = [r[0] for r in rows] if rows else []
+            purged = 0
+            for rid in ids:
+                # reuse the audited cascade hard-delete
+                ok, _ = self.hard_delete_report(rid, reason=f"Auto-purge after {retention_days} days")
+                if ok:
+                    purged += 1
+            if purged:
+                self.logger.info(f"Auto-purged {purged} expired deleted report(s)")
+            return purged, f"Purged {purged} report(s)"
+        except Exception as e:
+            self.logger.error(f"Error purging deleted reports: {str(e)}", exc_info=True)
+            return 0, f"Purge error: {str(e)}"

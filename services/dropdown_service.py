@@ -10,9 +10,10 @@ from datetime import datetime
 class DropdownService:
     """Service for managing dropdown values that admins can customize."""
 
-    # Admin-manageable dropdown categories (per requirements #7, #8, #11, #18)
+    # Admin-manageable dropdown categories (per requirements #7, #8, #11, #18).
+    # second_reason_for_suspicion is intentionally EXCLUDED (R73): its ~147
+    # reference values are IT-managed and not editable in Dropdown Management.
     ADMIN_MANAGEABLE_CATEGORIES = [
-        'second_reason_for_suspicion',
         'type_of_suspected_transaction',
         'report_classification',
         'fiu_feedback',

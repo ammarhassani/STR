@@ -88,7 +88,7 @@ class Client:
         self.settings = SettingsService(self.db, self.auth)
         self.reports = ReportService(self.db, self.log, self.auth)
         self.dashboard = DashboardService(self.db, self.log)
-        self.dropdowns = DropdownService(self.db, self.log)
+        self.dropdowns = DropdownService(self.db, self.log, self.auth)
         self.validation = ValidationService(self.db, self.log)
         self.numbers = ReportNumberService(self.db, self.log)
         self.activity = ActivityService(self.db, self.log, self.auth)

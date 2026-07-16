@@ -9,6 +9,7 @@ Handles report number and serial number generation with:
 This service is designed to handle concurrent access from multiple users safely.
 """
 
+import re
 import sqlite3
 from typing import Tuple, Optional, Dict, List
 from datetime import datetime, timedelta
@@ -296,11 +297,9 @@ class ReportNumberService:
         Returns:
             Tuple of (report_number, serial_number)
         """
-        # Get grace period from system config
-        grace_days = self._get_month_grace_period(cursor)
-
-        # Get month prefix with grace period applied
-        prefix = self.get_month_with_grace_period(grace_days) + "/"
+        # Month prefix respects admin month-close (R50/R51): numbering stays in
+        # the open month until an admin closes it, then advances by one.
+        prefix = self._active_month(cursor) + "/"
 
         # Get next report number for this month
         # Extract the maximum number from existing reports (not COUNT!)
@@ -811,6 +810,67 @@ class ReportNumberService:
             month = now.month
 
         return f"{year}/{month:02d}"
+
+    # ---- Month close / grace period (R50, R51) ------------------------
+    @staticmethod
+    def _next_month(month: str) -> str:
+        """'2025/07' -> '2025/08', '2025/12' -> '2026/01'."""
+        y, m = int(month[:4]), int(month[5:7])
+        return f"{y+1}/01" if m == 12 else f"{y}/{m+1:02d}"
+
+    def _active_month(self, cursor) -> str:
+        """The month numbering should use RIGHT NOW. Numbering never advances by
+        the calendar on its own (grace period, R50); it advances only when an
+        admin closes the current month (R51). So: one past the latest closed
+        month, else the month of the latest existing report, else this month."""
+        cursor.execute("SELECT MAX(month) FROM closed_months")
+        row = cursor.fetchone()
+        if row and row[0]:
+            return self._next_month(row[0])
+        cursor.execute(
+            "SELECT MAX(substr(report_number, 1, 7)) FROM reports "
+            "WHERE report_number GLOB '[0-9][0-9][0-9][0-9]/[0-9][0-9]/*'")
+        row = cursor.fetchone()
+        if row and row[0]:
+            return row[0]
+        now = datetime.now()
+        return f"{now.year}/{now.month:02d}"
+
+    def is_month_closed(self, month: str) -> bool:
+        try:
+            r = self.db_manager.execute_with_retry(
+                "SELECT 1 FROM closed_months WHERE month = ?", (month,))
+            return bool(r)
+        except Exception:
+            return False
+
+    def close_month(self, month: str, username: str) -> Tuple[bool, str]:
+        """Close a numbering month so numbering advances to the next (R51).
+        Admin only; a closed month can never be reopened (no such method)."""
+        try:
+            if not re.match(r'^\d{4}/(0[1-9]|1[0-2])$', str(month)):
+                return False, "Invalid month format (expected YYYY/MM)"
+            who = self.db_manager.execute_with_retry(
+                "SELECT role FROM users WHERE username = ? AND is_active = 1", (username,))
+            if not who or who[0][0] != 'admin':
+                return False, "Only administrators can close a month"
+            if self.is_month_closed(month):
+                return False, "This month is already closed"
+            self.db_manager.execute_write(
+                "INSERT INTO closed_months (month, closed_by) VALUES (?, ?)", (month, username))
+            self.logger.info(f"Month {month} closed by {username}")
+            return True, f"Month {month} closed; numbering advanced"
+        except Exception as e:
+            self.logger.error(f"Error closing month: {str(e)}")
+            return False, f"Error closing month: {str(e)}"
+
+    def get_active_numbering_month(self) -> str:
+        """Public read of the current active numbering month."""
+        conn = sqlite3.connect(self.db_manager.db_path)
+        try:
+            return self._active_month(conn.cursor())
+        finally:
+            conn.close()
 
     # Gap Queue Management Methods
 

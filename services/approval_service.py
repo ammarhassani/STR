@@ -223,7 +223,8 @@ class ApprovalService:
             self.logger.error(f"Error approving report: {str(e)}", exc_info=True)
             return False, f"Error approving report: {str(e)}"
 
-    def reject_report(self, approval_id: int, comment: str = "", request_rework: bool = False) -> Tuple[bool, str]:
+    def reject_report(self, approval_id: int, comment: str = "", request_rework: bool = False,
+                      reassign_to: Optional[str] = None) -> Tuple[bool, str]:
         """
         Reject a report or request rework (admin only).
 
@@ -231,6 +232,8 @@ class ApprovalService:
             approval_id: Approval request ID
             comment: Rejection/rework comment
             request_rework: If True, set status to 'rework', otherwise 'rejected'
+            reassign_to: On rework, optionally reassign ownership to this active
+                agent's username so a different agent handles the rework (R36)
 
         Returns:
             Tuple of (success, message)
@@ -243,6 +246,15 @@ class ApprovalService:
             # Check if user is admin
             if current_user.get('role') != 'admin':
                 return False, "Only administrators can reject reports"
+
+            # Validate reassignment target (rework only, must be an active agent)
+            if reassign_to:
+                if not request_rework:
+                    return False, "Reassignment is only allowed when requesting rework"
+                tgt = self.db_manager.execute_with_retry(
+                    "SELECT role, is_active FROM users WHERE username = ?", (reassign_to,))
+                if not tgt or not tgt[0][1] or tgt[0][0] != 'agent':
+                    return False, "Reassignment target must be an active agent"
 
             # Get approval request
             approval_query = """
@@ -288,6 +300,19 @@ class ApprovalService:
                 update_report,
                 (new_status, current_user['username'], datetime.now().isoformat(), report_id)
             )
+
+            # Reassign ownership to a different agent for the rework (R36)
+            if reassign_to:
+                self.db_manager.execute_with_retry(
+                    "UPDATE reports SET created_by = ? WHERE report_id = ?",
+                    (reassign_to, report_id))
+                new_uid = self.db_manager.execute_with_retry(
+                    "SELECT user_id FROM users WHERE username = ?", (reassign_to,))
+                if new_uid:
+                    self.create_notification(
+                        new_uid[0][0], "Report Reassigned to You",
+                        f"A report was reassigned to you for rework by {current_user['username']}",
+                        "info", report_id)
 
             # Notify the user who requested approval
             user_query = "SELECT user_id FROM users WHERE username = ?"
@@ -683,4 +708,15 @@ class ApprovalService:
 
         except Exception as e:
             self.logger.error(f"Error fetching admin users: {str(e)}", exc_info=True)
+            return []
+
+    def get_active_agents(self) -> List[Dict]:
+        """Active agents, for the rework reassignment dropdown (R36)."""
+        try:
+            result = self.db_manager.execute_with_retry(
+                "SELECT user_id, username, full_name FROM users "
+                "WHERE role = 'agent' AND is_active = 1 ORDER BY full_name")
+            return [{'user_id': r[0], 'username': r[1], 'full_name': r[2]} for r in result]
+        except Exception as e:
+            self.logger.error(f"Error fetching active agents: {str(e)}", exc_info=True)
             return []

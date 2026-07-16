@@ -140,6 +140,17 @@ class AppState:
             self.report_service.set_activity_service(self.activity_service)
             self.version_service.set_activity_service(self.activity_service)
 
+            # Maintenance schedulers: auto-purge (R80) + weekly backup (R107)
+            try:
+                from services.maintenance_service import MaintenanceService
+                from config import Config
+                self.maintenance_service = MaintenanceService(
+                    self.db_manager, self.logging_service, self.report_service,
+                    backup_dir=Config.BACKUP_PATH, settings_service=self.settings_service)
+                self.maintenance_service.start()
+            except Exception as e:
+                self.logging_service.warning(f"Maintenance schedulers not started: {e}")
+
             self.logging_service.info("All services initialized successfully")
             return True
 

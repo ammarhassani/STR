@@ -1134,6 +1134,68 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Dashboard widget port skipped: {str(e)}")
 
+        # Migration 29: Record-edit locks (R28) — one active editor per report
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='report_locks'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    CREATE TABLE report_locks (
+                        report_id INTEGER PRIMARY KEY,
+                        locked_by TEXT NOT NULL,
+                        locked_by_name TEXT,
+                        locked_at TEXT DEFAULT (datetime('now')),
+                        expires_at TEXT NOT NULL
+                    )
+                """)
+                conn.commit()
+                messages.append("Created report_locks table")
+        except Exception as e:
+            messages.append(f"report_locks table skipped: {str(e)}")
+
+        # Migration 30: Closed months (R50/R51) — numbering grace period
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='closed_months'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    CREATE TABLE closed_months (
+                        month TEXT PRIMARY KEY,
+                        closed_by TEXT NOT NULL,
+                        closed_at TEXT DEFAULT (datetime('now'))
+                    )
+                """)
+                conn.commit()
+                messages.append("Created closed_months table")
+        except Exception as e:
+            messages.append(f"closed_months table skipped: {str(e)}")
+
+        # Migration 31: Seed the FIU second-reason-for-suspicion catalog (R73).
+        # ~147 reference values, IT-managed (not editable in Dropdown Management).
+        try:
+            cursor.execute(
+                "SELECT COUNT(*) FROM system_config WHERE config_type='dropdown' "
+                "AND config_category='second_reason_for_suspicion'")
+            existing = cursor.fetchone()[0]
+            if existing < 50:  # only seed if not already populated
+                import os as _os, json as _json
+                ref = _os.path.join(_os.path.dirname(__file__), 'second_reasons.json')
+                if _os.path.exists(ref):
+                    with open(ref, encoding='utf-8') as f:
+                        reasons = _json.load(f)
+                    added = 0
+                    for idx, val in enumerate(reasons, 1):
+                        key = f"second_reason_ref_{idx}"
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO system_config "
+                            "(config_key, config_value, config_type, config_category, display_order, is_active) "
+                            "VALUES (?, ?, 'dropdown', 'second_reason_for_suspicion', ?, 1)",
+                            (key, val, idx))
+                        added += cursor.rowcount
+                    conn.commit()
+                    if added:
+                        messages.append(f"Seeded {added} second-reason reference values")
+        except Exception as e:
+            messages.append(f"Second-reason seed skipped: {str(e)}")
+
         conn.close()
 
         if messages:

@@ -284,6 +284,108 @@ def report():
         if not ok: print(f"  GAP {rid}: {desc} — {det}")
     return len(CRASHES), len(gaps)
 
+def part3_features():
+    print('PART 3: newly-built BRD features...')
+    # fresh, isolated DB (avoid rmtree race on WAL handles from part1/2)
+    global DB
+    DB = os.path.join(BOX, 'p3.db')
+    for suffix in ('', '-wal', '-shm'):
+        try: os.remove(DB + suffix)
+        except OSError: pass
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from services.security_service import SecurityService as _S
+    initialize_database(DB); migrate_database(DB)
+    _c = sqlite3.connect(DB)
+    _c.execute("UPDATE users SET password=?, role='admin', is_active=1 WHERE username='admin'",
+               (_S.hash_password('Admin@1234'),))
+    _c.commit(); _c.close()
+    admin = Client(); assert admin.login('admin', 'Admin@1234')[0]
+    admin.auth.create_user('agent1', 'pass123', 'Alice Agent', 'agent')
+    admin.auth.create_user('agent2', 'pass123', 'Bob Agent', 'agent')
+    agent = Client(); agent.login('agent1', 'pass123')
+    agent2 = Client(); agent2.login('agent2', 'pass123')
+
+    # ---- R28 record locking
+    ok, rid, _ = admin.make_report({'cic': '7000000000000001'})
+    acq, holder, _ = admin.reports.acquire_edit_lock(rid)
+    conf('R28', 'first user acquires edit lock', acq, holder)
+    acq2, holder2, _ = agent.reports.acquire_edit_lock(rid)
+    conf('R28', 'second user blocked while locked (holder named)', not acq2 and bool(holder2), holder2)
+    admin.reports.release_edit_lock(rid)
+    acq3, _, _ = agent.reports.acquire_edit_lock(rid)
+    conf('R28', 'lock re-acquirable after release', acq3)
+    # expiry: force an expired lock, then acquire should succeed
+    _c = sqlite3.connect(DB)
+    _c.execute("UPDATE report_locks SET expires_at = datetime('now','-1 hour') WHERE report_id=?", (rid,))
+    _c.commit(); _c.close()
+    acq4, _, _ = admin.reports.acquire_edit_lock(rid)
+    conf('R28', 'expired lock is reclaimable', acq4)
+    admin.reports.release_edit_lock(rid)
+
+    # ---- R36 rework reassign
+    ok, rid2, _ = agent.make_report({'cic': '7000000000000002'})
+    ap = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid2,))
+    okr, msg = admin.approvals.reject_report(ap, 'redo', request_rework=True, reassign_to='agent2')
+    conf('R36', 'rework reassign to active agent', okr, msg)
+    conf('R36', 'ownership moved to new agent', q1("SELECT created_by FROM reports WHERE report_id=?", (rid2,)) == 'agent2')
+    # new owner can edit, old cannot
+    conf('R36', 'reassigned agent can edit', agent2.reports.update_report(rid2, {'reported_entity_name': 'byBob'})[0])
+    conf('R36', 'original agent can no longer edit', not agent.reports.update_report(rid2, {'reported_entity_name': 'byAlice'})[0])
+    # invalid targets
+    ok, rid3, _ = agent.make_report({'cic': '7000000000000003'})
+    ap3 = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid3,))
+    conf('R36', 'reassign to non-agent rejected', not admin.approvals.reject_report(ap3, 'x', True, reassign_to='admin')[0])
+    ap3b = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid3,))
+    conf('R36', 'reassign without rework rejected', not admin.approvals.reject_report(ap3b or ap3, 'x', False, reassign_to='agent2')[0])
+    agents = admin.approvals.get_active_agents()
+    conf('R36', 'get_active_agents lists agents', len(agents) >= 2, len(agents))
+
+    # ---- R50/R51 month close
+    N = admin.numbers
+    active = N.get_active_numbering_month()
+    conf('R51', 'non-admin cannot close month', not agent.numbers.close_month(active, 'agent1')[0])
+    conf('R51', 'invalid month format rejected', not N.close_month('bad', 'admin')[0])
+    okc, msg = N.close_month(active, 'admin')
+    conf('R50', 'admin closes current month', okc, msg)
+    conf('R51', 'closing an already-closed month rejected', not N.close_month(active, 'admin')[0])
+    new_active = N.get_active_numbering_month()
+    conf('R50', 'numbering advances after close', new_active != active, f"{active}->{new_active}")
+    conf('R51', 'no reopen method exists', not hasattr(N, 'reopen_month'))
+    # a new report now uses the advanced month
+    ok, rid4, _ = admin.make_report({'cic': '7000000000000004'})
+    rn = q1("SELECT report_number FROM reports WHERE report_id=?", (rid4,))
+    conf('R50', 'new report uses advanced month prefix', rn.startswith(new_active), rn)
+
+    # ---- R80 auto-purge
+    from services.maintenance_service import MaintenanceService
+    maint = MaintenanceService(admin.db, admin.log, admin.reports, backup_dir=EXPD)
+    ok, rid5, _ = admin.make_report({'cic': '7000000000000005'})
+    admin.reports.delete_report(rid5)
+    # age the deletion beyond retention
+    _c = sqlite3.connect(DB); _c.execute("UPDATE reports SET deleted_at=datetime('now','-40 days') WHERE report_id=?", (rid5,)); _c.commit(); _c.close()
+    ok, rid6, _ = admin.make_report({'cic': '7000000000000006'})
+    admin.reports.delete_report(rid6)  # recent
+    n, msg = maint.run_purge()
+    conf('R80', 'expired soft-deleted report purged', q1("SELECT COUNT(*) FROM reports WHERE report_id=?", (rid5,)) == 0, msg)
+    conf('R80', 'recent soft-deleted report retained', q1("SELECT COUNT(*) FROM reports WHERE report_id=?", (rid6,)) == 1)
+
+    # ---- R107 weekly backup
+    okb, dest = maint.run_backup()
+    conf('R107', 'backup file produced', okb and os.path.exists(str(dest)), dest)
+    conf('R107', 'backup logged', q1("SELECT COUNT(*) FROM backup_log") >= 1)
+
+    # ---- R73 second-reason catalog
+    vals = admin.dropdowns.get_active_dropdown_values('second_reason_for_suspicion')
+    conf('R73', 'second-reason catalog seeded (>=100)', len(vals) >= 100, len(vals))
+    conf('R73', 'second-reason NOT admin-manageable in Dropdown Mgmt',
+         not admin.dropdowns.is_category_admin_manageable('second_reason_for_suspicion'))
+
+    # ---- R82 permanent-delete type-DELETE confirm (UI gate present)
+    src = open(os.path.join(REPO, 'flet_app/dialogs/delete_confirmation_dialog.py')).read()
+    conf('R82', 'permanent delete requires typing DELETE',
+         'DELETE' in src and 'upper() != "DELETE"' in src)
+
 if __name__ == '__main__':
     build()
     part1_fuzz()
@@ -291,5 +393,9 @@ if __name__ == '__main__':
         part2_conformance()
     except Exception as e:
         print(f"[part2 harness error: {e}]")
+    try:
+        part3_features()
+    except Exception as e:
+        import traceback; print(f"[part3 harness error: {e}]\n{traceback.format_exc()}")
     nc, ng = report()
     sys.exit(0)

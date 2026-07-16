@@ -523,7 +523,7 @@ def show_report_dialog(
         page.update()
 
     def close_dialog(e):
-        """Close dialog and cancel reservation if needed."""
+        """Close dialog, cancel reservation and release any edit lock (R28)."""
         if not is_edit_mode and reservation_info["value"] and report_number_service:
             try:
                 report_number_service.cancel_reservation(
@@ -532,6 +532,14 @@ def show_report_dialog(
                 )
             except Exception as ex:
                 logging_service.error(f"Error cancelling reservation: {ex}")
+
+        if is_edit_mode and report_data:
+            rid = report_data.get('report_id') or report_data.get('id')
+            if rid:
+                try:
+                    report_service.release_edit_lock(rid)
+                except Exception:
+                    pass
 
         dialog.open = False
         page.update()
@@ -1277,6 +1285,16 @@ def show_report_dialog(
         content=dialog_content,
         shape=ft.RoundedRectangleBorder(radius=12),
     )
+
+    # Record-edit lock (R28): one editor per report. Acquire before opening in
+    # edit mode; if another user holds it, refuse and tell the user who.
+    if is_edit_mode and report_data:
+        _rid = report_data.get('report_id') or report_data.get('id')
+        if _rid:
+            acquired, holder, _msg = report_service.acquire_edit_lock(_rid)
+            if not acquired:
+                show_error_dialog(f"This report is currently being edited by {holder or 'another user'}")
+                return
 
     # Show dialog
     page.overlay.append(dialog)
