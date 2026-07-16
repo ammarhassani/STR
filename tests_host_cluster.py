@@ -249,6 +249,7 @@ def test_multiclient_stress_and_replay():
 
         # crash-replay: re-handle an already-applied command id -> no change, same response
         applied = dbm.execute_with_retry("SELECT command_id FROM applied_commands LIMIT 1")
+        check('T7 ledger recorded commands (replay check is non-vacuous)', len(applied) >= 1, len(applied))
         if applied:
             cid = applied[0][0]
             before = dbm.execute_with_retry("SELECT COUNT(*) FROM users")[0][0]
