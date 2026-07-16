@@ -310,6 +310,41 @@ reintroduces the corruption problem; what infra must provide is an always-on
 *machine* (M1) or a *DB server* (M2). This architecture is the safe bridge that
 proves value on zero budget and converts to either without rebuilding.
 
+## 7b. Phase 1 status & carried-forward gates (post whole-branch review)
+
+Phase 1 (host + folder-queue + command-RPC) is **built and proven**: the machinery
+is correct, corruption-safety holds (one process opens the authoritative DB, on
+local disk; the share is a temp+rename mailbox; no client opens the shared DB), and
+exactly-once holds for command *redelivery* (proven by `tests_host_cluster.py`).
+
+**Hard gates before ANY multi-PC deployment (do not point >1 PC at shared data
+until all are done):**
+- **G1 — Flip the UI to client mode.** As shipped, the app still launches in LOCAL
+  single-machine mode (`initialize_services(db_path)` with no `bus_dir`). Deploying
+  the current UI to multiple PCs would open the DB directly on every PC — the exact
+  corruption this project prevents. Wire the login view to `login_remote`, launch
+  with `mode="client", bus_dir=get_bus_dir()`, and add the client replica
+  bootstrap/refresh loop.
+- **G2 — Stable command ids.** The command `id` is currently generated per
+  `gateway.call`. Before host-down queueing or any retry/resubmit is added, the id
+  MUST be stable per *logical* write and travel with the resubmission — otherwise a
+  resubmitted command carries a fresh id and the idempotency ledger double-applies.
+- **G3 — Phase 2 reservation rewrite** must remove the raw-SQL `DELETE` in
+  `flet_app/dialogs/reservation_dialog.py` (it bypasses the host; would misbehave in
+  client mode).
+
+**Tracked (fold in with the gate work):**
+- **Session timeout (R3, 30 min idle):** enforced host-side when G1 lands (sessions
+  currently live for the host's lifetime).
+- **Client replica opened read-only:** enforce single-writer by the engine, but
+  route client-side incidental writes (login session_log, DB log handler) away from
+  the read-only replica first.
+- **Exactly-once crash-window (Phase 3 failover):** collapse the service write and
+  the `applied_commands` INSERT into one transaction when failover replay-of-in-
+  flight is built; today's fallback is the DB uniqueness constraints.
+- Queue/replica robustness polish (logging on swallowed queue errors, temp cleanup
+  on backup failure, atomic `version.txt`).
+
 ## 8. Out of scope
 Cross-site/WAN use, >~20 users, real-time sub-100ms writes, automatic election
 without human confirmation (Phase 3 optional add-on), replacing the folder queue
