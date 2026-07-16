@@ -45,8 +45,25 @@ def test_flat_theme():
     check('T2 no page transitions', pg.theme.page_transitions is not None)
     check('T2 is_dark always False', tm.is_dark is False)
 
+def test_app_button():
+    import flet as ft
+    from components.app_button import app_button
+    clicked = {'n': 0}
+    for variant in ('primary', 'secondary', 'danger'):
+        b = app_button("Go", on_click=lambda e: clicked.__setitem__('n', clicked['n']+1),
+                       variant=variant)
+        check(f'T4 {variant} builds a Container', isinstance(b, ft.Container))
+        check(f'T4 {variant} no ripple (ink False)', b.ink is False)
+        check(f'T4 {variant} radius 4', b.border_radius == 4)
+        if b.on_click:
+            b.on_click(None)
+    check('T4 on_click fires', clicked['n'] == 3, clicked['n'])
+    dis = app_button("X", on_click=lambda e: None, disabled=True)
+    check('T4 disabled has no on_click', dis.on_click is None)
+
 if __name__ == '__main__':
     test_tokens()
     test_flat_theme()
+    test_app_button()
     print(f"\nTHEME FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
