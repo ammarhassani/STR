@@ -450,12 +450,17 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
             max_per_user = int(max_per_user_input.value or "1")
 
             def execute():
+                # Use INSERT OR REPLACE to handle missing rows (fixes silent UPDATE failure)
                 app_state.db_manager.execute_with_retry(
-                    "UPDATE system_settings SET setting_value = ? WHERE setting_key = 'max_concurrent_reservations'",
+                    """INSERT OR REPLACE INTO system_settings
+                       (setting_key, setting_value, description, category, is_editable)
+                       VALUES ('max_concurrent_reservations', ?, 'Maximum concurrent reservations system-wide', 'reservation', 1)""",
                     (str(max_concurrent),)
                 )
                 app_state.db_manager.execute_with_retry(
-                    "UPDATE system_settings SET setting_value = ? WHERE setting_key = 'max_reservations_per_user'",
+                    """INSERT OR REPLACE INTO system_settings
+                       (setting_key, setting_value, description, category, is_editable)
+                       VALUES ('max_reservations_per_user', ?, 'Maximum reservations per user', 'reservation', 1)""",
                     (str(max_per_user),)
                 )
 

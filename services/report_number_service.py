@@ -84,6 +84,8 @@ class ReportNumberService:
                     WHERE setting_key = 'max_concurrent_reservations'
                 """)
                 max_concurrent = cursor.fetchone()
+                if not max_concurrent:
+                    print("[WARNING] Setting 'max_concurrent_reservations' not found in system_settings, using default: 999")
                 max_concurrent = int(max_concurrent[0]) if max_concurrent else 999
 
                 # Collect info for logging (don't log during transaction!)
@@ -108,6 +110,8 @@ class ReportNumberService:
                     WHERE setting_key = 'max_reservations_per_user'
                 """)
                 max_per_user = cursor.fetchone()
+                if not max_per_user:
+                    print("[WARNING] Setting 'max_reservations_per_user' not found in system_settings, using default: 1")
                 max_per_user = int(max_per_user[0]) if max_per_user else 1
 
                 # Collect info for logging (don't log during transaction!)
