@@ -242,6 +242,40 @@ Because the host serializes everything, numbering is trivially safe:
   from backup), stale/again heartbeat (failover), half-written command file
   (temp+rename proves it's never seen).
 
+## 7a. Succession, bus-factor & migration to real infrastructure
+
+This system must outlive its author and survive the loss of any single PC.
+
+**Data is never stranded on one PC.** The host publishes a full DB replica +
+rolling backups to the share continuously. The share therefore always holds a
+recent, complete, **promotable** database. If the host PC (including the author's)
+is lost or wiped, another PC runs host mode, promotes from the share replica, and
+loses at most the seconds since the last publish — acknowledged in-flight writes
+are still recoverable from the durable queue.
+
+**The host role is portable, not personal.** Any teammate's PC can become host
+(§3.5). No credential, key, or config lives only on one machine — everything the
+next host needs (replica, queue, backups, config) is on the share.
+
+**Handoff runbook (ship as `docs/HOST_RUNBOOK.md`):** how to (1) start/stop host
+mode, (2) promote a backup PC to host, (3) verify integrity after promotion,
+(4) locate/restore a backup, (5) change which PC is host — written for a
+non-author teammate.
+
+**Migration path to infrastructure (this design IS the production design):**
+Because clients talk to a **service gateway, not the database** (§5), the data's
+location is invisible to the app. When infra becomes available, upgrade with **no
+app rewrite**:
+- **Option M1 — always-on host box.** Run the *same* host-mode app on an infra
+  VM/server instead of a workstation. Removes every workstation limitation
+  (sleep, reboot-login, admin). Pure deployment change.
+- **Option M2 — real client/server DB.** Swap the host's local-SQLite backend for
+  PostgreSQL/SQL Server behind the same service interface. Clients unchanged.
+A bare "shared partition" is **not** a fix — it is still a network share and
+reintroduces the corruption problem; what infra must provide is an always-on
+*machine* (M1) or a *DB server* (M2). This architecture is the safe bridge that
+proves value on zero budget and converts to either without rebuilding.
+
 ## 8. Out of scope
 Cross-site/WAN use, >~20 users, real-time sub-100ms writes, automatic election
 without human confirmation (Phase 3 optional add-on), replacing the folder queue
