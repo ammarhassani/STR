@@ -762,7 +762,7 @@ def show_report_dialog(
                 spacing=16,
                 scroll=ft.ScrollMode.AUTO,
             ),
-            padding=20,
+            padding=12,
         )
 
     def build_entity_details_tab():
@@ -907,7 +907,7 @@ def show_report_dialog(
                 spacing=12,
                 scroll=ft.ScrollMode.AUTO,
             ),
-            padding=20,
+            padding=12,
         )
 
     def build_suspicion_details_tab():
@@ -982,7 +982,7 @@ def show_report_dialog(
                 spacing=16,
                 scroll=ft.ScrollMode.AUTO,
             ),
-            padding=20,
+            padding=12,
         )
 
     def build_classification_tab():
@@ -1056,7 +1056,7 @@ def show_report_dialog(
                 spacing=16,
                 scroll=ft.ScrollMode.AUTO,
             ),
-            padding=20,
+            padding=12,
         )
 
     def build_fiu_details_tab():
@@ -1116,14 +1116,14 @@ def show_report_dialog(
                 spacing=16,
                 scroll=ft.ScrollMode.AUTO,
             ),
-            padding=20,
+            padding=12,
         )
 
     # Header with badges
     header_controls = [
         ft.Text(
             "Edit Report" if is_edit_mode else "Add New Report",
-            size=18,
+            size=15,
             weight=ft.FontWeight.BOLD,
             color=colors["text_primary"],
         ),
@@ -1216,7 +1216,7 @@ def show_report_dialog(
             "Save Report",
             icon=ft.Icons.SAVE,
             on_click=save_report,
-            variant="primary",
+            variant="secondary",
         )
     )
 
@@ -1231,58 +1231,53 @@ def show_report_dialog(
                     "Submit for Approval",
                     icon=ft.Icons.CHECK_CIRCLE,
                     on_click=submit_for_approval,
-                    variant="primary",
+                    variant="secondary",
                 )
             )
 
-    # Create error banner (hidden by default)
+    # Inline error message — no background box, just red text (shown on validation fail)
     error_banner = ft.Container(
         ref=error_banner_ref,
         content=ft.Row(
             controls=[
-                ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.WHITE, size=20),
-                ft.Text("", color=ft.Colors.WHITE, expand=True, size=13),
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=colors["danger"], size=16),
+                ft.Text("", color=colors["danger"], expand=True, size=12),
                 ft.IconButton(
                     icon=ft.Icons.CLOSE,
-                    icon_color=ft.Colors.WHITE,
-                    icon_size=16,
+                    icon_color=colors["danger"],
+                    icon_size=14,
                     on_click=lambda e: hide_error_banner(),
                 ),
             ],
-            spacing=8,
+            spacing=6,
         ),
-        bgcolor=colors["danger"],
-        padding=ft.padding.symmetric(horizontal=16, vertical=8),
-        border_radius=4,
         visible=False,
     )
 
-    # Create dialog content
+    # Compact, flat, content-first dialog. Header thin, form content prominent,
+    # inline (bg-less) error + a plain button row at the bottom.
     dialog_content = ft.Container(
         content=ft.Column(
             controls=[
-                # Error banner (shown when validation fails)
-                error_banner,
-                # Header
-                ft.Row(controls=header_controls, spacing=12),
-                ft.Divider(color=colors["border"]),
-                # Tabs
+                ft.Row(controls=header_controls, spacing=8),
                 tabs,
-                # Buttons
+                error_banner,
                 ft.Row(controls=action_buttons, spacing=8),
             ],
-            spacing=16,
+            spacing=10,
+            tight=True,
         ),
-        width=900,
-        height=650,
-        padding=24,
+        width=640,
+        height=560,
+        padding=16,
     )
 
     # Create dialog
     dialog = ft.AlertDialog(
         modal=True,
         content=dialog_content,
-        shape=ft.RoundedRectangleBorder(radius=12),
+        content_padding=0,
+        shape=ft.RoundedRectangleBorder(radius=4),
     )
 
     # Record-edit lock (R28): one editor per report. Acquire before opening in
