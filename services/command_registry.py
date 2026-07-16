@@ -25,6 +25,7 @@ WRITE_COMMANDS = {
     "report_number_service.mark_reservation_used": ("report_number_service", "mark_reservation_used"),
     "report_number_service.cancel_reservation": ("report_number_service", "cancel_reservation"),
     "report_number_service.close_month": ("report_number_service", "close_month"),
+    "report_number_service.cleanup_expired_reservations_public": ("report_number_service", "cleanup_expired_reservations_public"),
     "dropdown_service.add_dropdown_value": ("dropdown_service", "add_dropdown_value"),
     "dropdown_service.update_dropdown_value": ("dropdown_service", "update_dropdown_value"),
     "dropdown_service.delete_dropdown_value": ("dropdown_service", "delete_dropdown_value"),
