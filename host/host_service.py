@@ -104,5 +104,9 @@ class HostService:
     def serve_forever(self, poll: float = 0.1):
         self.publish_replica()
         while True:
-            if not self.run_once():
+            try:
+                if not self.run_once():
+                    time.sleep(poll)
+            except Exception as e:
+                print(f"[HOST][ERROR] run_once failed, continuing: {e}")
                 time.sleep(poll)

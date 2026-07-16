@@ -261,6 +261,45 @@ def test_multiclient_stress_and_replay():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_serve_forever_survives_poison_command():
+    """A single bad command must not kill the host loop (serve_forever try/except),
+    and a non-JSON-native response value must not blow up respond() (default=str)."""
+    import threading, time, datetime
+    from services.queue_transport import QueueTransport
+
+    # FIX 1: respond() must serialize non-JSON-native values (e.g. datetime) via default=str.
+    box1 = tempfile.mkdtemp()
+    try:
+        t = QueueTransport(os.path.join(box1, 'str_bus'))
+        raised = False
+        try:
+            t.respond('poison-1', {'id': 'poison-1', 'ok': True, 'result': datetime.datetime.now()})
+        except TypeError:
+            raised = True
+        check('T8 respond() serializes non-JSON values (default=str)', not raised)
+    finally:
+        shutil.rmtree(box1, ignore_errors=True)
+
+    # FIX 2: serve_forever must survive an exception raised inside run_once.
+    box2 = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box2)
+        calls = {'n': 0}
+        real_run_once = host.run_once
+        def poison_run_once():
+            calls['n'] += 1
+            if calls['n'] == 1:
+                raise RuntimeError('poison command exploded')
+            return real_run_once()
+        host.run_once = poison_run_once
+        th = threading.Thread(target=host.serve_forever, kwargs={'poll': 0.01}, daemon=True)
+        th.start()
+        time.sleep(0.5)
+        check('T8 serve_forever loop survives a poisoned run_once', th.is_alive())
+        check('T8 loop kept iterating after the exception', calls['n'] > 1, calls['n'])
+    finally:
+        shutil.rmtree(box2, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -269,5 +308,6 @@ if __name__ == '__main__':
     test_end_to_end_via_queue()
     test_client_proxy_routing()
     test_multiclient_stress_and_replay()
+    test_serve_forever_survives_poison_command()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

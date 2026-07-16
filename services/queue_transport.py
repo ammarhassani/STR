@@ -22,7 +22,7 @@ class QueueTransport:
     def _atomic_write(self, dest_path: str, data: dict):
         tmp = self._p(".tmp", uuid.uuid4().hex)
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False)
+            json.dump(data, f, ensure_ascii=False, default=str)
         os.replace(tmp, dest_path)  # atomic within the same filesystem
 
     # ---- client side ----
