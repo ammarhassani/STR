@@ -122,7 +122,8 @@ def test_host_login_and_command():
         aok, atoken, _ = host.login('agentnew1', 'pass123')
         r3 = host.handle_command({'id':'c2','command':'auth_service.create_user',
                                   'args':['x','y','z','agent'],'kwargs':{},'token':atoken})
-        check('T4 host enforces authz (agent cannot create_user)', not r3['ok'], r3)
+        check('T4 host enforces authz (agent cannot create_user)',
+              r3['ok'] and isinstance(r3['result'], (list, tuple)) and r3['result'][0] is False, r3)
         # replica publishes
         host.publish_replica()
         check('T4 replica published', os.path.exists(os.path.join(box,'str_bus','replica','fiu_ro.db')))

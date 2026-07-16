@@ -59,15 +59,7 @@ class HostService:
                     # set the auth context for THIS command, then dispatch
                     self.auth.current_user = user
                     result = cr.dispatch(self.services, name, cmd.get("args", []), cmd.get("kwargs", {}))
-                    # service methods use the (ok, ...) tuple convention for
-                    # in-band failures (e.g. host-side authz rejection) —
-                    # surface that as the response's own ok flag.
-                    if isinstance(result, tuple) and result and isinstance(result[0], bool):
-                        ok = result[0]
-                        resp = {"id": cid, "ok": ok, "result": result} if ok \
-                            else {"id": cid, "ok": False, "error": result[1] if len(result) > 1 else "failed"}
-                    else:
-                        resp = {"id": cid, "ok": True, "result": result}
+                    resp = {"id": cid, "ok": True, "result": result}
         except Exception as e:
             resp = {"id": cid, "ok": False, "error": f"{type(e).__name__}: {e}"}
 
