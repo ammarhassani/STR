@@ -163,11 +163,55 @@ def test_end_to_end_via_queue():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_client_proxy_routing():
+    import threading, time, shutil as _sh
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        stop = {'v': False}
+        def loop():
+            while not stop['v']:
+                if not host.run_once(): time.sleep(0.02)
+        th = threading.Thread(target=loop, daemon=True); th.start()
+        host.publish_replica()
+
+        from services.queue_transport import QueueTransport
+        from services.remote_gateway import RemoteGateway, RemoteServiceProxy
+        from database.db_manager import DatabaseManager
+        from services.auth_service import AuthService
+        from services.report_service import ReportService
+        from services.logging_service import LoggingService
+        from pathlib import Path
+        bus = os.path.join(box, 'str_bus')
+        # client read DB = copy of replica
+        client_db = os.path.join(box, 'client_ro.db')
+        _sh.copy(os.path.join(bus,'replica','fiu_ro.db'), client_db)
+        gw = RemoteGateway(QueueTransport(bus))
+        ok, msg = gw.login('admin', 'Admin@1234')
+        check('T6 gateway login', ok, msg)
+        rdbm = DatabaseManager(client_db)
+        rlog = LoggingService(rdbm, Path(os.path.join(box,'clog')))
+        rauth = AuthService(rdbm, rlog)
+        local_reports = ReportService(rdbm, rlog, rauth)
+        proxy = RemoteServiceProxy('auth_service', AuthService(rdbm, rlog), gw)
+        # write via proxy -> goes through queue -> host applies
+        ok2, m2 = proxy.create_user('agentp', 'pass123', 'Agent P', 'agent')
+        check('T6 proxy write routed to host', ok2, m2)
+        check('T6 host applied proxy write', dbm.execute_with_retry(
+            "SELECT COUNT(*) FROM users WHERE username='agentp'")[0][0] == 1)
+        # read via proxy delegates locally (no crash); read method exists
+        users = RemoteServiceProxy('auth_service', AuthService(rdbm, rlog), gw).get_all_users()
+        check('T6 proxy read delegates locally', isinstance(users, list))
+        stop['v'] = True; th.join(timeout=2)
+    finally:
+        _sh.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
     test_command_registry()
     test_host_login_and_command()
     test_end_to_end_via_queue()
+    test_client_proxy_routing()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

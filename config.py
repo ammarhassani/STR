@@ -64,6 +64,18 @@ class Config:
             return False
     
     @classmethod
+    def get_bus_dir(cls) -> str:
+        """Shared folder client/host processes exchange commands through.
+        Lives under the configured backup/share path; falls back to a
+        folder next to the DB (or the CWD) if that isn't set yet."""
+        base = cls.BACKUP_PATH
+        if not base:
+            base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else "."
+        bus_dir = os.path.join(base, "str_bus")
+        os.makedirs(bus_dir, exist_ok=True)
+        return bus_dir
+
+    @classmethod
     def is_configured(cls) -> bool:
         """Check if configuration exists and is valid"""
         # Check if paths are configured

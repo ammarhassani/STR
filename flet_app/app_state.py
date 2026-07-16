@@ -38,6 +38,7 @@ class AppState:
     settings_service: Any = None
     report_number_service: Any = None
     activity_service: Any = None
+    _gateway: Any = None  # RemoteGateway, set only in client mode
 
     # ==================== UI State ====================
     theme: str = "dark"
@@ -47,12 +48,21 @@ class AppState:
     _auth_listeners: List[Callable] = field(default_factory=list)
     _route_listeners: List[Callable] = field(default_factory=list)
 
-    def initialize_services(self, db_path: str) -> bool:
+    def initialize_services(self, db_path: str, mode: str = "client", bus_dir: str = None) -> bool:
         """
         Initialize all services with proper dependency injection.
 
         Args:
-            db_path: Path to the SQLite database file
+            db_path: Path to the SQLite database file (in client mode, this
+                is the client's local copy of the replica)
+            mode: "host" builds real services that write straight to db_path
+                (today's behavior). "client" additionally wraps the
+                write-capable services in a RemoteServiceProxy so writes go
+                through the host queue while reads stay local.
+            bus_dir: shared folder for the client/host command queue. Only
+                used when mode == "client"; if not given, no proxying
+                happens and this behaves exactly like a local single-machine
+                install.
 
         Returns:
             bool: True if initialization successful, False otherwise
@@ -151,6 +161,17 @@ class AppState:
             except Exception as e:
                 self.logging_service.warning(f"Maintenance schedulers not started: {e}")
 
+            if mode == "client" and bus_dir:
+                from services.queue_transport import QueueTransport
+                from services.remote_gateway import RemoteGateway, RemoteServiceProxy
+                gw = RemoteGateway(QueueTransport(bus_dir))
+                self._gateway = gw
+                for attr in ("auth_service", "report_service", "approval_service",
+                             "version_service", "report_number_service", "dropdown_service",
+                             "validation_service", "settings_service"):
+                    local = getattr(self, attr)
+                    setattr(self, attr, RemoteServiceProxy(attr, local, gw))
+
             self.logging_service.info("All services initialized successfully")
             return True
 
@@ -184,6 +205,13 @@ class AppState:
 
         # Notify listeners
         self._notify_auth_listeners()
+
+    def login_remote(self, username: str, password: str):
+        """Authenticate against the host in client mode (bypasses the local
+        auth_service proxy, which has no real password to check)."""
+        if not self._gateway:
+            return False, "Not in client mode (no gateway configured)"
+        return self._gateway.login(username, password)
 
     def logout(self):
         """Clear authenticated state and perform cleanup."""

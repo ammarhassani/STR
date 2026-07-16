@@ -428,4 +428,20 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
+    if "--host" in sys.argv:
+        # Host mode: no UI. Build services against the local DB and serve
+        # the command queue for clients until killed.
+        from services.queue_transport import QueueTransport
+        from host.host_service import HostService
+
+        Config.load()
+        app_state.initialize_services(Config.DATABASE_PATH, mode="host")
+        host_services = {a: getattr(app_state, a) for a in (
+            "auth_service", "settings_service", "report_service", "dashboard_service",
+            "dropdown_service", "validation_service", "report_number_service",
+            "activity_service", "version_service", "approval_service")}
+        bus_dir = Config.get_bus_dir()
+        HostService(host_services, app_state.db_manager, QueueTransport(bus_dir), bus_dir).serve_forever()
+        sys.exit(0)
+
     ft.app(target=main)
