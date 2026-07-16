@@ -9,7 +9,7 @@ pip install pyinstaller
 
 echo.
 echo Step 2: Building executable...
-pyinstaller --onefile --windowed --name FIU_System main.py
+pyinstaller --onefile --windowed --name FIU_System flet_app/main.py
 
 echo.
 echo ================================================
