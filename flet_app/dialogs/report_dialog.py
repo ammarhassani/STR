@@ -1272,18 +1272,22 @@ def show_report_dialog(
         width=760,
         height=620,
         padding=20,
-        bgcolor=ft.Colors.with_opacity(0.72, colors["bg_secondary"]),
-        blur=ft.Blur(24, 24, ft.BlurTileMode.MIRROR),
-        border=ft.border.all(1, ft.Colors.with_opacity(0.6, colors["border"])),
+        # strong glass: mostly see-through + heavy blur so the app content
+        # behind reads through it — the elements float, not sit on a box
+        bgcolor=ft.Colors.with_opacity(0.35, colors["bg_secondary"]),
+        blur=ft.Blur(40, 40, ft.BlurTileMode.MIRROR),
+        border=ft.border.all(1, ft.Colors.with_opacity(0.4, colors["border"])),
         border_radius=12,
     )
 
-    # Create dialog — transparent surface so the glass panel is what shows
+    # Create dialog — transparent surface + translucent barrier so the page
+    # content (not a grey scrim) is visible behind the glass panel.
     dialog = ft.AlertDialog(
         modal=True,
         content=dialog_content,
         content_padding=0,
         bgcolor=ft.Colors.TRANSPARENT,
+        barrier_color=ft.Colors.with_opacity(0.12, "#000000"),
         shadow_color=ft.Colors.TRANSPARENT,
         elevation=0,
         shape=ft.RoundedRectangleBorder(radius=12),
