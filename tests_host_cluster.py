@@ -44,8 +44,22 @@ def test_applied_commands_table():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_command_registry():
+    from services import command_registry as cr
+    check('T3 create_report is a write command', cr.is_write_command('report_service.create_report'))
+    check('T3 get_reports is NOT a write command', not cr.is_write_command('report_service.get_reports'))
+    class FakeReport:
+        def create_report(self, data): return (True, 7, 'ok')
+    result = cr.dispatch({'report_service': FakeReport()}, 'report_service.create_report', [{'x': 1}], {})
+    check('T3 dispatch calls the method', result == (True, 7, 'ok'), result)
+    raised = False
+    try: cr.dispatch({}, 'nope.nope', [], {})
+    except KeyError: raised = True
+    check('T3 unknown command raises KeyError', raised)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
+    test_command_registry()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
