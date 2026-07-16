@@ -55,10 +55,10 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Get current filter values."""
         filters = {}
 
-        # Status filter
+        # Status filter (map display label to approval_status value)
         status = status_ref.current.value if status_ref.current else ''
-        if status and status != 'All Statuses':
-            filters['status'] = status
+        if status and status_options.get(status):
+            filters['status'] = status_options[status]
 
         # Date range filter
         if date_filter_ref.current and date_filter_ref.current.value:
@@ -88,7 +88,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 params = []
 
                 if 'status' in filters:
-                    query += " AND status = ?"
+                    query += " AND approval_status = ?"
                     params.append(filters['status'])
 
                 if 'date_from' in filters:
@@ -300,15 +300,15 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
     )
 
     # Filters section
-    status_options = [
-        'All Statuses',
-        'Open',
-        'Case Review',
-        'Under Investigation',
-        'Case Validation',
-        'Close Case',
-        'Closed with STR'
-    ]
+    # Display label -> approval_status column value
+    status_options = {
+        'All Statuses': None,
+        'Draft': 'draft',
+        'Pending Approval': 'pending_approval',
+        'Approved': 'approved',
+        'Rejected': 'rejected',
+        'Rework': 'rework',
+    }
 
     filters_section = ft.Container(
         content=ft.Column(

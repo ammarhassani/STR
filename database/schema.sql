@@ -80,7 +80,6 @@ CREATE TABLE IF NOT EXISTS reports (
     fiu_feedback TEXT,
     fiu_letter_number TEXT,
     fiu_date TEXT,
-    status TEXT DEFAULT 'Open' CHECK(status IN ('Open', 'Case Review', 'Under Investigation', 'Case Validation', 'Close Case', 'Closed with STR')),
     is_deleted INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     created_by TEXT NOT NULL,
@@ -91,7 +90,6 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX idx_reports_report_number ON reports(report_number);
 CREATE INDEX idx_reports_sn ON reports(sn);
 CREATE INDEX idx_reports_cic ON reports(cic);
-CREATE INDEX idx_reports_status ON reports(status);
 CREATE INDEX idx_reports_report_date ON reports(report_date);
 CREATE INDEX idx_reports_is_deleted ON reports(is_deleted);
 CREATE INDEX idx_reports_entity_name ON reports(reported_entity_name);
@@ -353,16 +351,15 @@ INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_nam
 ('fiu_letter_receive_date', 'FIU Letter Receive Date', 'ØªØ§Ø±ÙŠØ® Ø§Ø³ØªÙ„Ø§Ù… Ø®Ø·Ø§Ø¨ FIU', 'DATE', 1, 0, 26, '{"format": "DD/MM/YYYY"}'),
 ('fiu_feedback', 'FIU Feedback', 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª FIU', 'TEXT', 1, 0, 27, '{}'),
 ('fiu_letter_number', 'FIU Letter Number', 'Ø±Ù‚Ù… Ø®Ø·Ø§Ø¨ FIU', 'TEXT', 1, 0, 28, '{"type": "integer"}'),
-('fiu_date', 'FIU Date', 'ØªØ§Ø±ÙŠØ® FIU', 'DATE', 1, 0, 29, '{"format": "DD/MM/YYYY"}'),
-('status', 'Status', 'Ø§Ù„Ø­Ø§Ù„Ø©', 'DROPDOWN', 1, 1, 30, '{"required": true, "options": ["Open", "Case Review", "Under Investigation", "Case Validation", "Close Case", "Closed with STR"]}');
+('fiu_date', 'FIU Date', 'ØªØ§Ø±ÙŠØ® FIU', 'DATE', 1, 0, 29, '{"format": "DD/MM/YYYY"}');
 
 -- Default Dashboard Widgets (Examples for Admin to customize)
 INSERT OR IGNORE INTO dashboard_config (widget_type, title, title_ar, sql_query, position_row, position_col, width, color, icon, visible_to_roles, is_active, display_order, created_by) VALUES
 ('kpi_card', 'Total Reports', 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±', 'SELECT COUNT(*) as value FROM reports WHERE is_deleted = 0', 0, 0, 3, '#3b82f6', 'file-text', 'admin,reporter', 1, 1, 'SYSTEM'),
-('kpi_card', 'Open Reports', 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ù…ÙØªÙˆØ­Ø©', 'SELECT COUNT(*) as value FROM reports WHERE status = ''Open'' AND is_deleted = 0', 0, 3, 3, '#10b981', 'folder-open', 'admin,reporter', 1, 2, 'SYSTEM'),
-('kpi_card', 'Under Investigation', 'Ù‚ÙŠØ¯ Ø§Ù„ØªØ­Ù‚ÙŠÙ‚', 'SELECT COUNT(*) as value FROM reports WHERE status = ''Under Investigation'' AND is_deleted = 0', 0, 6, 3, '#f59e0b', 'search', 'admin,reporter', 1, 3, 'SYSTEM'),
-('kpi_card', 'Closed Cases', 'Ø­Ø§Ù„Ø§Øª Ù…ØºÙ„Ù‚Ø©', 'SELECT COUNT(*) as value FROM reports WHERE status IN (''Close Case'', ''Closed with STR'') AND is_deleted = 0', 0, 9, 3, '#ef4444', 'check-circle', 'admin,reporter', 1, 4, 'SYSTEM'),
-('pie_chart', 'Reports by Status', 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø­Ø³Ø¨ Ø§Ù„Ø­Ø§Ù„Ø©', 'SELECT status as label, COUNT(*) as value FROM reports WHERE is_deleted = 0 GROUP BY status', 1, 0, 6, '#8b5cf6', NULL, 'admin,reporter', 1, 5, 'SYSTEM'),
+('kpi_card', 'Draft / Rework', 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø§Ù„Ù…ÙØªÙˆØ­Ø©', 'SELECT COUNT(*) as value FROM reports WHERE approval_status IN (''draft'', ''rework'') AND is_deleted = 0', 0, 3, 3, '#10b981', 'folder-open', 'admin,reporter', 1, 2, 'SYSTEM'),
+('kpi_card', 'Pending Approval', 'Ù‚ÙŠØ¯ Ø§Ù„ØªØ­Ù‚ÙŠÙ‚', 'SELECT COUNT(*) as value FROM reports WHERE approval_status = ''pending_approval'' AND is_deleted = 0', 0, 6, 3, '#f59e0b', 'search', 'admin,reporter', 1, 3, 'SYSTEM'),
+('kpi_card', 'Approved', 'Ø­Ø§Ù„Ø§Øª Ù…ØºÙ„Ù‚Ø©', 'SELECT COUNT(*) as value FROM reports WHERE approval_status = ''approved'' AND is_deleted = 0', 0, 9, 3, '#ef4444', 'check-circle', 'admin,reporter', 1, 4, 'SYSTEM'),
+('pie_chart', 'Reports by Status', 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø­Ø³Ø¨ Ø§Ù„Ø­Ø§Ù„Ø©', 'SELECT approval_status as label, COUNT(*) as value FROM reports WHERE is_deleted = 0 GROUP BY approval_status', 1, 0, 6, '#8b5cf6', NULL, 'admin,reporter', 1, 5, 'SYSTEM'),
 ('line_chart', 'Reports by Month', 'Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± Ø­Ø³Ø¨ Ø§Ù„Ø´Ù‡Ø±', 'SELECT strftime(''%Y-%m'', created_at) as label, COUNT(*) as value FROM reports WHERE is_deleted = 0 AND created_at >= date(''now'', ''-12 months'') GROUP BY strftime(''%Y-%m'', created_at) ORDER BY label', 1, 6, 6, '#06b6d4', NULL, 'admin,reporter', 1, 6, 'SYSTEM');
 
 -- ============================================================================
@@ -382,7 +379,7 @@ INSERT OR IGNORE INTO reports (
     type_of_suspected_transaction, arb_staff, total_transaction, report_classification,
     report_source, reporting_entity, reporter_initials,
     sending_date, original_copy_confirmation, fiu_number, fiu_letter_receive_date,
-    fiu_feedback, fiu_letter_number, fiu_date, status, created_by
+    fiu_feedback, fiu_letter_number, fiu_date, created_by
 ) VALUES
 (1, '2025/11/001', '04/11/2025', '3333', 'Example Financial Entity', 
  'Owner Name', 'Ø°ÙƒØ±', 'Saudi Arabian', '1122334455', '606051234567', 
@@ -390,14 +387,13 @@ INSERT OR IGNORE INTO reports (
  'Potential fraud and deception indicators', 'Internal Transfers', 'Ù„Ø§', '605040 SAR',
  'Crime', 'INCIDENT REPORT', 'Compliance Department', 'ZM',
  '04/11/2025', 'CONFIRMED', '416158', '04/11/2025',
- 'Entity added to database for monitoring', '5040', '04/11/2025',
- 'Open', 'admin'),
+ 'Entity added to database for monitoring', '5040', '04/11/2025', 'admin'),
 (2, '2025/11/002', '04/11/2025', '3334', 'Second Entity Example', 
  'Second Owner', 'Ø£Ù†Ø«Ù‰', 'Egyptian', '2233445566', '606051234568', 
  '56', '22554412', 'Unusual cash deposit patterns', 'Large transactions without clear business purpose', 
  'Cash Deposits', 'Ù†Ø¹Ù…', '1250000 SAR', 'Crime', 'INCIDENT REPORT', 
  'Branch Compliance', 'AK', '04/11/2025', 'PENDING', '416159', 
- '04/11/2025', 'Under review', '5041', '04/11/2025', 'Case Review', 'agent1');
+ '04/11/2025', 'Under review', '5041', '04/11/2025', 'agent1');
 
 -- ============================================================================
 -- VIEWS (For Reporting and Analytics)
@@ -434,19 +430,6 @@ GROUP BY u.user_id;
 -- ============================================================================
 -- TRIGGERS (Automatic Change Tracking)
 -- ============================================================================
-
--- Trigger: Log report status changes
-CREATE TRIGGER IF NOT EXISTS trg_reports_status_change
-AFTER UPDATE OF status ON reports
-FOR EACH ROW
-WHEN OLD.status != NEW.status
-BEGIN
-    INSERT INTO status_history (report_id, from_status, to_status, changed_by, changed_at)
-    VALUES (NEW.report_id, OLD.status, NEW.status, NEW.updated_by, NEW.updated_at);
-    
-    INSERT INTO change_history (table_name, record_id, field_name, old_value, new_value, change_type, changed_by, changed_at)
-    VALUES ('reports', NEW.report_id, 'status', OLD.status, NEW.status, 'STATUS_CHANGE', NEW.updated_by, NEW.updated_at);
-END;
 
 -- Trigger: Log report deletion (soft delete)
 CREATE TRIGGER IF NOT EXISTS trg_reports_soft_delete

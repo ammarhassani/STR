@@ -53,7 +53,7 @@ def export_reports(
     
     if filters:
         if filters.get('status'):
-            query += " AND status = ?"
+            query += " AND approval_status = ?"
             params.append(filters['status'])
         
         if filters.get('date_from'):

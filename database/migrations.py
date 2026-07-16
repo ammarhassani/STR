@@ -924,17 +924,28 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='reports'")
             result = cursor.fetchone()
             if result:
-                table_sql = result[0]
-
-                # Check if status column exists
-                if "status TEXT" in table_sql:
+                # Check if status column exists (exact column name via PRAGMA:
+                # substring matching on table SQL would also hit approval_status)
+                cursor.execute("PRAGMA table_info(reports)")
+                report_columns = {row[1] for row in cursor.fetchall()}
+                if 'status' in report_columns:
                     # Backup existing data
                     cursor.execute("SELECT COUNT(*) FROM reports")
                     report_count = cursor.fetchone()[0]
 
-                    # Drop views that depend on reports table first
-                    cursor.execute("DROP VIEW IF EXISTS v_active_reports")
-                    cursor.execute("DROP VIEW IF EXISTS v_reports_with_history")
+                    # Drop ALL views before renaming the table: SQLite refuses
+                    # ALTER TABLE ... RENAME while any view references reports
+                    # (e.g. v_user_activity, which the old code missed). Save
+                    # definitions so they can be recreated afterwards.
+                    cursor.execute("SELECT name, sql FROM sqlite_master WHERE type='view'")
+                    saved_views = cursor.fetchall()
+                    for view_name, _ in saved_views:
+                        cursor.execute(f"DROP VIEW IF EXISTS {view_name}")
+
+                    # Drop leftover temp table from a previously aborted run.
+                    # Safe: we only reach here when reports still exists with
+                    # its status column, so reports_new can only be stale.
+                    cursor.execute("DROP TABLE IF EXISTS reports_new")
 
                     # Create temporary table without status column
                     cursor.execute("""
@@ -980,36 +991,23 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                             relationship TEXT,
                             id_type TEXT,
                             deleted_at TEXT,
-                            deleted_by TEXT
+                            deleted_by TEXT,
+                            case_id TEXT
                         )
                     """)
 
-                    # Copy data from old table (excluding status column)
-                    cursor.execute("""
-                        INSERT INTO reports_new (
-                            report_id, sn, report_number, report_date, outgoing_letter_number,
-                            reported_entity_name, legal_entity_owner, gender, nationality, id_cr,
-                            account_membership, branch_id, cic, first_reason_for_suspicion,
-                            second_reason_for_suspicion, type_of_suspected_transaction, arb_staff,
-                            total_transaction, report_classification, report_source, reporting_entity,
-                            reporter_initials, sending_date, original_copy_confirmation, fiu_number,
-                            fiu_letter_receive_date, fiu_feedback, fiu_letter_number, fiu_date,
-                            is_deleted, created_at, created_by, updated_at, updated_by,
-                            current_version, approval_status, legal_entity_owner_checkbox,
-                            acc_membership_checkbox, relationship, id_type, deleted_at, deleted_by
-                        )
-                        SELECT
-                            report_id, sn, report_number, report_date, outgoing_letter_number,
-                            reported_entity_name, legal_entity_owner, gender, nationality, id_cr,
-                            account_membership, branch_id, cic, first_reason_for_suspicion,
-                            second_reason_for_suspicion, type_of_suspected_transaction, arb_staff,
-                            total_transaction, report_classification, report_source, reporting_entity,
-                            reporter_initials, sending_date, original_copy_confirmation, fiu_number,
-                            fiu_letter_receive_date, fiu_feedback, fiu_letter_number, fiu_date,
-                            is_deleted, created_at, created_by, updated_at, updated_by,
-                            current_version, approval_status, legal_entity_owner_checkbox,
-                            acc_membership_checkbox, relationship, id_type, deleted_at, deleted_by
-                        FROM reports
+                    # Copy data from old table (excluding status column).
+                    # Column list is computed dynamically: migration 26 (case_id)
+                    # may or may not have run before this one depending on the
+                    # DB's history, so copy whatever columns both tables share.
+                    cursor.execute("PRAGMA table_info(reports)")
+                    src_cols = {row[1] for row in cursor.fetchall()}
+                    cursor.execute("PRAGMA table_info(reports_new)")
+                    dst_cols = [row[1] for row in cursor.fetchall()]
+                    common = ", ".join(c for c in dst_cols if c in src_cols)
+                    cursor.execute(f"""
+                        INSERT INTO reports_new ({common})
+                        SELECT {common} FROM reports
                     """)
 
                     # Drop old table
@@ -1024,7 +1022,13 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                     cursor.execute("CREATE INDEX idx_reports_entity ON reports(reported_entity_name)")
                     cursor.execute("CREATE INDEX idx_reports_approval_status ON reports(approval_status)")
 
-                    # Recreate views
+                    # Recreate the views dropped above from their saved SQL
+                    for view_name, view_sql in saved_views:
+                        if view_sql:
+                            try:
+                                cursor.execute(view_sql)
+                            except sqlite3.OperationalError as view_err:
+                                messages.append(f"Could not recreate view {view_name}: {view_err}")
                     cursor.execute("""
                         CREATE VIEW IF NOT EXISTS v_active_reports AS
                         SELECT * FROM reports WHERE is_deleted = 0
@@ -1087,6 +1091,48 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                     messages.append(f"Seeded {added} column_settings rows for field validation")
         except Exception as e:
             messages.append(f"Column settings seed skipped: {str(e)}")
+
+        # Migration 28: Port stored dashboard widgets off the dropped status
+        # column. Only rewrites the exact SYSTEM-seeded queries so admin-
+        # customized widget SQL is never clobbered. Also removes the stale
+        # 'status' row from column_settings (field no longer exists on reports).
+        try:
+            widget_rewrites = [
+                ("SELECT COUNT(*) as value FROM reports WHERE status = 'Open' AND is_deleted = 0",
+                 "SELECT COUNT(*) as value FROM reports WHERE approval_status IN ('draft', 'rework') AND is_deleted = 0",
+                 "Draft / Rework"),
+                ("SELECT COUNT(*) as value FROM reports WHERE status = 'Under Investigation' AND is_deleted = 0",
+                 "SELECT COUNT(*) as value FROM reports WHERE approval_status = 'pending_approval' AND is_deleted = 0",
+                 "Pending Approval"),
+                ("SELECT COUNT(*) as value FROM reports WHERE status IN ('Close Case', 'Closed with STR') AND is_deleted = 0",
+                 "SELECT COUNT(*) as value FROM reports WHERE approval_status = 'approved' AND is_deleted = 0",
+                 "Approved"),
+                ("SELECT status as label, COUNT(*) as value FROM reports WHERE is_deleted = 0 GROUP BY status",
+                 "SELECT approval_status as label, COUNT(*) as value FROM reports WHERE is_deleted = 0 GROUP BY approval_status",
+                 None),
+            ]
+            rewritten = 0
+            for old_sql, new_sql, new_title in widget_rewrites:
+                if new_title:
+                    cursor.execute(
+                        "UPDATE dashboard_config SET sql_query = ?, title = ? WHERE sql_query = ?",
+                        (new_sql, new_title, old_sql)
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE dashboard_config SET sql_query = ? WHERE sql_query = ?",
+                        (new_sql, old_sql)
+                    )
+                rewritten += cursor.rowcount
+
+            cursor.execute("DELETE FROM column_settings WHERE column_name = 'status'")
+            removed_status_row = cursor.rowcount
+            conn.commit()
+
+            if rewritten or removed_status_row:
+                messages.append(f"Ported {rewritten} dashboard widgets to approval_status")
+        except Exception as e:
+            messages.append(f"Dashboard widget port skipped: {str(e)}")
 
         conn.close()
 

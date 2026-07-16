@@ -32,9 +32,9 @@ class DashboardService:
             query = """
                 SELECT
                     COUNT(*) FILTER (WHERE r.is_deleted = 0) as total_reports,
-                    COUNT(*) FILTER (WHERE r.status = 'Open' AND r.is_deleted = 0) as open_reports,
-                    COUNT(*) FILTER (WHERE r.status = 'Under Investigation' AND r.is_deleted = 0) as under_investigation,
-                    COUNT(*) FILTER (WHERE r.status IN ('Close Case', 'Closed with STR') AND r.is_deleted = 0) as closed_cases,
+                    COUNT(*) FILTER (WHERE r.approval_status IN ('draft', 'rework') AND r.is_deleted = 0) as open_reports,
+                    COUNT(*) FILTER (WHERE r.approval_status = 'pending_approval' AND r.is_deleted = 0) as under_investigation,
+                    COUNT(*) FILTER (WHERE r.approval_status = 'approved' AND r.is_deleted = 0) as closed_cases,
                     COUNT(*) FILTER (WHERE strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now') AND r.is_deleted = 0) as reports_this_month,
                     (SELECT COUNT(*) FROM users WHERE is_active = 1) as active_users
                 FROM reports r
@@ -68,18 +68,26 @@ class DashboardService:
         """
         try:
             query = """
-                SELECT status, COUNT(*) as count
+                SELECT approval_status, COUNT(*) as count
                 FROM reports
                 WHERE is_deleted = 0
-                GROUP BY status
+                GROUP BY approval_status
                 ORDER BY count DESC
             """
             result = self.db_manager.execute_with_retry(query)
 
+            # Human-readable labels for approval workflow states
+            labels = {
+                'draft': 'Draft',
+                'pending_approval': 'Pending Approval',
+                'approved': 'Approved',
+                'rejected': 'Rejected',
+                'rework': 'Rework',
+            }
             data = []
             for row in result:
                 data.append({
-                    'status': row[0],
+                    'status': labels.get(row[0], row[0] or 'Unknown'),
                     'count': row[1]
                 })
 

@@ -133,7 +133,7 @@ class ReportService:
                     report_number=report_data['report_number'],
                     metadata={
                         'entity_name': report_data.get('reported_entity_name', ''),
-                        'status': report_data.get('status', 'Open')
+                        'approval_status': report_data.get('approval_status', 'draft')
                     }
                 )
 
@@ -426,7 +426,7 @@ class ReportService:
         Get reports with optional filtering and pagination.
 
         Args:
-            status: Filter by status
+            status: Filter by approval status (draft, pending_approval, approved, rejected, rework)
             search_term: Search in report_number, reported_entity_name, cic
             date_from: Filter by start date (YYYY-MM-DD)
             date_to: Filter by end date (YYYY-MM-DD)
@@ -449,8 +449,8 @@ class ReportService:
             params = []
 
             if status:
-                query += " AND status = ?"
-                count_query += " AND status = ?"
+                query += " AND approval_status = ?"
+                count_query += " AND approval_status = ?"
                 params.append(status)
 
             if search_term:
@@ -509,80 +509,6 @@ class ReportService:
             self.logger.error(f"Error fetching reports: {str(e)}", exc_info=True)
             return [], 0
 
-    def update_report_status(self, report_id: int, new_status: str, comment: Optional[str] = None) -> Tuple[bool, str]:
-        """
-        Update report status.
-
-        Args:
-            report_id: Report ID
-            new_status: New status value
-            comment: Optional comment for the status change
-
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            current_user = self.auth_service.get_current_user()
-            if not current_user:
-                return False, "User not authenticated"
-
-            # Validate status
-            valid_statuses = ['Open', 'Case Review', 'Under Investigation',
-                            'Case Validation', 'Close Case', 'Closed with STR']
-            if new_status not in valid_statuses:
-                return False, f"Invalid status: {new_status}"
-
-            # Get current status
-            query = "SELECT status FROM reports WHERE report_id = ?"
-            result = self.db_manager.execute_with_retry(query, (report_id,))
-
-            if not result:
-                return False, "Report not found"
-
-            old_status = result[0][0]
-
-            # Update status
-            update_query = """
-                UPDATE reports
-                SET status = ?, updated_by = ?, updated_at = ?
-                WHERE report_id = ?
-            """
-            self.db_manager.execute_with_retry(
-                update_query,
-                (new_status, current_user['username'], datetime.now().isoformat(), report_id)
-            )
-
-            # Status history is automatically logged by trigger
-            # But we can add a comment if provided
-            if comment:
-                comment_query = """
-                    UPDATE status_history
-                    SET comment = ?
-                    WHERE report_id = ? AND to_status = ?
-                    ORDER BY changed_at DESC
-                    LIMIT 1
-                """
-                self.db_manager.execute_with_retry(
-                    comment_query,
-                    (comment, report_id, new_status)
-                )
-
-            self.logger.log_user_action(
-                "STATUS_CHANGED",
-                {
-                    'report_id': report_id,
-                    'old_status': old_status,
-                    'new_status': new_status,
-                    'comment': comment
-                }
-            )
-
-            return True, f"Status updated from '{old_status}' to '{new_status}'"
-
-        except Exception as e:
-            self.logger.error(f"Error updating status: {str(e)}", exc_info=True)
-            return False, f"Error updating status: {str(e)}"
-
     def get_report_history(self, report_id: int) -> List[Dict]:
         """
         Get change history for a report.
@@ -620,43 +546,6 @@ class ReportService:
 
         except Exception as e:
             self.logger.error(f"Error fetching report history: {str(e)}", exc_info=True)
-            return []
-
-    def get_status_history(self, report_id: int) -> List[Dict]:
-        """
-        Get status change history for a report.
-
-        Args:
-            report_id: Report ID
-
-        Returns:
-            List of status history dictionaries
-        """
-        try:
-            query = """
-                SELECT status_history_id, from_status, to_status, comment,
-                       changed_by, changed_at
-                FROM status_history
-                WHERE report_id = ?
-                ORDER BY changed_at DESC
-            """
-            result = self.db_manager.execute_with_retry(query, (report_id,))
-
-            history = []
-            for row in result:
-                history.append({
-                    'status_history_id': row[0],
-                    'from_status': row[1],
-                    'to_status': row[2],
-                    'comment': row[3],
-                    'changed_by': row[4],
-                    'changed_at': row[5]
-                })
-
-            return history
-
-        except Exception as e:
-            self.logger.error(f"Error fetching status history: {str(e)}", exc_info=True)
             return []
 
     def hard_delete_report(self, report_id: int, reason: str = "") -> Tuple[bool, str]:

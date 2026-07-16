@@ -35,17 +35,6 @@ def seed_dropdown_values(db_path):
 
         # Define dropdown values by category
         dropdown_data = {
-            # Note: 'status' field is being removed per requirements, kept for backward compatibility
-            'status': [
-                'Open',
-                'Under Review',
-                'Pending Information',
-                'Approved',
-                'Rejected',
-                'Closed',
-                'Escalated',
-                'On Hold',
-            ],
             # NEW: Comprehensive nationality list (~195 countries)
             'nationality': [
                 'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan', 'Antiguan', 'Argentine',

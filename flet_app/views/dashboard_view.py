@@ -390,7 +390,7 @@ def build_dashboard_content(
                             color=colors["text_primary"],
                         ),
                         ft.Text(
-                            "Open Reports",
+                            "Draft / Rework",
                             size=13,
                             color=colors["text_secondary"],
                             weight=ft.FontWeight.W_500,
@@ -428,7 +428,7 @@ def build_dashboard_content(
                             color=colors["text_primary"],
                         ),
                         ft.Text(
-                            "Under Investigation",
+                            "Pending Approval",
                             size=13,
                             color=colors["text_secondary"],
                             weight=ft.FontWeight.W_500,
@@ -466,7 +466,7 @@ def build_dashboard_content(
                             color=colors["text_primary"],
                         ),
                         ft.Text(
-                            "Closed Cases",
+                            "Approved",
                             size=13,
                             color=colors["text_secondary"],
                             weight=ft.FontWeight.W_500,
