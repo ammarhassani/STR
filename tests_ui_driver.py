@@ -82,20 +82,20 @@ def run():
     build_db()
     st = make_app_state()
 
-    # ============================================== LOGIN VIEW (real handler)
+    # ============================================== LOGIN VIEW (real handler, LIVE class)
     A = 'UI Login'
-    from flet_app.views.login_view import build_login_view
+    from flet_app.views.login_view import LoginView
     page = FakePage()
     captured = {}
     def on_success(user): captured['user'] = user
-    view = build_login_view(page, st, on_success)
-    # locate the two text fields + login button by walking tree
-    fields = [c for c in walk(view) if isinstance(c, ft.TextField)]
-    finding(A, 'login view builds with 2 fields', len(fields) < 2, f"{len(fields)} fields")
-    pass_f = next((f for f in fields if getattr(f, 'password', False)), None)
-    user_f = next((f for f in fields if not getattr(f, 'password', False)), None)
-    btns = find_buttons(view, 'login') or find_buttons(view)
-    login_btn = btns[0] if btns else None
+    login_view = LoginView(page, st, on_success)
+    view = login_view.build()
+    # LoginView exposes the fields/button directly — use those, not tree-walking
+    finding(A, 'login view builds with 2 fields',
+            login_view.username_field is None or login_view.password_field is None)
+    pass_f = login_view.password_field
+    user_f = login_view.username_field
+    login_btn = login_view.login_button
 
     def submit(u, p):
         """Click login; swallow the focus-on-unmounted AssertionError which is

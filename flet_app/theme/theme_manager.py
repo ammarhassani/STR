@@ -88,13 +88,22 @@ class ThemeManager:
             macos=ft.PageTransitionTheme.NONE, windows=ft.PageTransitionTheme.NONE,
             linux=ft.PageTransitionTheme.NONE,
         )
+        flat_button_theme = ft.ButtonTheme(
+            shape=ft.RoundedRectangleBorder(radius=r),
+            splash_color=ft.Colors.TRANSPARENT,
+        )
         self._page.theme = ft.Theme(
             use_material3=True,
             visual_density=ft.VisualDensity.COMPACT,
             splash_color=ft.Colors.TRANSPARENT,
             highlight_color=ft.Colors.TRANSPARENT,
             hover_color=colors["hover"],
+            shadow_color=ft.Colors.TRANSPARENT,
             page_transitions=none_tx,
+            elevated_button_theme=flat_button_theme,
+            text_button_theme=flat_button_theme,
+            outlined_button_theme=flat_button_theme,
+            filled_button_theme=flat_button_theme,
             color_scheme=ft.ColorScheme(
                 primary=colors["primary"],
                 secondary=colors["accent"],

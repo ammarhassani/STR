@@ -327,6 +327,7 @@ class LoginView:
                 color=ft.Colors.WHITE,
                 bgcolor=colors["primary"],
                 shape=ft.RoundedRectangleBorder(radius=8),
+                elevation=0,
             ),
             on_click=self._handle_login,
         )

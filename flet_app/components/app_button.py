@@ -5,6 +5,10 @@ from theme.theme_manager import theme_manager
 
 def app_button(text, on_click=None, variant="primary", icon=None,
                disabled=False, expand=False):
+    # NOTE: `disabled` is resolved once, at build time, into opacity/on_click/on_hover —
+    # it is NOT a live-updating property like ft.ElevatedButton.disabled. If a button's
+    # enabled state must change dynamically after build (e.g. loading spinners), use a
+    # styled ft.ElevatedButton instead of app_button.
     c = theme_manager.get_colors()
     r = c.get("radius", 4)
     if variant == "danger":

@@ -42,6 +42,7 @@ def test_flat_theme():
     check('T2 forced light mode', pg.theme_mode == ft.ThemeMode.LIGHT, pg.theme_mode)
     check('T2 compact density', pg.theme.visual_density == ft.VisualDensity.COMPACT)
     check('T2 no ripple splash', pg.theme.splash_color == ft.Colors.TRANSPARENT)
+    check('T2 no shadows', pg.theme.shadow_color == ft.Colors.TRANSPARENT)
     check('T2 no page transitions', pg.theme.page_transitions is not None)
     check('T2 is_dark always False', tm.is_dark is False)
 
