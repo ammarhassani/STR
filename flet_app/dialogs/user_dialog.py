@@ -7,6 +7,7 @@ from typing import Optional, Any, Callable
 
 from theme.theme_manager import theme_manager
 from services.security_service import SecurityService
+from components.app_button import app_button
 
 
 def show_user_dialog(
@@ -238,12 +239,11 @@ def show_user_dialog(
                     controls=[
                         ft.Container(expand=True),
                         ft.TextButton("Cancel", on_click=close_dialog),
-                        ft.ElevatedButton(
+                        app_button(
                             "Save",
                             icon=ft.Icons.SAVE,
-                            bgcolor=colors["primary"],
-                            color=ft.Colors.WHITE,
                             on_click=save_user,
+                            variant="primary",
                         ),
                     ],
                     spacing=8,

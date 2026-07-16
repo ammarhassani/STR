@@ -9,6 +9,7 @@ from typing import Callable, Optional, Any
 from theme.theme_manager import theme_manager
 from theme.colors import Colors
 from components.toast import show_error
+from components.app_button import app_button
 
 
 def build_login_view(
@@ -37,9 +38,9 @@ def build_login_view(
     # Create refs for controls we need to update
     username_ref = ft.Ref[ft.TextField]()
     password_ref = ft.Ref[ft.TextField]()
-    login_btn_ref = ft.Ref[ft.ElevatedButton]()
     error_text_ref = ft.Ref[ft.Text]()
     error_container_ref = ft.Ref[ft.Container]()
+    login_btn = None  # assigned below, before set_loading() can ever run
 
     def set_loading(loading: bool):
         """Set loading state."""
@@ -50,9 +51,11 @@ def build_login_view(
             username_ref.current.disabled = loading
         if password_ref.current:
             password_ref.current.disabled = loading
-        if login_btn_ref.current:
-            login_btn_ref.current.disabled = loading
-            login_btn_ref.current.text = "Logging in..." if loading else "Login"
+        if login_btn is not None:
+            login_btn.disabled = loading
+            login_btn.opacity = 0.45 if loading else 1.0
+            # app_button has no ref-able inner text; poke the Text control it wraps
+            login_btn.content.controls[-1].value = "Logging in..." if loading else "Login"
 
         page.update()
 
@@ -136,6 +139,7 @@ def build_login_view(
             handle_login(e)
 
     # Build the UI
+    login_btn = app_button("Login", on_click=handle_login, variant="primary", expand=False)
     login_card = ft.Container(
         content=ft.Column(
             controls=[
@@ -220,18 +224,7 @@ def build_login_view(
                 ft.Container(height=16),
 
                 # Login button
-                ft.ElevatedButton(
-                    ref=login_btn_ref,
-                    text="Login",
-                    width=float("inf"),
-                    height=48,
-                    style=ft.ButtonStyle(
-                        color=ft.Colors.WHITE,
-                        bgcolor=colors["primary"],
-                        shape=ft.RoundedRectangleBorder(radius=8),
-                    ),
-                    on_click=handle_login,
-                ),
+                login_btn,
 
                 # Spacer
                 ft.Container(expand=True),

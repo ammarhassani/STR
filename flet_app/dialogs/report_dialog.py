@@ -9,6 +9,7 @@ import re
 import asyncio
 
 from theme.theme_manager import theme_manager
+from components.app_button import app_button
 from components.form_fields import (
     create_text_field,
     create_dropdown,
@@ -1211,12 +1212,11 @@ def show_report_dialog(
     )
 
     action_buttons.append(
-        ft.ElevatedButton(
+        app_button(
             "Save Report",
             icon=ft.Icons.SAVE,
-            bgcolor=colors["primary"],
-            color=ft.Colors.WHITE,
             on_click=save_report,
+            variant="primary",
         )
     )
 
@@ -1227,12 +1227,11 @@ def show_report_dialog(
         is_admin = current_user and current_user.get('role') == 'admin'
         if not is_admin and approval_status not in ['pending_approval', 'approved']:
             action_buttons.append(
-                ft.ElevatedButton(
+                app_button(
                     "Submit for Approval",
                     icon=ft.Icons.CHECK_CIRCLE,
-                    bgcolor=colors["success"],
-                    color=ft.Colors.WHITE,
                     on_click=submit_for_approval,
+                    variant="primary",
                 )
             )
 

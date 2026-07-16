@@ -9,6 +9,7 @@ from datetime import datetime
 
 from theme.theme_manager import theme_manager
 from components.toast import show_success, show_error
+from components.app_button import app_button
 
 
 def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
@@ -219,8 +220,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 f"This cannot be undone and existing report numbers are unchanged."),
             actions=[
                 ft.TextButton("Cancel", on_click=cancel),
-                ft.ElevatedButton("Close Month", bgcolor=colors["warning"],
-                                  color=ft.Colors.WHITE, on_click=do_close),
+                app_button("Close Month", on_click=do_close, variant="danger"),
             ],
         )
         page.overlay.append(confirm)
@@ -414,12 +414,11 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 icon=ft.Icons.RESTORE,
                 on_click=handle_reset,
             ),
-            ft.ElevatedButton(
+            app_button(
                 "Save Settings",
                 icon=ft.Icons.SAVE,
-                bgcolor=colors["primary"],
-                color=ft.Colors.WHITE,
                 on_click=handle_save,
+                variant="primary",
             ),
         ],
         spacing=12,

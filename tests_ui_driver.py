@@ -51,6 +51,11 @@ def find_buttons(tree, text_sub=None):
         if isinstance(c, (ft.ElevatedButton, ft.TextButton, ft.FilledButton, ft.OutlinedButton, ft.IconButton)):
             if text_sub is None or (getattr(c, 'text', '') and text_sub.lower() in c.text.lower()):
                 out.append(c)
+        elif isinstance(c, ft.Container) and getattr(c, 'on_click', None) is not None:
+            # app_button() flat Container: Row of [Icon?, Text] with on_click set
+            label = ' '.join(sub.value for sub in walk(c) if isinstance(sub, ft.Text) and sub.value)
+            if text_sub is None or text_sub.lower() in label.lower():
+                out.append(c)
     return out
 
 def build_db():

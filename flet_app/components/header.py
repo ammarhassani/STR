@@ -7,6 +7,7 @@ from typing import Callable, Optional, Any
 
 from theme.theme_manager import theme_manager
 from theme.colors import Colors
+from components.app_button import app_button
 
 
 def create_header(
@@ -88,12 +89,11 @@ def create_header(
     # New Report button (if user has permission)
     if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
         toolbar_buttons.append(
-            ft.ElevatedButton(
+            app_button(
                 "New Report",
                 icon=ft.Icons.ADD,
-                bgcolor=colors["primary"],
-                color=ft.Colors.WHITE,
                 on_click=handle_new_report,
+                variant="primary",
             )
         )
 
