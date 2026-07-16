@@ -177,6 +177,56 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         reset_dialog.open = True
         page.update()
 
+    active_month_ref = ft.Ref[ft.Text]()
+
+    def refresh_active_month():
+        svc = getattr(app_state, 'report_number_service', None)
+        if svc and active_month_ref.current:
+            try:
+                active_month_ref.current.value = f"Current numbering month: {svc.get_active_numbering_month()}"
+            except Exception:
+                active_month_ref.current.value = "Current numbering month: unknown"
+
+    def handle_close_month(e):
+        """Admin closes the current numbering month (R50/R51). No reopen."""
+        svc = getattr(app_state, 'report_number_service', None)
+        user = app_state.current_user or {}
+        if not svc:
+            show_error(page, "Numbering service unavailable")
+            return
+        month = svc.get_active_numbering_month()
+
+        def do_close(ev):
+            confirm.open = False
+            page.update()
+            ok, msg = svc.close_month(month, user.get('username', ''))
+            if ok:
+                show_success(page, msg)
+                refresh_active_month()
+                page.update()
+            else:
+                show_error(page, msg)
+
+        def cancel(ev):
+            confirm.open = False
+            page.update()
+
+        confirm = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Close Numbering Month"),
+            content=ft.Text(
+                f"Close month {month}? New reports will use the next month. "
+                f"This cannot be undone and existing report numbers are unchanged."),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel),
+                ft.ElevatedButton("Close Month", bgcolor=colors["warning"],
+                                  color=ft.Colors.WHITE, on_click=do_close),
+            ],
+        )
+        page.overlay.append(confirm)
+        confirm.open = True
+        page.update()
+
     def create_setting_field(
         label: str,
         ref: ft.Ref,
@@ -257,6 +307,18 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                     "Days into new month to continue using previous month. Example: Set to 3 means Dec 1st-3rd still use November (2025/11)",
                     0, 15,
                 ),
+                ft.Divider(height=1, color=colors["border"]),
+                ft.Text(ref=active_month_ref, value="Current numbering month: …",
+                        size=12, color=colors["text_secondary"]),
+                ft.Row(controls=[
+                    ft.OutlinedButton(
+                        "Close Current Month",
+                        icon=ft.Icons.EVENT_BUSY,
+                        on_click=handle_close_month,
+                    ),
+                    ft.Text("Advances numbering to the next month. Cannot be undone.",
+                            size=11, italic=True, color=colors["text_muted"]),
+                ], spacing=10),
             ],
             spacing=8,
         ),
@@ -365,6 +427,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Trigger initial load
     page.run_task(load_settings)
+    refresh_active_month()
 
     return ft.Column(
         controls=[

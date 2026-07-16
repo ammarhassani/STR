@@ -221,6 +221,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         decision_ref = {"value": "approve"}
         is_edit_mode = {"value": False}
         comment_ref = ft.Ref[ft.TextField]()
+        reassign_ref = ft.Ref[ft.Dropdown]()
         form_container_ref = ft.Ref[ft.Container]()
         loading_ref = ft.Ref[ft.Container]()
         save_btn_ref = ft.Ref[ft.ElevatedButton]()
@@ -411,9 +412,13 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 show_error(page, "Please provide feedback for rejection or rework request.")
                 return
 
+            reassign_to = None
+            if decision == "rework" and reassign_ref.current and reassign_ref.current.value:
+                reassign_to = reassign_ref.current.value
+
             review_dialog.open = False
             page.update()
-            process_decision(approval, decision, comment)
+            process_decision(approval, decision, comment, reassign_to)
 
         def cancel_review(e):
             review_dialog.open = False
@@ -569,6 +574,21 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                             max_lines=3,
                             text_size=12,
                         ),
+
+                        # Rework reassignment (R36): optionally hand off to a
+                        # different active agent. Only relevant for Rework.
+                        ft.Dropdown(
+                            ref=reassign_ref,
+                            label="Reassign rework to (optional)",
+                            hint_text="Keep current agent",
+                            options=[ft.dropdown.Option(key="", text="-- Keep current agent --")] + [
+                                ft.dropdown.Option(key=a['username'], text=a['full_name'] or a['username'])
+                                for a in (app_state.approval_service.get_active_agents()
+                                          if app_state.approval_service else [])
+                            ],
+                            value="",
+                            text_size=12,
+                        ),
                     ],
                     spacing=10,
                     scroll=ft.ScrollMode.AUTO,
@@ -596,7 +616,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         # Load report data after dialog is shown
         load_report_data()
 
-    def process_decision(approval: Dict, decision: str, comment: str):
+    def process_decision(approval: Dict, decision: str, comment: str, reassign_to: str = None):
         """Process the approval decision."""
         try:
             approval_id = approval['approval_id']
@@ -611,7 +631,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             else:
                 request_rework = (decision == 'rework')
                 success, message = approval_service.reject_report(
-                    approval_id, comment, request_rework
+                    approval_id, comment, request_rework, reassign_to=reassign_to
                 )
 
             if success:

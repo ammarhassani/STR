@@ -194,6 +194,20 @@ def run():
         except Exception as e:
             finding(D, f'{name} view build CRASHED', True, traceback.format_exc().splitlines()[-1])
 
+    # ---- new-feature UI wiring present
+    E = 'UI Feature wiring'
+    ap_src = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
+    finding(E, 'approval panel missing reassign dropdown wiring',
+            'reassign_ref' not in ap_src or 'get_active_agents' not in ap_src)
+    finding(E, 'reject_report not passed reassign_to from UI',
+            'reassign_to=reassign_to' not in ap_src)
+    set_src = open(os.path.join(REPO, 'flet_app/views/settings_view.py')).read()
+    finding(E, 'settings missing Close Month control',
+            'handle_close_month' not in set_src or 'close_month(' not in set_src)
+    rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py')).read()
+    finding(E, 'report dialog missing edit-lock acquire/release',
+            'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]
