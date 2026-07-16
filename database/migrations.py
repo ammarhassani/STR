@@ -1058,6 +1058,36 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             conn.commit()
             messages.append("Added case_id column to reports table")
 
+        # Migration 27: Seed column_settings rows for all report fields on existing DBs.
+        # schema.sql seeds these only when a database is created fresh; older DBs are
+        # missing rows for most fields, which silently disables generic field validation.
+        # Re-executing the INSERT OR IGNORE from schema.sql is safe: column_name is
+        # UNIQUE, so existing rows (including admin-customized rules) are untouched.
+        try:
+            import os
+            import re
+            cursor.execute("SELECT COUNT(*) FROM column_settings")
+            before_count = cursor.fetchone()[0]
+
+            schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+            with open(schema_path, 'r', encoding='utf-8') as f:
+                schema_sql = f.read()
+
+            match = re.search(
+                r"INSERT OR IGNORE INTO column_settings.*?;",
+                schema_sql,
+                re.DOTALL
+            )
+            if match:
+                cursor.execute(match.group(0))
+                conn.commit()
+                cursor.execute("SELECT COUNT(*) FROM column_settings")
+                added = cursor.fetchone()[0] - before_count
+                if added > 0:
+                    messages.append(f"Seeded {added} column_settings rows for field validation")
+        except Exception as e:
+            messages.append(f"Column settings seed skipped: {str(e)}")
+
         conn.close()
 
         if messages:

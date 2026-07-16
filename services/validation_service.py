@@ -556,8 +556,7 @@ class ValidationService:
                 SELECT column_name, display_name_en, display_name_ar,
                        is_required, validation_rules, updated_by
                 FROM column_settings
-                WHERE column_name IN ('id_cr', 'account_membership')
-                ORDER BY column_name
+                ORDER BY display_order, column_name
             """
             results = self.db_manager.execute_with_retry(query)
 
@@ -650,9 +649,12 @@ class ValidationService:
             # Strip whitespace
             value = value.strip()
 
-            # Check if empty (required check should be done separately)
+            # For empty values, check required status
             if not value:
-                return True, ""
+                if self.is_field_required(field_name):
+                    display_name = self._get_field_display_name(field_name)
+                    return False, f"{display_name} is required"
+                return True, ""  # Optional empty field is valid
 
             # Validate based on field type
             if field_name == 'id_cr':
@@ -742,3 +744,104 @@ class ValidationService:
             if self.logger:
                 self.logger.error(f"Error checking if field is required: {str(e)}")
             return False
+
+    def _get_field_display_name(self, field_name: str) -> str:
+        """
+        Get display name for a field from database.
+
+        Args:
+            field_name: Column name in column_settings table
+
+        Returns:
+            Display name or formatted field name
+        """
+        if not self.db_manager:
+            return field_name.replace('_', ' ').title()
+
+        try:
+            query = "SELECT display_name_en FROM column_settings WHERE column_name = ?"
+            result = self.db_manager.execute_with_retry(query, (field_name,))
+            if result and result[0][0]:
+                return result[0][0]
+        except:
+            pass
+
+        return field_name.replace('_', ' ').title()
+
+    def validate_field_generic(self, field_name: str, value: str, check_required: bool = True) -> Tuple[bool, str]:
+        """
+        Generic field validation using database rules.
+        Works with any field that has validation rules configured.
+
+        Args:
+            field_name: Column name in column_settings
+            value: Value to validate
+            check_required: Whether to enforce required status
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            # Get display name for error messages
+            display_name = self._get_field_display_name(field_name)
+
+            # Check required status first
+            if check_required and self.is_field_required(field_name):
+                if not value or not str(value).strip():
+                    return False, f"{display_name} is required"
+
+            # Skip pattern validation if empty (required check already passed)
+            if not value or not str(value).strip():
+                return True, ""
+
+            # Get validation rules
+            rules = self.get_validation_rules(field_name)
+            if not rules:
+                return True, ""
+
+            value = str(value).strip()
+
+            # Apply pattern validation if defined
+            if 'pattern' in rules:
+                pattern = rules['pattern']
+                if not re.match(pattern, value):
+                    error_msg = rules.get('error_message', f"Invalid format for {display_name}")
+                    return False, error_msg
+
+            # Apply length validation
+            if 'maxLength' in rules and len(value) > rules['maxLength']:
+                return False, f"Must be at most {rules['maxLength']} characters"
+
+            if 'minLength' in rules and len(value) < rules['minLength']:
+                return False, f"Must be at least {rules['minLength']} characters"
+
+            # Apply exact length validation
+            if 'length' in rules and len(value) != rules['length']:
+                return False, f"Must be exactly {rules['length']} characters"
+
+            # Apply numeric validation
+            if rules.get('type') == 'numeric' or rules.get('type') == 'integer':
+                if not value.replace('.', '').replace('-', '').isdigit():
+                    return False, "Must be a valid number"
+
+            # Apply min/max value for numbers
+            if 'min' in rules:
+                try:
+                    if float(value) < rules['min']:
+                        return False, f"Must be at least {rules['min']}"
+                except ValueError:
+                    pass
+
+            if 'max' in rules:
+                try:
+                    if float(value) > rules['max']:
+                        return False, f"Must be at most {rules['max']}"
+                except ValueError:
+                    pass
+
+            return True, ""
+
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Validation error for {field_name}: {str(e)}")
+            return False, f"Validation error: {str(e)}"

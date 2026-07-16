@@ -76,19 +76,46 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         if not rules:
             return "No rules defined"
 
+        parts = []
+
+        # Handle special fields first
         if field_name == 'id_cr':
-            return (
-                f"Length: {rules.get('length', 'N/A')} digits | "
-                f"Saudi ID starts: {rules.get('saudi_starts_with', 'N/A')} | "
-                f"CR starts: {rules.get('cr_starts_with', 'N/A')}"
-            )
+            if 'length' in rules:
+                parts.append(f"Length: {rules['length']} digits")
+            if 'saudi_starts_with' in rules:
+                parts.append(f"Saudi ID starts: {rules['saudi_starts_with']}")
+            if 'cr_starts_with' in rules:
+                parts.append(f"CR starts: {rules['cr_starts_with']}")
+            return " | ".join(parts) if parts else "Default ID/CR validation"
+
         elif field_name == 'account_membership':
-            return (
-                f"Account: {rules.get('account_length', 'N/A')} digits | "
-                f"Membership: {rules.get('membership_length', 'N/A')} digits"
-            )
-        else:
-            return str(rules)
+            if 'account_length' in rules:
+                parts.append(f"Account: {rules['account_length']} digits")
+            if 'membership_length' in rules:
+                parts.append(f"Membership: {rules['membership_length']} digits")
+            return " | ".join(parts) if parts else "Default account validation"
+
+        # Generic field rules
+        if rules.get('required'):
+            parts.append("Required")
+        if 'pattern' in rules:
+            parts.append(f"Pattern: {rules.get('example', rules['pattern'][:20])}")
+        if 'maxLength' in rules:
+            parts.append(f"Max: {rules['maxLength']} chars")
+        if 'minLength' in rules:
+            parts.append(f"Min: {rules['minLength']} chars")
+        if 'length' in rules:
+            parts.append(f"Length: {rules['length']}")
+        if rules.get('type') == 'numeric':
+            parts.append("Numeric")
+        elif rules.get('type') == 'integer':
+            parts.append("Integer")
+        if 'min' in rules:
+            parts.append(f"Min value: {rules['min']}")
+        if 'max' in rules:
+            parts.append(f"Max value: {rules['max']}")
+
+        return " | ".join(parts) if parts else "Default validation"
 
     def build_table() -> ft.Control:
         """Build the fields data table."""
@@ -257,12 +284,69 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 }
 
         else:
+            # Generic field validation - show common rule inputs
+            pattern_input = ft.TextField(
+                label="Pattern (regex)",
+                value=str(rules.get('pattern', '')),
+                hint_text="e.g., ^[A-Z]{2}[0-9]+$",
+                width=300,
+            )
+            min_length_input = ft.TextField(
+                label="Min Length",
+                value=str(rules.get('minLength', '')) if rules.get('minLength') else '',
+                keyboard_type=ft.KeyboardType.NUMBER,
+                width=120,
+            )
+            max_length_input = ft.TextField(
+                label="Max Length",
+                value=str(rules.get('maxLength', '')) if rules.get('maxLength') else '',
+                keyboard_type=ft.KeyboardType.NUMBER,
+                width=120,
+            )
+            type_dropdown = ft.Dropdown(
+                label="Type",
+                value=rules.get('type', 'text'),
+                options=[
+                    ft.dropdown.Option("text", "Text"),
+                    ft.dropdown.Option("numeric", "Numeric"),
+                    ft.dropdown.Option("integer", "Integer"),
+                ],
+                width=120,
+            )
+
             rules_controls = [
-                ft.Text("No specific validation rules for this field", color=colors["text_muted"]),
+                ft.Text("Validation Rules", weight=ft.FontWeight.BOLD, size=13),
+                ft.Container(height=8),
+                ft.Row(controls=[type_dropdown, min_length_input, max_length_input], spacing=12, wrap=True),
+                ft.Container(height=8),
+                pattern_input,
+                ft.Container(height=4),
+                ft.Text(
+                    "Pattern: Regular expression for value format\n"
+                    "Min/Max Length: Character count constraints\n"
+                    "Type: Data type (numeric fields only allow numbers)",
+                    size=11,
+                    color=colors["text_muted"],
+                ),
             ]
 
             def get_rules():
-                return {}
+                new_rules = {}
+                if pattern_input.value and pattern_input.value.strip():
+                    new_rules['pattern'] = pattern_input.value.strip()
+                if min_length_input.value and min_length_input.value.strip():
+                    try:
+                        new_rules['minLength'] = int(min_length_input.value)
+                    except ValueError:
+                        pass
+                if max_length_input.value and max_length_input.value.strip():
+                    try:
+                        new_rules['maxLength'] = int(max_length_input.value)
+                    except ValueError:
+                        pass
+                if type_dropdown.value and type_dropdown.value != 'text':
+                    new_rules['type'] = type_dropdown.value
+                return new_rules
 
         def save_changes(e):
             current_user = app_state.auth_service.get_current_user()
@@ -358,7 +442,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Info text
     info_text = ft.Text(
-        "Configure validation rules for ID/CR and Account/Membership fields. "
+        "Configure validation rules and required status for all report fields. "
         "These rules will be applied when creating or editing reports.",
         size=13,
         color=colors["text_secondary"],

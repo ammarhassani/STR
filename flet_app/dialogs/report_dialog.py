@@ -190,40 +190,146 @@ def show_report_dialog(
                 reporter_initials_ref.current.error_text = None
             page.update()
 
+    def validate_id_cr_live(e):
+        """Live validation for ID/CR field using database rules."""
+        if id_cr_ref.current:
+            value = id_cr_ref.current.value.strip() if id_cr_ref.current.value else ""
+            if not value:
+                id_cr_ref.current.error_text = None
+                page.update()
+                return
+
+            # Get context
+            nationality = nationality_ref.current.value if nationality_ref.current else ""
+            is_cr = id_type_checkbox_ref.current.value if id_type_checkbox_ref.current else False
+
+            # Validate using service
+            is_valid, error_msg = validation_service.validate_field_from_db(
+                'id_cr', value, nationality=nationality, is_cr=is_cr
+            )
+
+            id_cr_ref.current.error_text = error_msg if not is_valid else None
+            page.update()
+
+    def validate_account_live(e):
+        """Live validation for Account/Membership field using database rules."""
+        if account_ref.current:
+            value = account_ref.current.value.strip() if account_ref.current.value else ""
+            if not value:
+                account_ref.current.error_text = None
+                page.update()
+                return
+
+            # Get context
+            is_membership = acc_membership_ref.current.value if acc_membership_ref.current else False
+
+            # Validate using service
+            is_valid, error_msg = validation_service.validate_field_from_db(
+                'account_membership', value, is_membership=is_membership
+            )
+
+            account_ref.current.error_text = error_msg if not is_valid else None
+            page.update()
+
     def validate_form() -> tuple[bool, list]:
-        """Validate form data. Returns (is_valid, errors)."""
+        """Validate form data using database-backed rules. Returns (is_valid, errors)."""
         errors = []
+        form_data = get_form_data()
 
-        # Required fields
-        sn = sn_ref.current.value.strip() if sn_ref.current else ""
-        if not sn:
-            errors.append("Serial Number is required")
-        elif not sn.isdigit():
-            errors.append("Serial Number must be a number")
+        # Field mapping: database column name -> (form_data key, display name)
+        field_mappings = {
+            'sn': ('sn', 'Serial Number'),
+            'report_number': ('report_number', 'Report Number'),
+            'report_date': ('report_date', 'Report Date'),
+            'reported_entity_name': ('reported_entity_name', 'Reported Entity Name'),
+            'id_cr': ('id_cr', 'ID/CR'),
+            'account_membership': ('account_membership', 'Account/Membership'),
+            'cic': ('cic', 'CIC'),
+            'reporter_initials': ('reporter_initials', 'Reporter Initials'),
+            'gender': ('gender', 'Gender'),
+            'nationality': ('nationality', 'Nationality'),
+            'branch_id': ('branch_id', 'Branch ID'),
+            'first_reason_for_suspicion': ('first_reason_for_suspicion', 'First Reason for Suspicion'),
+            'second_reason_for_suspicion': ('second_reason_for_suspicion', 'Second Reason for Suspicion'),
+            'type_of_suspected_transaction': ('type_of_suspected_transaction', 'Type of Suspected Transaction'),
+            'arb_staff': ('arb_staff', 'ARB Staff'),
+            'total_transaction': ('total_transaction', 'Total Transaction'),
+            'report_classification': ('report_classification', 'Report Classification'),
+            'report_source': ('report_source', 'Report Source'),
+            'reporting_entity': ('reporting_entity', 'Reporting Entity'),
+            'sending_date': ('sending_date', 'Sending Date'),
+            'fiu_number': ('fiu_number', 'FIU Number'),
+            'fiu_letter_receive_date': ('fiu_letter_receive_date', 'FIU Letter Receive Date'),
+            'fiu_feedback': ('fiu_feedback', 'FIU Feedback'),
+            'fiu_letter_number': ('fiu_letter_number', 'FIU Letter Number'),
+        }
 
-        report_num = report_number_ref.current.value.strip() if report_number_ref.current else ""
-        if not report_num:
-            errors.append("Report Number is required")
-        elif not re.match(r'^\d{4}/\d{2}/\d{3}$', report_num):
-            errors.append("Report Number must be in format YYYY/MM/NNN (e.g., 2025/11/001)")
+        # Validate each field using database rules
+        for field_name, (data_key, display_name) in field_mappings.items():
+            value = form_data.get(data_key)
+            if value is None:
+                value = ''
+            value = str(value).strip() if value else ''
 
-        entity = entity_name_ref.current.value.strip() if entity_name_ref.current else ""
-        if not entity:
-            errors.append("Reported Entity Name is required")
+            # Special handling for id_cr field (needs nationality context)
+            if field_name == 'id_cr' and value:
+                nationality = form_data.get('nationality', '')
+                is_cr = form_data.get('id_type', 'ID') == 'CR'
+                is_valid, error_msg = validation_service.validate_field_from_db(
+                    'id_cr', value, nationality=nationality, is_cr=is_cr
+                )
+                if not is_valid:
+                    errors.append(f"{display_name}: {error_msg}")
+                continue
 
-        # CIC validation
-        cic = cic_ref.current.value.strip() if cic_ref.current else ""
+            # Special handling for account_membership field
+            if field_name == 'account_membership' and value:
+                is_membership = form_data.get('acc_membership_checkbox', 0) == 1
+                is_valid, error_msg = validation_service.validate_field_from_db(
+                    'account_membership', value, is_membership=is_membership
+                )
+                if not is_valid:
+                    errors.append(f"{display_name}: {error_msg}")
+                continue
+
+            # Generic validation for all other fields
+            is_valid, error_msg = validation_service.validate_field_generic(
+                field_name, value, check_required=True
+            )
+            if not is_valid:
+                # Avoid duplicate "is required" text
+                if "is required" in error_msg:
+                    errors.append(error_msg)
+                else:
+                    errors.append(f"{display_name}: {error_msg}")
+
+        # Additional format validations (keep existing hardcoded rules for complex patterns)
+        sn = form_data.get('sn', '')
+        if sn and not str(sn).isdigit():
+            if "Serial Number" not in str(errors):
+                errors.append("Serial Number must be a number")
+
+        report_num = form_data.get('report_number', '')
+        if report_num and not re.match(r'^\d{4}/\d{2}/\d{3}$', str(report_num)):
+            if "Report Number" not in str(errors):
+                errors.append("Report Number must be in format YYYY/MM/NNN (e.g., 2025/11/001)")
+
+        # CIC validation (16 digits)
+        cic = form_data.get('cic', '')
         if cic:
-            cic_cleaned = cic.replace(' ', '').replace('-', '')
+            cic_cleaned = str(cic).replace(' ', '').replace('-', '')
             if not cic_cleaned.isdigit():
-                errors.append("CIC must contain only digits")
+                if "CIC" not in str(errors):
+                    errors.append("CIC must contain only digits")
             elif len(cic_cleaned) != 16:
-                errors.append("CIC must be exactly 16 digits")
+                if "CIC" not in str(errors):
+                    errors.append("CIC must be exactly 16 digits")
 
-        # Reporter initials validation
-        initials = reporter_initials_ref.current.value.strip() if reporter_initials_ref.current else ""
-        if initials and not re.match(r'^[A-Z]{2}$', initials):
-            errors.append("Reporter Initials must be 2 uppercase letters")
+        # Reporter initials validation (2 uppercase letters)
+        initials = form_data.get('reporter_initials', '')
+        if initials and not re.match(r'^[A-Z]{2}$', str(initials)):
+            if "Reporter Initials" not in str(errors):
+                errors.append("Reporter Initials must be 2 uppercase letters")
 
         return len(errors) == 0, errors
 
@@ -699,6 +805,7 @@ def show_report_dialog(
                                 hint_text="Enter ID or Commercial Registration number",
                                 text_size=13,
                                 border_radius=8,
+                                on_change=validate_id_cr_live,
                             ),
                         ],
                         spacing=4,
@@ -730,6 +837,7 @@ def show_report_dialog(
                                 hint_text="Enter account or membership number",
                                 text_size=13,
                                 border_radius=8,
+                                on_change=validate_account_live,
                             ),
                         ],
                         spacing=4,
