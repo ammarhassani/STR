@@ -69,8 +69,10 @@ class HostService:
                 self.db.execute_with_retry(
                     "INSERT OR IGNORE INTO applied_commands (command_id, response_json) VALUES (?, ?)",
                     (cid, json.dumps(resp, default=str)))
-            except Exception:
-                pass
+            except Exception as e:
+                # safety-critical: if the idempotency ledger write fails, a
+                # post-restart replay could re-run this command. Never silent.
+                print(f"[HOST][WARN] failed to record applied_command {cid}: {e}")
         return resp
 
     # ---- replica ----
