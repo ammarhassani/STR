@@ -1,14 +1,16 @@
-"""Flat, Material-free button. Container + on_click, no ripple/elevation."""
+"""Flat, Material-free button. Container + on_click, no ripple/elevation.
+
+`disabled` uses Flet's native Control.disabled, so it is LIVE: toggle
+`btn.disabled` (and call `btn.update()`) after build and the button re-arms
+correctly — native disabled blocks the click and greys the control. Use
+`set_button_enabled(btn, enabled)` for the opacity + disabled toggle together.
+"""
 import flet as ft
 from theme.theme_manager import theme_manager
 
 
 def app_button(text, on_click=None, variant="primary", icon=None,
                disabled=False, expand=False):
-    # NOTE: `disabled` is resolved once, at build time, into opacity/on_click/on_hover —
-    # it is NOT a live-updating property like ft.ElevatedButton.disabled. If a button's
-    # enabled state must change dynamically after build (e.g. loading spinners), use a
-    # styled ft.ElevatedButton instead of app_button.
     c = theme_manager.get_colors()
     r = c.get("radius", 4)
     if variant == "danger":
@@ -32,15 +34,28 @@ def app_button(text, on_click=None, variant="primary", icon=None,
         border_radius=r,
         ink=False,
         alignment=ft.alignment.center,
+        # Native disabled: blocks the click AND stays live-toggleable. on_click
+        # is always wired; Flet gates it while disabled.
+        disabled=disabled,
         opacity=0.45 if disabled else 1.0,
-        on_click=(None if disabled else on_click),
+        on_click=on_click,
         expand=expand,
     )
 
     def _hover(e):
+        if cont.disabled:
+            return
         cont.bgcolor = hover if e.data == "true" else bg
         cont.update()
 
-    if not disabled:
-        cont.on_hover = _hover
+    cont.on_hover = _hover
+    # remember base colors so a dynamic re-enable restores them
+    cont.data = {"bg": bg, "hover": hover}
     return cont
+
+
+def set_button_enabled(btn, enabled: bool):
+    """Live-toggle an app_button's enabled state (disabled + opacity together)."""
+    btn.disabled = not enabled
+    btn.opacity = 1.0 if enabled else 0.45
+    btn.update()

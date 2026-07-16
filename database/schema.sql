@@ -340,7 +340,7 @@ INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_nam
 ('second_reason_for_suspicion', 'Second Reason for Suspicion', 'Ø§Ù„Ø³Ø¨Ø¨ Ø§Ù„Ø«Ø§Ù†ÙŠ Ù„Ù„Ø§Ø´ØªØ¨Ø§Ù‡', 'TEXT', 1, 0, 14, '{}'),
 ('type_of_suspected_transaction', 'Type of Suspected Transaction', 'Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© Ø§Ù„Ù…Ø´ØªØ¨Ù‡ Ø¨Ù‡Ø§', 'TEXT', 1, 0, 15, '{}'),
 ('arb_staff', 'ARB Staff', 'Ù…ÙˆØ¸Ù ARB', 'DROPDOWN', 1, 0, 16, '{"options": ["Ù†Ø¹Ù…", "Ù„Ø§"]}'),
-('total_transaction', 'Total Transaction', 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø©', 'TEXT', 1, 0, 17, '{"pattern": "^\\d+\\s*SAR$", "example": "605040 SAR"}'),
+('total_transaction', 'Total Transaction', 'Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø©', 'TEXT', 1, 0, 17, '{"pattern": "^\\d{1,15}(\\.\\d{1,3})?$", "example": "605040 or 605040.50"}'),
 ('report_classification', 'Report Classification', 'ØªØµÙ†ÙŠÙ Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 0, 18, '{}'),
 ('report_source', 'Report Source', 'Ù…ØµØ¯Ø± Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 0, 19, '{}'),
 ('reporting_entity', 'Reporting Entity', 'Ø§Ù„Ø¬Ù‡Ø© Ø§Ù„Ù…Ø¨Ù„ØºØ©', 'TEXT', 1, 0, 20, '{}'),

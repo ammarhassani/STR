@@ -1196,6 +1196,22 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Second-reason seed skipped: {str(e)}")
 
+        # Migration 32: Total Transaction is a numeric amount (BRD R63), not a
+        # "NNN SAR" string. Replace the old SAR-suffix pattern on existing DBs.
+        try:
+            cursor.execute(
+                "SELECT validation_rules FROM column_settings WHERE column_name = 'total_transaction'")
+            row = cursor.fetchone()
+            if row and row[0] and 'SAR' in row[0]:
+                cursor.execute(
+                    "UPDATE column_settings SET validation_rules = ?, updated_at = datetime('now') "
+                    "WHERE column_name = 'total_transaction'",
+                    ('{"pattern": "^\\\\d{1,15}(\\\\.\\\\d{1,3})?$", "example": "605040 or 605040.50"}',))
+                conn.commit()
+                messages.append("Updated Total Transaction rule to numeric (removed SAR requirement)")
+        except Exception as e:
+            messages.append(f"Total Transaction rule update skipped: {str(e)}")
+
         conn.close()
 
         if messages:

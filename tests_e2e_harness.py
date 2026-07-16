@@ -115,7 +115,7 @@ class Client:
             'report_date': datetime.now().strftime('%d/%m/%Y'),
             'reported_entity_name': f'Entity {resv["report_number"]}',
             'nationality': 'Saudi Arabian',
-            'total_transaction': '1000 SAR',
+            'total_transaction': '1000',
         }
         if extra:
             data.update(extra)
@@ -306,8 +306,8 @@ def phase1():
     check(F, 'required empty fails', not v.validate_field_generic('reported_entity_name', '')[0])
     check(F, 'pattern pass (initials AB)', v.validate_field_generic('reporter_initials', 'AB')[0])
     check(F, 'pattern fail (initials abc)', not v.validate_field_generic('reporter_initials', 'abc')[0])
-    check(F, 'SAR amount pass', v.validate_field_generic('total_transaction', '500 SAR')[0])
-    check(F, 'SAR amount fail', not v.validate_field_generic('total_transaction', '500 USD')[0])
+    check(F, 'numeric amount pass', v.validate_field_generic('total_transaction', '500')[0])
+    check(F, 'non-numeric amount fail', not v.validate_field_generic('total_transaction', '500 USD')[0])
     check(F, 'integer type fail', not v.validate_field_generic('fiu_number', 'abc')[0])
     check(F, 'maxLength fail', not v.validate_field_generic('nationality', 'x' * 101)[0])
     check(F, 'optional empty passes', v.validate_field_generic('nationality', '')[0])

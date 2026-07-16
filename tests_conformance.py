@@ -242,9 +242,11 @@ def part2_conformance():
     ok, rc1, _ = admin.make_report({'cic': '1212121212121212', 'case_id': 'CASE-001'})
     ok4, _, msg = admin.make_report({'cic': '1313131313131313', 'case_id': 'CASE-001'})
     conf('R57', 'duplicate Case ID blocked', not ok4, msg)
-    # R63 total_transaction: negatives rejected by validation
-    r = admin.validation.validate_field_generic('total_transaction', '-500 SAR')
-    conf('R63', 'negative amount rejected', not r[0], r[1])
+    # R63 total_transaction: numeric amount (no SAR suffix), negatives rejected
+    conf('R63', 'plain numeric amount accepted', admin.validation.validate_field_generic('total_transaction', '87868799')[0])
+    conf('R63', 'decimal amount accepted', admin.validation.validate_field_generic('total_transaction', '605040.50')[0])
+    conf('R63', 'negative amount rejected', not admin.validation.validate_field_generic('total_transaction', '-500')[0])
+    conf('R63', 'SAR-suffixed value now rejected (numeric only)', not admin.validation.validate_field_generic('total_transaction', '500 SAR')[0])
     # R75/R76 dropdown deactivate (not hard delete) + not selectable when inactive
     admin.dropdowns.add_dropdown_value('report_source', 'TempVal', 'admin')
     cid = [v['config_id'] for v in admin.dropdowns.get_all_dropdown_values('report_source') if v['value'] == 'TempVal'][0]
@@ -384,7 +386,7 @@ def part3_features():
     # ---- R82 permanent-delete type-DELETE confirm (UI gate present)
     src = open(os.path.join(REPO, 'flet_app/dialogs/delete_confirmation_dialog.py')).read()
     conf('R82', 'permanent delete requires typing DELETE',
-         'DELETE' in src and 'upper() != "DELETE"' in src)
+         'Type \'DELETE\'' in src and 'upper() == "DELETE"' in src)
 
 if __name__ == '__main__':
     build()

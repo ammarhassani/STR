@@ -59,8 +59,15 @@ def test_app_button():
         if b.on_click:
             b.on_click(None)
     check('T4 on_click fires', clicked['n'] == 3, clicked['n'])
+    # native disabled: on_click stays wired but the control is disabled + dimmed
     dis = app_button("X", on_click=lambda e: None, disabled=True)
-    check('T4 disabled has no on_click', dis.on_click is None)
+    check('T4 disabled sets native disabled', dis.disabled is True)
+    check('T4 disabled is dimmed', dis.opacity == 0.45)
+    # live re-enable works (the dynamic-button fix)
+    from components.app_button import set_button_enabled
+    dis.update = lambda: None  # no page attached in test
+    set_button_enabled(dis, True)
+    check('T4 set_button_enabled re-arms', dis.disabled is False and dis.opacity == 1.0)
 
 if __name__ == '__main__':
     test_tokens()

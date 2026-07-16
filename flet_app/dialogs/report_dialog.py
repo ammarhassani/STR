@@ -1138,7 +1138,7 @@ def show_report_dialog(
             ft.Container(
                 content=ft.Text(f"v{current_version}", size=11, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                 bgcolor=colors["primary"],
-                border_radius=10,
+                border_radius=4,
                 padding=ft.padding.symmetric(horizontal=12, vertical=4),
             )
         )
@@ -1168,7 +1168,7 @@ def show_report_dialog(
                     color=ft.Colors.WHITE,
                 ),
                 bgcolor=status_colors.get(approval_status, colors["text_secondary"]),
-                border_radius=10,
+                border_radius=4,
                 padding=ft.padding.symmetric(horizontal=12, vertical=4),
             )
         )

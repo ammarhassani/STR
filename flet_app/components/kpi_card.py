@@ -42,7 +42,7 @@ def create_kpi_card(
                             content=ft.Icon(icon, color=accent_color, size=24),
                             width=44,
                             height=44,
-                            border_radius=10,
+                            border_radius=4,
                             bgcolor=f"{accent_color}15",  # 15% opacity
                             alignment=ft.alignment.center,
                         ),

@@ -162,7 +162,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                     color=ft.Colors.WHITE,
                                 ),
                                 bgcolor=colors["warning"],
-                                border_radius=10,
+                                border_radius=4,
                                 padding=ft.padding.symmetric(horizontal=8, vertical=2),
                             )
                         ),
@@ -454,7 +454,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                     ft.Container(
                                         content=ft.Text("Pending Review", size=11, color=ft.Colors.WHITE),
                                         bgcolor=colors["warning"],
-                                        border_radius=10,
+                                        border_radius=4,
                                         padding=ft.padding.symmetric(horizontal=8, vertical=2),
                                     ),
                                 ],

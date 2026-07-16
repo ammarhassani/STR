@@ -179,7 +179,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                     color=ft.Colors.WHITE,
                                 ),
                                 bgcolor=colors["primary"],
-                                border_radius=10,
+                                border_radius=4,
                                 padding=ft.padding.symmetric(horizontal=8, vertical=2),
                             )
                         ),

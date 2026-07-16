@@ -6,6 +6,7 @@ import flet as ft
 from typing import Optional, Any, Callable, Dict
 
 from theme.theme_manager import theme_manager
+from components.app_button import app_button, set_button_enabled
 
 
 def show_delete_confirmation_dialog(
@@ -54,6 +55,10 @@ def show_delete_confirmation_dialog(
             confirm_dialog.open = False
             page.update()
 
+        # flat danger button, disabled until the user types DELETE (live-toggled)
+        confirm_btn = app_button("Permanently Delete", on_click=confirm_hard_delete,
+                                 variant="danger", disabled=True)
+
         confirm_dialog = ft.AlertDialog(
             modal=True,
             title=ft.Row(
@@ -95,28 +100,14 @@ def show_delete_confirmation_dialog(
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=cancel_hard_delete),
-                ft.ElevatedButton(
-                    "Permanently Delete",
-                    bgcolor=colors["danger"],
-                    color=ft.Colors.WHITE,
-                    disabled=True,
-                    on_click=confirm_hard_delete,
-                    data="confirm_btn",
-                ),
+                confirm_btn,
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
 
-        confirm_btn = None
-        for action in confirm_dialog.actions:
-            if hasattr(action, 'data') and action.data == "confirm_btn":
-                confirm_btn = action
-                break
-
         def update_confirm_button(value):
-            if confirm_btn:
-                confirm_btn.disabled = value.upper() != "DELETE"
-                page.update()
+            # live-toggle the flat danger button as the user types DELETE
+            set_button_enabled(confirm_btn, value.upper() == "DELETE")
 
         page.overlay.append(confirm_dialog)
         confirm_dialog.open = True
