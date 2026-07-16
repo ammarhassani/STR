@@ -145,6 +145,31 @@ class DatabaseManager:
         
         return 0
     
+    def execute_write(
+        self,
+        query: str,
+        params: tuple = (),
+        max_retries: int = 5
+    ) -> int:
+        """
+        Execute an INSERT/UPDATE/DELETE and return the affected row count from
+        the SAME connection. Use this (not a separate SELECT changes()) for
+        atomic conditional updates — a follow-up statement runs on a fresh
+        connection and would report 0.
+        """
+        for attempt in range(max_retries):
+            try:
+                with self.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    return cursor.rowcount
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < max_retries - 1:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
+        return 0
+
     def insert_returning_id(
         self,
         query: str,

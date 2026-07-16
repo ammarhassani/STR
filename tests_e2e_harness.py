@@ -281,19 +281,24 @@ def phase1():
     rows, total = agent.reports.get_reports(limit=1, offset=0)
     check(F, 'pagination limit', len(rows) == 1 and total >= 2, (len(rows), total))
     admin_c = Client('t-admin3'); admin_c.login('admin', 'Admin@1234')
-    ok, msg = admin_c.reports.delete_report(rid2)
-    check(F, 'soft delete', ok, msg)
+    # pending reports cannot be deleted (business rule); use an admin report
+    # which is auto-approved, so it is deletable
+    ok, rid_del, _, _ = admin_c.make_report()
+    check(F, 'pending report delete blocked', not admin_c.reports.delete_report(rid2)[0],
+          'agent report is pending')
+    ok, msg = admin_c.reports.delete_report(rid_del)
+    check(F, 'soft delete (approved report)', ok, msg)
     check(F, 'deleted count reflects', admin_c.reports.get_deleted_reports_count() >= 1)
     rows, total = agent.reports.get_reports()
-    check(F, 'soft-deleted excluded from list', all(r['report_id'] != rid2 for r in rows))
-    ok, msg = admin_c.reports.restore_report(rid2)
+    check(F, 'soft-deleted excluded from list', all(r['report_id'] != rid_del for r in rows))
+    ok, msg = admin_c.reports.restore_report(rid_del)
     check(F, 'restore soft-deleted', ok, msg)
-    impact = admin_c.reports.get_report_impact(rid2)
+    impact = admin_c.reports.get_report_impact(rid_del)
     check(F, 'get_report_impact dict', isinstance(impact, dict), impact)
-    ok, msg = admin_c.reports.delete_report(rid2)
-    ok, msg = admin_c.reports.hard_delete_report(rid2, 'e2e cleanup')
+    ok, msg = admin_c.reports.delete_report(rid_del)
+    ok, msg = admin_c.reports.hard_delete_report(rid_del, 'e2e cleanup')
     check(F, 'hard delete', ok, msg)
-    check(F, 'hard-deleted gone', agent.reports.get_report(rid2) is None)
+    check(F, 'hard-deleted gone', agent.reports.get_report(rid_del) is None)
 
     # ------------------------------------------------------------ validation
     F = '05 Field validation'

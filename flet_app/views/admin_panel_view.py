@@ -249,12 +249,15 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             page.update()
 
             try:
-                query = "DELETE FROM users WHERE user_id = ?"
-                app_state.db_manager.execute_with_retry(query, (user['user_id'],))
-
-                show_success(page, "User deleted successfully")
-                app_state.logging_service.log_user_action("USER_DELETED", {"user_id": user['user_id']})
-                page.run_task(load_users)
+                # Route through the service: soft delete (is_active=0), admin
+                # guard, and audit — never a raw hard DELETE (which would orphan
+                # the user's audit trail and can't be undone).
+                ok, msg = app_state.auth_service.delete_user(user['user_id'])
+                if ok:
+                    show_success(page, msg)
+                    page.run_task(load_users)
+                else:
+                    show_error(page, msg)
 
             except Exception as ex:
                 show_error(page, f"Failed to delete user: {str(ex)}")

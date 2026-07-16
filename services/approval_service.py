@@ -151,19 +151,23 @@ class ApprovalService:
             if current_status != 'pending':
                 return False, f"Approval request is already {current_status}"
 
-            # Update approval request
-            update_approval = """
-                UPDATE report_approvals
-                SET approval_status = 'approved',
-                    approver_id = (SELECT user_id FROM users WHERE username = ?),
-                    approval_comment = ?,
-                    reviewed_at = ?
-                WHERE approval_id = ?
-            """
-            self.db_manager.execute_with_retry(
-                update_approval,
+            # Separation of duties: an approver may not approve their own submission
+            if requested_by == current_user['username']:
+                return False, "You cannot approve your own submitted report"
+
+            # Atomic claim: transition to 'approved' only if STILL pending. The
+            # WHERE ... = 'pending' + rowcount check makes exactly one concurrent
+            # approver win; the rest get rowcount 0. Prevents double-approval.
+            claimed = self.db_manager.execute_write(
+                "UPDATE report_approvals "
+                "SET approval_status = 'approved', "
+                "    approver_id = (SELECT user_id FROM users WHERE username = ?), "
+                "    approval_comment = ?, reviewed_at = ? "
+                "WHERE approval_id = ? AND approval_status = 'pending'",
                 (current_user['username'], comment, datetime.now().isoformat(), approval_id)
             )
+            if claimed != 1:
+                return False, "Approval request is already being processed"
 
             # Update report status
             update_report = """
@@ -252,21 +256,23 @@ class ApprovalService:
             if current_status != 'pending':
                 return False, f"Approval request is already {current_status}"
 
+            # Separation of duties: cannot rule on your own submission
+            if requested_by == current_user['username']:
+                return False, "You cannot reject your own submitted report"
+
             new_status = 'rework' if request_rework else 'rejected'
 
-            # Update approval request
-            update_approval = """
-                UPDATE report_approvals
-                SET approval_status = ?,
-                    approver_id = (SELECT user_id FROM users WHERE username = ?),
-                    approval_comment = ?,
-                    reviewed_at = ?
-                WHERE approval_id = ?
-            """
-            self.db_manager.execute_with_retry(
-                update_approval,
+            # Atomic claim: transition only if still pending (see approve_report)
+            claimed = self.db_manager.execute_write(
+                "UPDATE report_approvals "
+                "SET approval_status = ?, "
+                "    approver_id = (SELECT user_id FROM users WHERE username = ?), "
+                "    approval_comment = ?, reviewed_at = ? "
+                "WHERE approval_id = ? AND approval_status = 'pending'",
                 (new_status, current_user['username'], comment, datetime.now().isoformat(), approval_id)
             )
+            if claimed != 1:
+                return False, "Approval request is already being processed"
 
             # Update report status
             update_report = """

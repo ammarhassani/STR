@@ -263,7 +263,15 @@ class SettingsService:
         Returns:
             Number of rows per page
         """
-        return int(self.get_setting('rows_per_page', 25, user_id))
+        try:
+            val = int(self.get_setting('rows_per_page', 25, user_id))
+        except (ValueError, TypeError):
+            return 25
+        # Clamp to a sane range: a stored 0/negative/huge value must never
+        # reach pagination (LIMIT -1 = unbounded, 0 = empty page).
+        if val < 1 or val > 1000:
+            return 25
+        return val
 
     def is_animations_enabled(self, user_id: Optional[int] = None) -> bool:
         """

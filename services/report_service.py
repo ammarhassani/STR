@@ -26,6 +26,10 @@ class ReportService:
         'relationship', 'id_type', 'case_id'
     }
 
+    # Coarse per-field length backstop (characters). Real format rules live in
+    # column_settings; this just stops storage/DoS abuse of unbounded TEXT.
+    MAX_FIELD_LEN = 10000
+
     def __init__(self, db_manager, logging_service, auth_service, activity_service=None):
         """
         Initialize the report service.
@@ -59,6 +63,16 @@ class ReportService:
             current_user = self.auth_service.get_current_user()
             if not current_user:
                 return False, None, "User not authenticated"
+
+            # Authorization: only roles with add_report may create (reporters cannot)
+            if not self.auth_service.has_permission('add_report'):
+                return False, None, "You do not have permission to create reports"
+
+            # Reject absurdly long field values (storage/DoS guard). Field-level
+            # format rules live in column_settings; this is a coarse backstop.
+            for k, v in report_data.items():
+                if isinstance(v, str) and len(v) > self.MAX_FIELD_LEN:
+                    return False, None, f"Field '{k}' exceeds maximum length"
 
             # Validate required fields
             required_fields = ['sn', 'report_number', 'report_date', 'reported_entity_name']
@@ -236,6 +250,17 @@ class ReportService:
             if not old_report:
                 return False, "Report not found"
 
+            # Authorization: admins edit any report; agents only their own;
+            # reporters not at all. Uses the RBAC ownership rule.
+            if not self.auth_service.has_permission('edit_report',
+                                                    resource_owner=old_report.get('created_by')):
+                return False, "You do not have permission to edit this report"
+
+            # Reject absurdly long field values (storage/DoS guard)
+            for k, v in report_data.items():
+                if isinstance(v, str) and len(v) > self.MAX_FIELD_LEN:
+                    return False, f"Field '{k}' exceeds maximum length"
+
             # Security: Filter fields against whitelist to prevent SQL injection
             allowed_data = {k: v for k, v in report_data.items() if k in self.ALLOWED_FIELDS}
             invalid_fields = set(report_data.keys()) - self.ALLOWED_FIELDS
@@ -340,7 +365,7 @@ class ReportService:
                 return False, "Only administrators can delete reports"
 
             # Check if report exists
-            check_query = "SELECT report_number, reported_entity_name, is_deleted FROM reports WHERE report_id = ?"
+            check_query = "SELECT report_number, reported_entity_name, is_deleted, approval_status FROM reports WHERE report_id = ?"
             result = self.db_manager.execute_with_retry(check_query, (report_id,))
 
             if not result:
@@ -349,9 +374,15 @@ class ReportService:
             report_number = result[0][0]
             entity_name = result[0][1]
             is_deleted = result[0][2]
+            approval_status = result[0][3]
 
             if is_deleted:
                 return False, "Report is already deleted"
+
+            # Business rule: a report awaiting a decision must not be deleted out
+            # from under the approver — decide (approve/reject/rework) first.
+            if approval_status == 'pending_approval':
+                return False, "Cannot delete a report that is pending approval; decide it first"
 
             # Soft delete with tracking
             query = """

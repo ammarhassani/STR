@@ -344,8 +344,15 @@ def show_report_dialog(
         def get_checkbox_value(ref):
             return 1 if ref.current and ref.current.value else 0
 
+        def get_int_value(ref, default=0):
+            raw = get_value(ref, str(default))
+            try:
+                return int(raw)
+            except (ValueError, TypeError):
+                return default
+
         return {
-            'sn': int(get_value(sn_ref, "0")),
+            'sn': get_int_value(sn_ref, 0),
             'report_number': get_value(report_number_ref),
             'case_id': get_value(case_id_ref) or None,
             'report_date': get_value(report_date_ref),
@@ -383,9 +390,8 @@ def show_report_dialog(
             show_error_dialog("\n".join(f"• {err}" for err in errors))
             return
 
-        form_data = get_form_data()
-
         try:
+            form_data = get_form_data()
             if is_edit_mode:
                 report_id = report_data.get('report_id') or report_data.get('id')
                 if not report_id:

@@ -79,46 +79,28 @@ def show_user_dialog(
         is_active = 1 if status_ref.current.value == "Active" else 0
 
         try:
+            # Route through auth_service: admin authorization, consistent
+            # bcrypt hashing, and audit all live in one place. No raw SQL.
             if is_edit_mode:
-                # Update existing user
                 user_id = user_data['user_id']
-
+                fields = {'full_name': fullname, 'role': role, 'is_active': is_active}
                 if password:
-                    # Hash the new password using SecurityService
-                    hashed_password = SecurityService.hash_password(password)
-                    query = """
-                        UPDATE users
-                        SET password = ?, full_name = ?, role = ?, is_active = ?,
-                            updated_at = datetime('now'), updated_by = 'admin'
-                        WHERE user_id = ?
-                    """
-                    db_manager.execute_with_retry(query, (hashed_password, fullname, role, is_active, user_id))
-                else:
-                    # Update without changing password
-                    query = """
-                        UPDATE users
-                        SET full_name = ?, role = ?, is_active = ?,
-                            updated_at = datetime('now'), updated_by = 'admin'
-                        WHERE user_id = ?
-                    """
-                    db_manager.execute_with_retry(query, (fullname, role, is_active, user_id))
-
-                show_success("User updated successfully")
-                logging_service.log_user_action("USER_UPDATED", {"user_id": user_id})
-
+                    fields['password'] = password  # service hashes
+                ok, msg = auth_service.update_user(user_id, **fields)
             else:
-                # Create new user - hash password using SecurityService
-                hashed_password = SecurityService.hash_password(password)
-                query = """
-                    INSERT INTO users (username, password, full_name, role, is_active,
-                                     created_at, created_by)
-                    VALUES (?, ?, ?, ?, ?, datetime('now'), 'admin')
-                """
-                db_manager.execute_with_retry(query, (username, hashed_password, fullname, role, is_active))
+                ok, msg = auth_service.create_user(username, password, fullname, role)
+                # create_user activates by default; honor an "Inactive" choice
+                if ok and not is_active:
+                    row = db_manager.execute_with_retry(
+                        "SELECT user_id FROM users WHERE username = ? COLLATE NOCASE", (username,))
+                    if row:
+                        auth_service.update_user(row[0][0], is_active=0)
 
-                show_success("User created successfully")
-                logging_service.log_user_action("USER_CREATED")
+            if not ok:
+                show_error(msg)
+                return
 
+            show_success(msg)
             dialog.open = False
             page.update()
             if on_save:

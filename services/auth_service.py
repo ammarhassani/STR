@@ -180,6 +180,21 @@ class AuthService:
         """Check if a user is currently authenticated."""
         return self.current_user is not None
 
+    def _require_admin(self, action: str) -> Tuple[bool, str]:
+        """Authorization gate for privileged user-management operations.
+        The service layer is the security boundary — never rely on the UI
+        hiding a button, since a lower-privileged session that reaches the
+        method directly would otherwise escalate."""
+        if not self.current_user:
+            return False, "Not authenticated"
+        if self.current_user.get('role') != 'admin':
+            self.logger.warning(
+                f"Unauthorized {action} attempt by "
+                f"{self.current_user.get('username')} (role={self.current_user.get('role')})"
+            )
+            return False, "Administrator privileges required"
+        return True, ""
+
     def has_permission(self, permission: str, resource_owner: Optional[str] = None) -> bool:
         """
         Check if current user has a specific permission.
@@ -216,6 +231,10 @@ class AuthService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("create_user")
+            if not allowed:
+                return False, why
+
             # Validate role
             if role not in ['admin', 'agent', 'reporter']:
                 return False, "Invalid role"
@@ -260,6 +279,17 @@ class AuthService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("update_user")
+            if not allowed:
+                return False, why
+
+            # Guard against an admin locking themselves out of admin
+            if self.current_user and user_id == self.current_user.get('user_id'):
+                if 'role' in kwargs and kwargs['role'] != 'admin':
+                    return False, "You cannot remove your own administrator role"
+                if 'is_active' in kwargs and not kwargs['is_active']:
+                    return False, "You cannot deactivate your own account"
+
             # Build update query
             allowed_fields = ['password', 'full_name', 'role', 'is_active']
             updates = []
@@ -267,6 +297,9 @@ class AuthService:
 
             for field, value in kwargs.items():
                 if field in allowed_fields:
+                    # Never store a plaintext password
+                    if field == 'password' and value and not SecurityService.is_bcrypt_hash(str(value)):
+                        value = SecurityService.hash_password(str(value))
                     updates.append(f"{field} = ?")
                     params.append(value)
 
@@ -309,6 +342,10 @@ class AuthService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("delete_user")
+            if not allowed:
+                return False, why
+
             # Cannot delete yourself
             if self.current_user and user_id == self.current_user['user_id']:
                 return False, "Cannot delete your own account"
@@ -375,10 +412,16 @@ class AuthService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("reset_password")
+            if not allowed:
+                return False, why
+
+            # Always store a bcrypt hash, never the plaintext password
+            hashed = SecurityService.hash_password(new_password)
             query = "UPDATE users SET password = ?, updated_by = ?, updated_at = ? WHERE user_id = ?"
             self.db_manager.execute_with_retry(
                 query,
-                (new_password,
+                (hashed,
                  self.current_user['username'] if self.current_user else 'SYSTEM',
                  datetime.now().isoformat(),
                  user_id)
@@ -467,6 +510,10 @@ class AuthService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("unlock_account")
+            if not allowed:
+                return False, why
+
             query = "UPDATE users SET failed_login_attempts = 0 WHERE user_id = ?"
             self.db_manager.execute_with_retry(query, (user_id,))
 
