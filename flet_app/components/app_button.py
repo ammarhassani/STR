@@ -8,9 +8,9 @@ def app_button(text, on_click=None, variant="primary", icon=None,
     c = theme_manager.get_colors()
     r = c.get("radius", 4)
     if variant == "danger":
-        bg, fg, border, hover = c["danger"], "#ffffff", c["danger"], "#a52626"
+        bg, fg, border, hover = c["danger"], "#ffffff", c["danger"], c.get("danger_hover", c["danger"])
     elif variant == "secondary":
-        bg, fg, border, hover = "#ffffff", c["text_primary"], c["border"], c["hover"]
+        bg, fg, border, hover = "transparent", c["text_primary"], c["border"], c["hover"]
     else:  # primary
         bg, fg, border, hover = c["primary"], "#ffffff", c["primary"], c["primary_light"]
 

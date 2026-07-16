@@ -78,6 +78,7 @@ class Colors:
         "warning": "#b7791f",
         "warning_bg": "#f6efe1",
         "danger": "#c53030",
+        "danger_hover": "#a52626",
         "danger_bg": "#f7e8e8",
         "info": "#3b5bdb",
         "info_bg": "#e8ecfb",
