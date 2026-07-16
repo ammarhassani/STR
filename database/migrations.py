@@ -1212,6 +1212,22 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Total Transaction rule update skipped: {str(e)}")
 
+        # Migration 33: idempotency ledger for host command-RPC (exactly-once apply)
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applied_commands'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    CREATE TABLE applied_commands (
+                        command_id TEXT PRIMARY KEY,
+                        response_json TEXT,
+                        applied_at TEXT DEFAULT (datetime('now'))
+                    )
+                """)
+                conn.commit()
+                messages.append("Created applied_commands table")
+        except Exception as e:
+            messages.append(f"applied_commands table skipped: {str(e)}")
+
         conn.close()
 
         if messages:

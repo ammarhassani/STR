@@ -31,7 +31,21 @@ def test_transport_roundtrip():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_applied_commands_table():
+    import sqlite3
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    box = tempfile.mkdtemp()
+    try:
+        db = os.path.join(box, 'x.db')
+        initialize_database(db); migrate_database(db)
+        cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(applied_commands)")}
+        check('T2 applied_commands table exists', {'command_id','response_json','applied_at'} <= cols, cols)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
+    test_applied_commands_table()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
