@@ -87,13 +87,17 @@ class FletApp:
     def _configure_page(self):
         """Configure the Flet page."""
         self.page.title = "FIU Report Management System"
+        # Open windowed-fullscreen (maximized), not a small off-centre window
         self.page.window.width = 1400
         self.page.window.height = 900
         self.page.window.min_width = 1024
         self.page.window.min_height = 600
+        self.page.window.center()
+        self.page.window.maximized = True
         self.page.padding = 0
         self.page.spacing = 0
-        self.page.bgcolor = "#0d1117"
+        # light-only theme background
+        self.page.bgcolor = theme_manager.get_colors()["bg_primary"]
 
         # Setup keyboard shortcuts
         self.page.on_keyboard_event = self._handle_keyboard_event

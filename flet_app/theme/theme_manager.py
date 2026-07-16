@@ -25,7 +25,7 @@ class ThemeManager:
         if self._initialized:
             return
 
-        self._current_theme: str = "dark"  # Default theme
+        self._current_theme: str = "light"  # light-only (dark mode removed)
         self._listeners: List[Callable[[str], None]] = []
         self._page: Optional[ft.Page] = None
         self._settings_service = None
@@ -178,9 +178,8 @@ class ThemeManager:
         try:
             current_user = self._auth_service.get_current_user()
             if current_user:
-                settings = self._settings_service.get_user_settings(current_user['user_id'])
-                if settings and 'theme' in settings:
-                    self._current_theme = settings['theme']
+                # Dark mode removed: ignore any stored 'dark' preference, stay light
+                self._current_theme = "light"
         except Exception as e:
             print(f"Error loading theme preference: {e}")
 
