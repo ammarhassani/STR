@@ -59,6 +59,10 @@ def test_app_button():
         if b.on_click:
             b.on_click(None)
     check('T4 on_click fires', clicked['n'] == 3, clicked['n'])
+    # ghost variant floats: no fill, no border
+    g = app_button("Save", on_click=lambda e: None, variant="ghost")
+    check('T4 ghost has no bg', g.bgcolor == "transparent", g.bgcolor)
+    check('T4 ghost has no border', g.border is None)
     # native disabled: on_click stays wired but the control is disabled + dimmed
     dis = app_button("X", on_click=lambda e: None, disabled=True)
     check('T4 disabled sets native disabled', dis.disabled is True)

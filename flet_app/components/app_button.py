@@ -17,6 +17,10 @@ def app_button(text, on_click=None, variant="primary", icon=None,
         bg, fg, border, hover = c["danger"], "#ffffff", c["danger"], c.get("danger_hover", c["danger"])
     elif variant == "secondary":
         bg, fg, border, hover = "transparent", c["text_primary"], c["border"], c["hover"]
+    elif variant == "ghost":
+        # fully floating: no fill, no border — just accent-colored icon+text.
+        # hover shows a faint translucent tint so it still reads as clickable.
+        bg, fg, border, hover = "transparent", c["primary"], None, ft.Colors.with_opacity(0.10, c["primary"])
     else:  # primary
         bg, fg, border, hover = c["primary"], "#ffffff", c["primary"], c["primary_light"]
 
@@ -30,7 +34,7 @@ def app_button(text, on_click=None, variant="primary", icon=None,
                        alignment=ft.MainAxisAlignment.CENTER),
         bgcolor=bg,
         padding=ft.padding.symmetric(vertical=9, horizontal=16),
-        border=ft.border.all(1, border),
+        border=(ft.border.all(1, border) if border else None),
         border_radius=r,
         ink=False,
         alignment=ft.alignment.center,

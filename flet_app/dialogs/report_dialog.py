@@ -1216,7 +1216,7 @@ def show_report_dialog(
             "Save Report",
             icon=ft.Icons.SAVE,
             on_click=save_report,
-            variant="secondary",
+            variant="ghost",
         )
     )
 
@@ -1231,7 +1231,7 @@ def show_report_dialog(
                     "Submit for Approval",
                     icon=ft.Icons.CHECK_CIRCLE,
                     on_click=submit_for_approval,
-                    variant="secondary",
+                    variant="ghost",
                 )
             )
 
@@ -1256,6 +1256,8 @@ def show_report_dialog(
 
     # Compact, flat, content-first dialog. Header thin, form content prominent,
     # inline (bg-less) error + a plain button row at the bottom.
+    # Glassmorphism panel: translucent, blurred surface so the page shows
+    # through and the floating buttons don't sit on a solid box.
     dialog_content = ft.Container(
         content=ft.Column(
             controls=[
@@ -1264,20 +1266,27 @@ def show_report_dialog(
                 error_banner,
                 ft.Row(controls=action_buttons, spacing=8),
             ],
-            spacing=10,
+            spacing=12,
             tight=True,
         ),
-        width=640,
-        height=560,
-        padding=16,
+        width=760,
+        height=620,
+        padding=20,
+        bgcolor=ft.Colors.with_opacity(0.72, colors["bg_secondary"]),
+        blur=ft.Blur(24, 24, ft.BlurTileMode.MIRROR),
+        border=ft.border.all(1, ft.Colors.with_opacity(0.6, colors["border"])),
+        border_radius=12,
     )
 
-    # Create dialog
+    # Create dialog — transparent surface so the glass panel is what shows
     dialog = ft.AlertDialog(
         modal=True,
         content=dialog_content,
         content_padding=0,
-        shape=ft.RoundedRectangleBorder(radius=4),
+        bgcolor=ft.Colors.TRANSPARENT,
+        shadow_color=ft.Colors.TRANSPARENT,
+        elevation=0,
+        shape=ft.RoundedRectangleBorder(radius=12),
     )
 
     # Record-edit lock (R28): one editor per report. Acquire before opening in
