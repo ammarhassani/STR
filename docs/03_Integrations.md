@@ -3,6 +3,11 @@
 
 **Version:** 1.0 | **Date:** January 2026
 
+> **VOID (July 2026):** This entire document is out of scope. The
+> organizational handoff was rejected; development continues standalone with
+> no external integrations. See [00_Scope_Amendment.md](00_Scope_Amendment.md).
+> Kept for historical reference only.
+
 ---
 
 ## Integration Summary
