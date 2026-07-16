@@ -130,10 +130,44 @@ def test_host_login_and_command():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_end_to_end_via_queue():
+    import threading, time
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        stop = {'v': False}
+        def loop():
+            while not stop['v']:
+                if not host.run_once():
+                    time.sleep(0.02)
+        th = threading.Thread(target=loop, daemon=True); th.start()
+
+        from services.queue_transport import QueueTransport
+        client = QueueTransport(os.path.join(box, 'str_bus'))
+        # login via queue
+        import uuid as _u
+        lid = _u.uuid4().hex
+        client.submit({'id': lid, 'command': 'login', 'args': ['admin','Admin@1234'], 'kwargs': {}})
+        lresp = client.await_response(lid, timeout=10)
+        check('T5 login via queue', lresp['ok'] and lresp['result']['token'], lresp)
+        token = lresp['result']['token']
+        # create_user via queue
+        cid = _u.uuid4().hex
+        client.submit({'id': cid, 'command': 'auth_service.create_user',
+                       'args': ['agentq','pass123','Agent Q','agent'], 'kwargs': {}, 'token': token})
+        cresp = client.await_response(cid, timeout=10)
+        check('T5 create_user via queue', cresp['ok'], cresp)
+        check('T5 user present host-side', dbm.execute_with_retry(
+            "SELECT COUNT(*) FROM users WHERE username='agentq'")[0][0] == 1)
+        stop['v'] = True; th.join(timeout=2)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
     test_command_registry()
     test_host_login_and_command()
+    test_end_to_end_via_queue()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
