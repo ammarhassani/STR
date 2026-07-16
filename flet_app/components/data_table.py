@@ -100,7 +100,7 @@ def create_data_table(
         data_row_color={
             ft.ControlState.HOVERED: colors["hover"],
         },
-        border_radius=8,
+        border_radius=4,
         show_checkbox_column=show_checkbox,
     )
 
@@ -228,7 +228,7 @@ def create_paginated_table(
                 ),
                 expand=True,
                 border=ft.border.all(1, colors["border"]),
-                border_radius=8,
+                border_radius=4,
             ),
             ft.Container(
                 content=pagination,

@@ -179,7 +179,7 @@ def show_delete_confirmation_dialog(
                     spacing=8,
                 ),
                 padding=12,
-                border_radius=8,
+                border_radius=4,
                 bgcolor=colors["bg_tertiary"],
                 border=ft.border.all(1, colors["border"]),
             )
@@ -272,7 +272,7 @@ def show_delete_confirmation_dialog(
                                     spacing=12,
                                 ),
                                 padding=12,
-                                border_radius=8,
+                                border_radius=4,
                                 border=ft.border.all(1, colors["border"]),
                             ),
                             # Hard delete option
@@ -307,7 +307,7 @@ def show_delete_confirmation_dialog(
                                     spacing=12,
                                 ),
                                 padding=12,
-                                border_radius=8,
+                                border_radius=4,
                                 border=ft.border.all(1, colors["danger"]),
                             ),
                         ],

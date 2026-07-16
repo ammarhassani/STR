@@ -177,7 +177,7 @@ def build_login_view(
                 ft.TextField(
                     ref=username_ref,
                     hint_text="Enter your username",
-                    border_radius=8,
+                    border_radius=4,
                     height=50,
                     text_size=14,
                     content_padding=ft.padding.symmetric(horizontal=16, vertical=0),
@@ -199,7 +199,7 @@ def build_login_view(
                     hint_text="Enter your password",
                     password=True,
                     can_reveal_password=True,
-                    border_radius=8,
+                    border_radius=4,
                     height=50,
                     text_size=14,
                     content_padding=ft.padding.symmetric(horizontal=16, vertical=0),
@@ -286,7 +286,7 @@ class LoginView:
 
         self.username_field = ft.TextField(
             hint_text="Enter your username",
-            border_radius=8,
+            border_radius=4,
             height=50,
             text_size=14,
             content_padding=ft.padding.symmetric(horizontal=16, vertical=0),
@@ -298,7 +298,7 @@ class LoginView:
             hint_text="Enter your password",
             password=True,
             can_reveal_password=True,
-            border_radius=8,
+            border_radius=4,
             height=50,
             text_size=14,
             content_padding=ft.padding.symmetric(horizontal=16, vertical=0),

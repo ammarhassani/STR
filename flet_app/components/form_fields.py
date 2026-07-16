@@ -60,7 +60,7 @@ def create_text_field(
         width=width,
         text_size=13,
         content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
-        border_radius=8,
+        border_radius=4,
         on_change=on_change,
         error_text=error_text,
         max_length=max_length,
@@ -117,7 +117,7 @@ def create_dropdown(
         width=width,
         text_size=13,
         content_padding=ft.padding.symmetric(horizontal=12, vertical=0),
-        border_radius=8,
+        border_radius=4,
         on_change=on_change,
         hint_text=hint,
     )
@@ -172,7 +172,7 @@ def create_date_picker(
         width=width,
         text_size=13,
         content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
-        border_radius=8,
+        border_radius=4,
         suffix=ft.Icon(ft.Icons.CALENDAR_TODAY, size=18, color=colors["text_secondary"]),
         on_change=on_change,
     )
@@ -338,7 +338,7 @@ def create_form_section(
             spacing=12,
         ),
         padding=16,
-        border_radius=8,
+        border_radius=4,
         bgcolor=colors["card_bg"],
         border=ft.border.all(1, colors["card_border"]),
     )

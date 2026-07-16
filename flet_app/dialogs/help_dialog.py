@@ -137,7 +137,7 @@ Only users with Admin role can approve reports.
                 ),
                 padding=16,
                 bgcolor=colors["bg_tertiary"],
-                border_radius=8,
+                border_radius=4,
             ),
         ],
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,

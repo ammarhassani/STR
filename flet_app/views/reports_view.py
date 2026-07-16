@@ -525,7 +525,7 @@ def build_reports_view(
             data_row_color={
                 ft.ControlState.HOVERED: colors["hover"],
             },
-            border_radius=8,
+            border_radius=4,
         )
 
     def handle_row_click(report: Dict):
@@ -840,7 +840,7 @@ def build_reports_view(
                         ),
                         bgcolor=f"{colors['danger']}20",
                         padding=12,
-                        border_radius=8,
+                        border_radius=4,
                     ),
                     ft.Text(
                         f"You are about to permanently delete {selected_count} report(s).",
@@ -1160,7 +1160,7 @@ def build_reports_view(
         ),
         padding=ft.padding.symmetric(horizontal=16, vertical=8),
         bgcolor=f"{colors['primary']}15",
-        border_radius=8,
+        border_radius=4,
         visible=False,  # Hidden by default
     ) if is_admin else ft.Container()
 
@@ -1258,7 +1258,7 @@ def build_reports_view(
                 ),
                 expand=True,
                 border=ft.border.all(1, colors["border"]),
-                border_radius=8,
+                border_radius=4,
                 bgcolor=colors["card_bg"],
             ),
         ],

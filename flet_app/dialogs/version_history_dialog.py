@@ -336,7 +336,7 @@ def show_version_history_dialog(
                 spacing=12,
             ),
             padding=ft.padding.all(12),
-            border_radius=8,
+            border_radius=4,
             bgcolor=f"{colors['danger']}10" if is_deleted else (
                 colors["bg_tertiary"] if is_selected else "transparent"
             ),
@@ -658,7 +658,7 @@ def show_version_history_dialog(
                                 ref=version_container_ref,
                                 content=version_list,
                                 border=ft.border.all(1, colors["border"]),
-                                border_radius=8,
+                                border_radius=4,
                                 expand=True,
                                 visible=True,  # Controlled by switch_tab
                             ),
@@ -666,7 +666,7 @@ def show_version_history_dialog(
                                 ref=activity_container_ref,
                                 content=activity_list,
                                 border=ft.border.all(1, colors["border"]),
-                                border_radius=8,
+                                border_radius=4,
                                 expand=True,
                                 visible=False,  # Controlled by switch_tab
                             ),

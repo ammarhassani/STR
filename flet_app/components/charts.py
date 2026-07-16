@@ -435,6 +435,6 @@ def create_stat_display(
         ),
         padding=12,
         bgcolor=colors["card_bg"],
-        border_radius=8,
+        border_radius=4,
         border=ft.border.all(1, colors["card_border"]),
     )

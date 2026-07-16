@@ -181,7 +181,7 @@ def create_header(
                 spacing=4,
             ),
             padding=ft.padding.symmetric(horizontal=8, vertical=4),
-            border_radius=8,
+            border_radius=4,
         ),
         items=[
             ft.PopupMenuItem(

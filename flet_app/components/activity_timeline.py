@@ -260,7 +260,7 @@ def create_activity_timeline(
             spacing=8 if not compact else 4,
         ),
         padding=16 if not compact else 8,
-        border_radius=8,
+        border_radius=4,
         bgcolor=colors["bg_secondary"],
         border=ft.border.all(1, colors["border"]),
     )

@@ -188,7 +188,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             data_row_color={
                 ft.ControlState.HOVERED: colors["hover"],
             },
-            border_radius=8,
+            border_radius=4,
         )
 
     def handle_refresh(e):
@@ -320,7 +320,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         ),
         padding=ft.padding.all(12),
         bgcolor=colors["bg_tertiary"],
-        border_radius=8,
+        border_radius=4,
     )
 
     # Actions row
@@ -403,7 +403,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 expand=True,
                 border=ft.border.all(1, colors["border"]),
-                border_radius=8,
+                border_radius=4,
                 bgcolor=colors["card_bg"],
             ),
         ],

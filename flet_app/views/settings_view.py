@@ -324,7 +324,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         ),
         padding=ft.padding.all(16),
         bgcolor=colors["card_bg"],
-        border_radius=8,
+        border_radius=4,
         border=ft.border.all(1, colors["border"]),
     )
 
@@ -367,7 +367,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         ),
         padding=ft.padding.all(16),
         bgcolor=colors["card_bg"],
-        border_radius=8,
+        border_radius=4,
         border=ft.border.all(1, colors["border"]),
     )
 
@@ -401,7 +401,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         ),
         padding=ft.padding.all(16),
         bgcolor=colors["card_bg"],
-        border_radius=8,
+        border_radius=4,
         border=ft.border.all(1, colors["border"]),
     )
 

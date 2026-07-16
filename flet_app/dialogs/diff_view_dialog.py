@@ -252,7 +252,7 @@ def show_diff_view_dialog(
                 scroll=ft.ScrollMode.AUTO,
             ),
             border=ft.border.all(1, colors["border"]),
-            border_radius=8,
+            border_radius=4,
             expand=True,
         )
 
@@ -360,7 +360,7 @@ def show_diff_view_dialog(
                 scroll=ft.ScrollMode.AUTO,
             ),
             border=ft.border.all(1, colors["border"]),
-            border_radius=8,
+            border_radius=4,
             expand=True,
         )
 

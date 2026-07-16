@@ -79,7 +79,7 @@ def create_sidebar(
                 spacing=12,
             ),
             padding=ft.padding.symmetric(horizontal=16, vertical=12),
-            border_radius=8,
+            border_radius=4,
             bgcolor=colors["primary"] if is_active else "transparent",
             on_click=lambda e, r=item["route"]: on_navigate(r),
             ink=True,

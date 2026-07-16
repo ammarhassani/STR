@@ -209,7 +209,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             data_row_color={
                 ft.ControlState.HOVERED: colors["hover"],
             },
-            border_radius=8,
+            border_radius=4,
         )
 
     def handle_role_filter_change(e):
@@ -409,7 +409,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 expand=True,
                 border=ft.border.all(1, colors["border"]),
-                border_radius=8,
+                border_radius=4,
                 bgcolor=colors["card_bg"],
             ),
         ],

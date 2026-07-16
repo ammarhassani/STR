@@ -411,7 +411,7 @@ def build_activity_view(
                         ft.Container(
                             content=activity_list,
                             border=ft.border.all(1, colors["border"]),
-                            border_radius=8,
+                            border_radius=4,
                             expand=True,
                         ),
                         # Pagination

@@ -144,7 +144,7 @@ def create_stat_card(
                             content=ft.Icon(icon, color=accent_color, size=20),
                             width=40,
                             height=40,
-                            border_radius=8,
+                            border_radius=4,
                             bgcolor=f"{accent_color}20",
                             alignment=ft.alignment.center,
                         ),

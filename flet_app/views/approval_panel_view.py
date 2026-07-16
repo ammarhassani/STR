@@ -206,7 +206,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             data_row_color={
                 ft.ControlState.HOVERED: colors["hover"],
             },
-            border_radius=8,
+            border_radius=4,
         )
 
     def handle_review(approval: Dict, idx: int):
@@ -461,7 +461,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                 spacing=8,
                             ),
                             bgcolor=colors["bg_tertiary"],
-                            border_radius=8,
+                            border_radius=4,
                             padding=12,
                         ),
 
@@ -749,7 +749,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 expand=True,
                 border=ft.border.all(1, colors["border"]),
-                border_radius=8,
+                border_radius=4,
                 bgcolor=colors["card_bg"],
             ),
         ],
