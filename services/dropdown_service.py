@@ -27,16 +27,35 @@ class DropdownService:
     FIXED_CATEGORIES = [
     ]
 
-    def __init__(self, db_manager, logging_service):
+    def __init__(self, db_manager, logging_service, auth_service=None):
         """
         Initialize the dropdown service.
 
         Args:
             db_manager: DatabaseManager instance
             logging_service: LoggingService instance
+            auth_service: AuthService instance (for admin authorization on mutators)
         """
         self.db_manager = db_manager
         self.logger = logging_service
+        self.auth_service = auth_service
+
+    def _require_admin(self, action: str) -> Tuple[bool, str]:
+        """Authorization gate for dropdown-config mutations. Only admins may
+        change the shared dropdown catalog. If no auth_service is wired
+        (e.g. deploy/seed scripts), the check is skipped."""
+        if self.auth_service is None:
+            return True, ""
+        user = self.auth_service.get_current_user()
+        if not user:
+            return False, "Not authenticated"
+        if user.get('role') != 'admin':
+            self.logger.warning(
+                f"Unauthorized dropdown {action} attempt by {user.get('username')} "
+                f"(role={user.get('role')})"
+            )
+            return False, "Administrator privileges required"
+        return True, ""
 
     def get_dropdown_values(self, category: str) -> List[Dict]:
         """
@@ -158,6 +177,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("add")
+            if not allowed:
+                return False, why
             # Check if value already exists
             query = """
                 SELECT COUNT(*)
@@ -216,6 +238,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("update")
+            if not allowed:
+                return False, why
             # Build update query
             if display_order is not None:
                 update_query = """
@@ -254,6 +279,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("delete")
+            if not allowed:
+                return False, why
             # Soft delete by setting is_active = 0
             update_query = """
                 UPDATE system_config
@@ -285,6 +313,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("reorder")
+            if not allowed:
+                return False, why
             # Update display order for each item
             for order, config_id in enumerate(ordered_ids, start=1):
                 update_query = """
@@ -316,6 +347,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("restore")
+            if not allowed:
+                return False, why
             update_query = """
                 UPDATE system_config
                 SET is_active = 1, updated_at = ?, updated_by = ?
@@ -359,6 +393,9 @@ class DropdownService:
             Tuple of (success, message)
         """
         try:
+            allowed, why = self._require_admin("bulk_import")
+            if not allowed:
+                return False, why
             if replace_existing:
                 # Deactivate all existing values in this category
                 deactivate_query = """

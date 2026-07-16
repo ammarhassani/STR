@@ -59,7 +59,7 @@ class Client:
         self.settings = SettingsService(self.db, self.auth)
         self.reports = ReportService(self.db, self.log, self.auth)
         self.dashboard = DashboardService(self.db, self.log)
-        self.dropdowns = DropdownService(self.db, self.log)
+        self.dropdowns = DropdownService(self.db, self.log, self.auth)
         self.validation = ValidationService(self.db, self.log)
         self.numbers = ReportNumberService(self.db, self.log)
         self.activity = ActivityService(self.db, self.log, self.auth)
@@ -144,6 +144,16 @@ def prosecute_authz():
     # 7. reporter creates a report (reporter has NO add_report permission)
     ok, rid_r, msg = rep.make_report()
     charge(CAT, 'reporter can create reports (lacks add_report perm)', ok, msg)
+
+    # 7b. agent mutates the shared dropdown catalog (admin-only config)
+    ok, msg = agent.dropdowns.add_dropdown_value('report_source', 'EVIL', 'agent1')
+    added = 'EVIL' in agent.dropdowns.get_active_dropdown_values('report_source')
+    charge(CAT, 'agent can add dropdown values (admin-only)', ok and added, msg)
+    cid = None
+    for v in admin.dropdowns.get_all_dropdown_values('report_source'):
+        if v['value'] == 'nationality': cid = v['config_id']
+    ok, msg = agent.dropdowns.delete_dropdown_value(cid or 999999, 'agent1')
+    charge(CAT, 'agent can delete dropdown values (admin-only)', ok, msg)
 
     # 8. self-approval: does approve_report allow requester==approver?
     #    admin makes a 2nd admin, that admin submits, then approves own.

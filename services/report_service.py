@@ -92,6 +92,23 @@ class ReportService:
             if result and result[0][0] > 0:
                 return False, None, "Serial number already exists"
 
+            # CIC uniqueness across NON-deleted reports (a deleted report's CIC
+            # is reusable). Data-integrity rule — enforced here, not just the UI.
+            cic = report_data.get('cic')
+            if cic:
+                dup = self.db_manager.execute_with_retry(
+                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0", (cic,))
+                if dup and dup[0][0] > 0:
+                    return False, None, "A report already exists for this CIC"
+
+            # Case ID uniqueness (optional field; same non-deleted scope)
+            case_id = report_data.get('case_id')
+            if case_id:
+                dup = self.db_manager.execute_with_retry(
+                    "SELECT COUNT(*) FROM reports WHERE case_id = ? AND is_deleted = 0", (case_id,))
+                if dup and dup[0][0] > 0:
+                    return False, None, "A report already exists for this Case ID"
+
             # Security: Filter fields against whitelist to prevent SQL injection
             allowed_data = {k: v for k, v in report_data.items() if k in self.ALLOWED_FIELDS}
             invalid_fields = set(report_data.keys()) - self.ALLOWED_FIELDS
@@ -260,6 +277,20 @@ class ReportService:
             for k, v in report_data.items():
                 if isinstance(v, str) and len(v) > self.MAX_FIELD_LEN:
                     return False, f"Field '{k}' exceeds maximum length"
+
+            # CIC / Case ID uniqueness across other non-deleted reports
+            if report_data.get('cic'):
+                dup = self.db_manager.execute_with_retry(
+                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0 AND report_id != ?",
+                    (report_data['cic'], report_id))
+                if dup and dup[0][0] > 0:
+                    return False, "A report already exists for this CIC"
+            if report_data.get('case_id'):
+                dup = self.db_manager.execute_with_retry(
+                    "SELECT COUNT(*) FROM reports WHERE case_id = ? AND is_deleted = 0 AND report_id != ?",
+                    (report_data['case_id'], report_id))
+                if dup and dup[0][0] > 0:
+                    return False, "A report already exists for this Case ID"
 
             # Security: Filter fields against whitelist to prevent SQL injection
             allowed_data = {k: v for k, v in report_data.items() if k in self.ALLOWED_FIELDS}

@@ -106,7 +106,7 @@ class AppState:
                 self.db_manager, self.logging_service, self.auth_service
             )
             self.dashboard_service = DashboardService(self.db_manager, self.logging_service)
-            self.dropdown_service = DropdownService(self.db_manager, self.logging_service)
+            self.dropdown_service = DropdownService(self.db_manager, self.logging_service, self.auth_service)
             self.validation_service = ValidationService(self.db_manager, self.logging_service)
             self.report_number_service = ReportNumberService(
                 self.db_manager, self.logging_service

@@ -96,6 +96,23 @@ class SettingsService:
         """
         self.db_manager.execute_with_retry(create_table_sql)
 
+    def _resolve_uid(self, user_id):
+        """Coerce user_id to a valid int, or fall back to the current user.
+        Rejects non-integer junk (list/dict/str) so it never reaches SQLite."""
+        if isinstance(user_id, bool):
+            user_id = None
+        elif user_id is not None:
+            try:
+                user_id = int(user_id)
+            except (ValueError, TypeError, OverflowError):
+                user_id = None
+        if user_id is None:
+            current_user = self.auth_service.get_current_user() if self.auth_service else None
+            if not current_user:
+                return None
+            user_id = current_user.get('user_id')
+        return user_id
+
     def get_all_settings(self, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Get all settings for a user.
@@ -106,14 +123,16 @@ class SettingsService:
         Returns:
             Dictionary of all settings with defaults for missing values
         """
-        if user_id is None:
-            current_user = self.auth_service.get_current_user()
-            if not current_user:
-                return self.DEFAULTS.copy()
-            user_id = current_user['user_id']
+        uid = self._resolve_uid(user_id)
+        if uid is None:
+            return self.DEFAULTS.copy()
 
-        query = "SELECT settings_json FROM user_settings WHERE user_id = ?"
-        result = self.db_manager.execute_with_retry(query, (user_id,))
+        try:
+            query = "SELECT settings_json FROM user_settings WHERE user_id = ?"
+            result = self.db_manager.execute_with_retry(query, (uid,))
+        except Exception as e:
+            self.logger.error(f"Error reading settings: {e}") if hasattr(self, 'logger') else None
+            return self.DEFAULTS.copy()
 
         if result and len(result) > 0:
             try:
@@ -123,7 +142,7 @@ class SettingsService:
                 settings = self.DEFAULTS.copy()
                 settings.update(user_settings)
                 return settings
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, TypeError):
                 return self.DEFAULTS.copy()
 
         return self.DEFAULTS.copy()
@@ -141,6 +160,7 @@ class SettingsService:
             Setting value or default
         """
         settings = self.get_all_settings(user_id)
+        key = str(key)  # never index the dict with an unhashable/non-str key
         return settings.get(key, default if default is not None else self.DEFAULTS.get(key))
 
     def save_settings(self, settings: Dict[str, Any], user_id: Optional[int] = None) -> bool:
@@ -154,29 +174,32 @@ class SettingsService:
         Returns:
             True if successful
         """
-        if user_id is None:
-            current_user = self.auth_service.get_current_user()
-            if not current_user:
-                return False
-            user_id = current_user['user_id']
-
-        # Get existing settings and merge
-        existing = self.get_all_settings(user_id)
-        existing.update(settings)
-
-        settings_json = json.dumps(existing)
-
-        # Insert or update
-        query = """
-        INSERT INTO user_settings (user_id, settings_json, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET
-            settings_json = excluded.settings_json,
-            updated_at = CURRENT_TIMESTAMP
-        """
+        uid = self._resolve_uid(user_id)
+        if uid is None:
+            return False
 
         try:
-            self.db_manager.execute_with_retry(query, (user_id, settings_json))
+            if not isinstance(settings, dict):
+                return False
+            # Get existing settings and merge; coerce keys to str and drop any
+            # value that can't be JSON-serialized (defends against junk input)
+            existing = self.get_all_settings(uid)
+            for k, v in settings.items():
+                try:
+                    json.dumps(v)
+                    existing[str(k)] = v
+                except (TypeError, ValueError):
+                    continue
+            settings_json = json.dumps(existing)
+
+            query = """
+            INSERT INTO user_settings (user_id, settings_json, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id) DO UPDATE SET
+                settings_json = excluded.settings_json,
+                updated_at = CURRENT_TIMESTAMP
+            """
+            self.db_manager.execute_with_retry(query, (uid, settings_json))
             return True
         except Exception as e:
             print(f"Error saving settings: {e}")
@@ -194,7 +217,7 @@ class SettingsService:
         Returns:
             True if successful
         """
-        return self.save_settings({key: value}, user_id)
+        return self.save_settings({str(key): value}, user_id)
 
     def reset_to_defaults(self, user_id: Optional[int] = None) -> bool:
         """

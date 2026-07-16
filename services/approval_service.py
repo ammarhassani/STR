@@ -62,6 +62,10 @@ class ApprovalService:
                 return False, None, "Report is already pending approval"
             elif current_approval_status == 'approved':
                 return False, None, "Report is already approved"
+            elif current_approval_status == 'rejected':
+                # A rejection is final (BRD): a rejected report cannot re-enter
+                # the workflow. Only 'rework' can be resubmitted.
+                return False, None, "This report was rejected and cannot be resubmitted"
 
             # Create version snapshot before submitting for approval
             success, version_id, msg = self.version_service.create_version_snapshot(

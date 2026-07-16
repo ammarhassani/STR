@@ -290,6 +290,19 @@ class AuthService:
                 if 'is_active' in kwargs and not kwargs['is_active']:
                     return False, "You cannot deactivate your own account"
 
+            # System must always retain at least one active admin: block a change
+            # that would demote or deactivate the last one.
+            demoting = ('role' in kwargs and kwargs['role'] != 'admin') or \
+                       ('is_active' in kwargs and not kwargs['is_active'])
+            if demoting:
+                target = self.db_manager.execute_with_retry(
+                    "SELECT role, is_active FROM users WHERE user_id = ?", (user_id,))
+                if target and target[0][0] == 'admin' and target[0][1]:
+                    n_admins = self.db_manager.execute_with_retry(
+                        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1")
+                    if n_admins and n_admins[0][0] <= 1:
+                        return False, "Cannot remove the last active administrator"
+
             # Build update query
             allowed_fields = ['password', 'full_name', 'role', 'is_active']
             updates = []
