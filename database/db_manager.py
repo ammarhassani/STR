@@ -145,16 +145,29 @@ class DatabaseManager:
         
         return 0
     
-    def get_last_insert_id(self) -> Optional[int]:
-        """Get the last inserted row ID"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT last_insert_rowid()")
-                result = cursor.fetchone()
-                return result[0] if result else None
-        except Exception:
-            return None
+    def insert_returning_id(
+        self,
+        query: str,
+        params: tuple = (),
+        max_retries: int = 5
+    ) -> Optional[int]:
+        """
+        Execute an INSERT and return the new row's id from the SAME
+        connection. A separate SELECT last_insert_rowid() call is useless
+        with this manager because every statement gets a fresh connection.
+        """
+        for attempt in range(max_retries):
+            try:
+                with self.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(query, params)
+                    return cursor.lastrowid
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < max_retries - 1:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                raise
+        return None
     
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists in the database"""

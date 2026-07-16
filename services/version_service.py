@@ -77,8 +77,14 @@ class VersionService:
                 (report_id, new_version_number, snapshot_data, change_summary, current_user['username'])
             )
 
-            # Get the version_id
-            result = self.db_manager.execute_with_retry("SELECT last_insert_rowid()")
+            # Get the version_id (last_insert_rowid() is useless here — the
+            # db_manager opens a fresh connection per statement, so it always
+            # returns 0; fetch the row we just inserted instead)
+            result = self.db_manager.execute_with_retry(
+                "SELECT version_id FROM report_versions WHERE report_id = ? AND version_number = ? "
+                "ORDER BY version_id DESC LIMIT 1",
+                (report_id, new_version_number)
+            )
             version_id = result[0][0] if result else None
 
             # Update report's current_version
@@ -242,7 +248,7 @@ class VersionService:
             # Log the restoration
             change_query = """
                 INSERT INTO change_history (table_name, record_id, field_name, old_value, new_value, change_type, change_reason, changed_by)
-                VALUES ('reports', ?, 'version_restored', NULL, ?, 'RESTORE', ?, ?)
+                VALUES ('reports', ?, 'version_restored', NULL, ?, 'ROLLBACK', ?, ?)
             """
             self.db_manager.execute_with_retry(
                 change_query,

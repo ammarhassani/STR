@@ -149,13 +149,19 @@ class ReportNumberService:
                     # Number is already reserved
                     reserved_by, expires_at = existing[1], existing[2]
                     if reserved_by == username:
-                        # Same user, extend the reservation
-                        new_expires_at = (datetime.now() + timedelta(minutes=reservation_minutes)).isoformat()
+                        # Same user, extend the reservation.
+                        # expires_at must be SQL-generated: comparisons all use
+                        # datetime('now') (UTC, space-separated), so a Python
+                        # local-time ISO string here never expires same-day.
                         cursor.execute("""
                             UPDATE report_number_reservations
-                            SET expires_at = ?
+                            SET expires_at = datetime('now', '+' || ? || ' minutes')
                             WHERE reservation_id = ?
-                        """, (new_expires_at, existing[0]))
+                        """, (reservation_minutes, existing[0]))
+                        cursor.execute(
+                            "SELECT expires_at FROM report_number_reservations WHERE reservation_id = ?",
+                            (existing[0],))
+                        new_expires_at = cursor.fetchone()[0]
                         conn.commit()
 
                         return True, {
@@ -171,13 +177,15 @@ class ReportNumberService:
                         return False, None, f"This report number is currently reserved by {reserved_by}. Please try again."
 
                 # Step 5: Create new reservation
-                expires_at = (datetime.now() + timedelta(minutes=reservation_minutes)).isoformat()
-
+                # expires_at SQL-generated in UTC to match datetime('now') comparisons
                 cursor.execute("""
                     INSERT INTO report_number_reservations
                     (report_number, serial_number, reserved_by, reserved_at, expires_at, is_used)
-                    VALUES (?, ?, ?, datetime('now'), ?, 0)
-                """, (report_number, serial_number, username, expires_at))
+                    VALUES (?, ?, ?, datetime('now'), datetime('now', '+' || ? || ' minutes'), 0)
+                """, (report_number, serial_number, username, reservation_minutes))
+                cursor.execute(
+                    "SELECT expires_at FROM report_number_reservations WHERE reservation_id = last_insert_rowid()")
+                expires_at = cursor.fetchone()[0]
 
                 conn.commit()
 
@@ -635,12 +643,15 @@ class ReportNumberService:
                         has_gap = False
 
                     # Create reservation with generic batch username
-                    expires_at = (datetime.now() + timedelta(minutes=reservation_minutes)).isoformat()
+                    # expires_at SQL-generated in UTC to match datetime('now') comparisons
                     cursor.execute("""
                         INSERT INTO report_number_reservations
                         (report_number, serial_number, reserved_by, expires_at, is_used)
-                        VALUES (?, ?, ?, ?, 0)
-                    """, (report_number, serial_number, f"BATCH_POOL", expires_at))
+                        VALUES (?, ?, ?, datetime('now', '+' || ? || ' minutes'), 0)
+                    """, (report_number, serial_number, "BATCH_POOL", reservation_minutes))
+                    cursor.execute(
+                        "SELECT expires_at FROM report_number_reservations WHERE reservation_id = last_insert_rowid()")
+                    expires_at = cursor.fetchone()[0]
 
                     reservations.append({
                         'report_number': report_number,

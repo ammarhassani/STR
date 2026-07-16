@@ -88,14 +88,10 @@ class ApprovalService:
                 INSERT INTO report_approvals (report_id, version_id, approval_status, requested_by, approval_comment)
                 VALUES (?, ?, 'pending', ?, ?)
             """
-            self.db_manager.execute_with_retry(
+            approval_id = self.db_manager.insert_returning_id(
                 insert_query,
                 (report_id, version_id, current_user['username'], comment)
             )
-
-            # Get approval_id
-            result = self.db_manager.execute_with_retry("SELECT last_insert_rowid()")
-            approval_id = result[0][0] if result else None
 
             # Notify all admins
             admins = self.get_admin_users()
@@ -347,7 +343,7 @@ class ApprovalService:
                     ra.requested_by,
                     ra.requested_at,
                     ra.approval_comment,
-                    r.status
+                    r.approval_status
                 FROM report_approvals ra
                 JOIN reports r ON ra.report_id = r.report_id
                 WHERE ra.approval_status = 'pending'
@@ -487,7 +483,7 @@ class ApprovalService:
                     ra.approval_comment,
                     u.username as approver_name,
                     u.full_name as approver_full_name,
-                    r.status as report_status
+                    r.approval_status as report_status
                 FROM report_approvals ra
                 JOIN reports r ON ra.report_id = r.report_id
                 LEFT JOIN users u ON ra.approver_id = u.user_id
@@ -543,13 +539,10 @@ class ApprovalService:
                 INSERT INTO notifications (user_id, title, message, notification_type, related_report_id)
                 VALUES (?, ?, ?, ?, ?)
             """
-            self.db_manager.execute_with_retry(
+            notification_id = self.db_manager.insert_returning_id(
                 query,
                 (user_id, title, message, notification_type, related_report_id)
             )
-
-            result = self.db_manager.execute_with_retry("SELECT last_insert_rowid()")
-            notification_id = result[0][0] if result else None
 
             return True, notification_id
 

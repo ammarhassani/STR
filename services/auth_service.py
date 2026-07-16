@@ -113,9 +113,12 @@ class AuthService:
                 (user_id, db_username, datetime.now().isoformat())
             )
 
-            # Get the session ID
+            # Get the session ID (last_insert_rowid() is useless here — the
+            # db_manager opens a fresh connection per statement, so it always
+            # returns 0; fetch the row we just inserted instead)
             session_id_result = self.db_manager.execute_with_retry(
-                "SELECT last_insert_rowid()"
+                "SELECT session_id FROM session_log WHERE user_id = ? ORDER BY session_id DESC LIMIT 1",
+                (user_id,)
             )
             self.current_session_id = session_id_result[0][0] if session_id_result else None
 
@@ -140,9 +143,11 @@ class AuthService:
             return False, None, "An error occurred during login"
 
     def logout(self):
-        """Logout the current user."""
-        if self.current_user and self.current_session_id:
-            try:
+        """Logout the current user. Always clears session state, even if
+        the session-log bookkeeping fails — a user must never stay
+        authenticated after logout."""
+        try:
+            if self.current_user and self.current_session_id:
                 # Update session log with logout time
                 logout_query = """
                     UPDATE session_log
@@ -157,15 +162,15 @@ class AuthService:
                     (datetime.now().isoformat(), datetime.now().isoformat(), self.current_session_id)
                 )
 
+            if self.current_user:
                 self.logger.info(f"User logged out: {self.current_user['username']}")
 
-                # Clear user context
-                self.logger.clear_user_context()
-                self.current_user = None
-                self.current_session_id = None
-
-            except Exception as e:
-                self.logger.error(f"Error during logout: {str(e)}", exc_info=True)
+        except Exception as e:
+            self.logger.error(f"Error during logout: {str(e)}", exc_info=True)
+        finally:
+            self.logger.clear_user_context()
+            self.current_user = None
+            self.current_session_id = None
 
     def get_current_user(self) -> Optional[Dict]:
         """Get the current authenticated user."""
@@ -221,14 +226,15 @@ class AuthService:
             if result and result[0][0] > 0:
                 return False, "Username already exists"
 
-            # Insert user
+            # Insert user (always store a bcrypt hash, never the plain password)
             insert_query = """
                 INSERT INTO users (username, password, full_name, role, is_active, created_by)
                 VALUES (?, ?, ?, ?, 1, ?)
             """
             self.db_manager.execute_with_retry(
                 insert_query,
-                (username, password, full_name, role, self.current_user['username'] if self.current_user else 'SYSTEM')
+                (username, SecurityService.hash_password(password), full_name, role,
+                 self.current_user['username'] if self.current_user else 'SYSTEM')
             )
 
             self.logger.log_user_action(

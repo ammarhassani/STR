@@ -125,7 +125,9 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
             result = await loop.run_in_executor(None, fetch)
 
             reservations_data = result or []
-            now = datetime.now()
+            # expires_at/reserved_at are stored in UTC (SQL datetime('now')) —
+            # compare and display in UTC to match
+            now = datetime.utcnow()
 
             reservations_table.rows.clear()
 

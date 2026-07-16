@@ -108,15 +108,11 @@ class ActivityService:
                  version_id, version_number, description, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
-            self.db_manager.execute_with_retry(
+            activity_id = self.db_manager.insert_returning_id(
                 insert_query,
                 (user_id, username, action_type, report_id, report_number,
                  version_id, version_number, description, metadata_json)
             )
-
-            # Get the activity_id
-            result = self.db_manager.execute_with_retry("SELECT last_insert_rowid()")
-            activity_id = result[0][0] if result else None
 
             return True, activity_id, "Activity logged successfully"
 
