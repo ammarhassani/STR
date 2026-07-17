@@ -259,9 +259,11 @@ def ui_create_report(client, hostile=False):
                 c.value = str(random.randint(1000, 9_000_000))
             # every other field is OPTIONAL (is_required=0) — leave blank so the
             # valid path reliably passes; hostile inputs are exercised separately.
-        # gender / arb dropdowns are optional; set to a real option anyway
+        # gender / arb dropdowns are optional; set to a real option anyway.
+        # (dropdowns are now the custom SearchableDropdown, not ft.Dropdown)
+        from components.searchable_dropdown import SearchableDropdown
         for c in walk(tree):
-            if isinstance(c, ft.Dropdown) and c.options:
+            if isinstance(c, (ft.Dropdown, SearchableDropdown)) and c.options:
                 try:
                     c.value = next((o.key for o in c.options if o.key), c.options[0].key)
                 except Exception:
