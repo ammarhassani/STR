@@ -233,7 +233,7 @@ def test_multiclient_stress_and_replay():
                 # a per-user "already has an active reservation" business result is a
                 # normal returned (False, msg) tuple, not a thrown error — only real
                 # exceptions from the gateway/host count as worker errors here.
-                gw.call('report_number_service.reserve_next_numbers', [f'ag{i}'], {})
+                gw.call('report_number_service.reserve_block', [f'ag{i}', 5], {})
             except Exception as e:
                 errors.append(f'ag{i}: {e}')
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(NUSERS)]
@@ -367,6 +367,12 @@ def test_create_report_gate():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_registry_reservation_commands():
+    from services import command_registry as cr
+    check('P2T4 reserve_block is a write command', cr.is_write_command('report_number_service.reserve_block'))
+    check('P2T4 transfer_numbers is a write command', cr.is_write_command('report_number_service.transfer_numbers'))
+    check('P2T4 old reserve_next_numbers removed', not cr.is_write_command('report_number_service.reserve_next_numbers'))
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -379,5 +385,6 @@ if __name__ == '__main__':
     test_reserved_numbers_table()
     test_block_reservation()
     test_create_report_gate()
+    test_registry_reservation_commands()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
