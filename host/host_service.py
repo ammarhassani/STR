@@ -120,6 +120,12 @@ class HostService:
     def _beat(self):
         hb.write_heartbeat(self.bus, self.host_id, self.term, self._db_version, self.pid, self.hostname)
 
+    def should_step_down(self) -> bool:
+        beat = hb.read_heartbeat(self.bus)
+        if not beat:
+            return False
+        return beat.get("host_id") != self.host_id and beat.get("term", 0) > self.term
+
     # ---- startup / self-heal ----
     def startup(self):
         from host.integrity import check_and_restore
@@ -173,6 +179,9 @@ class HostService:
     def serve_forever(self, poll: float = 0.1):
         self.startup()
         while True:
+            if self.should_step_down():
+                print(f"[HOST] stepping down: a newer term holds the lease (mine={self.term})")
+                return
             try:
                 if not self.run_once():
                     self._beat()

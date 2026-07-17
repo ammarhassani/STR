@@ -102,10 +102,37 @@ def test_session_timeout():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_step_down():
+    from host.host_service import HostService
+    from host.heartbeat import write_heartbeat
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    from host.lease import bump_lease
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    bus = os.path.join(d, "bus"); QueueTransport(bus)
+    class _A: pass
+    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus)
+    host.term = 1
+    try:
+        check("no rival -> stay", host.should_step_down() is False)
+        write_heartbeat(bus, host.host_id, 5, 0, 1, "self")  # same host, higher term -> not a rival
+        check("own higher heartbeat -> stay", host.should_step_down() is False)
+        write_heartbeat(bus, "OTHER-HOST", 2, 0, 1, "PC2")   # different host, higher term
+        check("rival higher term -> step down", host.should_step_down() is True)
+        write_heartbeat(bus, "OTHER-HOST", 1, 0, 1, "PC2")   # different host, equal term
+        check("rival equal term -> stay", host.should_step_down() is False)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
     test_heartbeat()
     test_integrity_and_session()
     test_session_timeout()
+    test_step_down()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
