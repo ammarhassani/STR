@@ -334,8 +334,25 @@ class ReportNumberService:
             last_reserved = result[0]
             max_reserved_num = int(last_reserved.split('/')[-1])
 
-        # Next number is max of both + 1 (ensures no conflicts!)
-        next_num = max(max_existing_num, max_reserved_num) + 1
+        # Also check owned-block reservations (reserved_numbers): these hold
+        # report_number permanently (UNIQUE NOT NULL), including numbers
+        # allocated earlier in the *same* reserve_block loop/transaction —
+        # without this a multi-number reserve_block would generate the same
+        # number repeatedly and hit the UNIQUE constraint.
+        cursor.execute("""
+            SELECT report_number
+            FROM reserved_numbers
+            WHERE report_number LIKE ?
+            ORDER BY report_number DESC
+            LIMIT 1
+        """, (f"{prefix}%",))
+        result = cursor.fetchone()
+        max_block_num = 0
+        if result:
+            max_block_num = int(result[0].split('/')[-1])
+
+        # Next number is max of all three + 1 (ensures no conflicts!)
+        next_num = max(max_existing_num, max_reserved_num, max_block_num) + 1
         report_number = f"{prefix}{next_num:03d}"
 
         # Get next serial number (global counter)
@@ -346,7 +363,11 @@ class ReportNumberService:
         cursor.execute("SELECT COALESCE(MAX(serial_number), 0) FROM report_number_reservations WHERE is_used = 0")
         max_reserved_sn = cursor.fetchone()[0]
 
-        serial_number = max(max_sn, max_reserved_sn) + 1
+        # Also check owned-block serial numbers (serial_number is UNIQUE NOT NULL)
+        cursor.execute("SELECT COALESCE(MAX(serial_number), 0) FROM reserved_numbers")
+        max_block_sn = cursor.fetchone()[0]
+
+        serial_number = max(max_sn, max_reserved_sn, max_block_sn) + 1
 
         return report_number, serial_number
 
@@ -1054,6 +1075,87 @@ class ReportNumberService:
         except Exception as e:
             print(f"[ERROR] Error cleaning gap queue: {str(e)}")
             return 0
+
+    # ---- Owned-block reservation (Phase 2) -----------------------------
+
+    def reserve_block(self, username, count):
+        """Allocate the next `count` sequential numbers to `username` as
+        'available', in one transaction. count clamped to [1, 100]."""
+        try:
+            count = int(count)
+        except (TypeError, ValueError):
+            return False, [], "Invalid count"
+        if count < 1 or count > 100:
+            return False, [], "Count must be between 1 and 100"
+        conn = sqlite3.connect(self.db_manager.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE")
+            allocated = []
+            for _ in range(count):
+                report_number, serial_number = self._generate_next_numbers(cursor)
+                cursor.execute(
+                    "INSERT INTO reserved_numbers (report_number, serial_number, owned_by, status) "
+                    "VALUES (?, ?, ?, 'available')", (report_number, serial_number, username))
+                allocated.append(report_number)
+            conn.commit()
+            self.logger.info(f"Reserved block of {count} numbers for {username}")
+            return True, allocated, f"Reserved {count} numbers"
+        except Exception as e:
+            conn.rollback()
+            self.logger.error(f"reserve_block error: {e}")
+            return False, [], f"Error: {e}"
+        finally:
+            conn.close()
+
+    def get_available_numbers(self, username):
+        """This user's 'available' numbers, ascending."""
+        rows = self.db_manager.execute_with_retry(
+            "SELECT id, report_number, serial_number, reserved_at, transferred_from "
+            "FROM reserved_numbers WHERE owned_by = ? AND status = 'available' "
+            "ORDER BY serial_number", (username,))
+        return [{'id': r[0], 'report_number': r[1], 'serial_number': r[2],
+                 'reserved_at': r[3], 'transferred_from': r[4]} for r in (rows or [])]
+
+    def get_available_count(self, username):
+        r = self.db_manager.execute_with_retry(
+            "SELECT COUNT(*) FROM reserved_numbers WHERE owned_by = ? AND status = 'available'", (username,))
+        return r[0][0] if r else 0
+
+    def consume_next_available(self, username, report_id):
+        """Atomically flip the user's lowest 'available' number to 'used',
+        linking used_by_report_id=report_id. Used by create_report inside
+        the same transaction."""
+        n = self.db_manager.execute_write(
+            "UPDATE reserved_numbers SET status='used', used_by_report_id=? "
+            "WHERE id = (SELECT id FROM reserved_numbers WHERE owned_by=? AND status='available' "
+            "ORDER BY serial_number LIMIT 1)", (report_id, username))
+        if n != 1:
+            return False, None, "You have no reserved numbers available"
+        r = self.db_manager.execute_with_retry(
+            "SELECT report_number FROM reserved_numbers WHERE used_by_report_id=? ORDER BY id DESC LIMIT 1",
+            (report_id,))
+        return True, (r[0][0] if r else None), "ok"
+
+    def transfer_numbers(self, from_user, to_user, report_numbers):
+        """Reassign owned_by for the given 'available' numbers (must currently
+        be owned by from_user). to_user must be an active user."""
+        if not report_numbers:
+            return False, "No numbers selected"
+        tgt = self.db_manager.execute_with_retry(
+            "SELECT is_active FROM users WHERE username = ?", (to_user,))
+        if not tgt or not tgt[0][0]:
+            return False, "Recipient must be an active user"
+        moved = 0
+        for rn in report_numbers:
+            n = self.db_manager.execute_write(
+                "UPDATE reserved_numbers SET owned_by=?, transferred_from=? "
+                "WHERE report_number=? AND owned_by=? AND status='available'",
+                (to_user, from_user, rn, from_user))
+            moved += n
+        if moved == 0:
+            return False, "No transferable numbers (must be yours and unused)"
+        return True, f"Transferred {moved} number(s) to {to_user}"
 
     def __del__(self):
         """Cleanup when service is destroyed."""

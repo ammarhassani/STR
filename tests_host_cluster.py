@@ -314,6 +314,38 @@ def test_reserved_numbers_table():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_block_reservation():
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        nums = host.services['report_number_service']
+        ok, block, msg = nums.reserve_block('ali', 5)
+        check('P2T2 reserve_block allocates 5', ok and len(block) == 5, msg)
+        check('P2T2 available count = 5', nums.get_available_count('ali') == 5)
+        # consume lowest
+        ok, rn, _ = nums.consume_next_available('ali', 999)
+        check('P2T2 consume returns a number', ok and rn == block[0], (rn, block[0]))
+        check('P2T2 available now 4', nums.get_available_count('ali') == 4)
+        import sqlite3
+        row = sqlite3.connect(dbm.db_path).execute(
+            "SELECT status, used_by_report_id FROM reserved_numbers WHERE report_number=?", (rn,)).fetchone()
+        check('P2T2 consumed marked used+linked', row[0] == 'used' and row[1] == 999, row)
+        # transfer 2 of ali's remaining to sara (seed sara active)
+        dbm.execute_with_retry("INSERT INTO users (username,password,full_name,role,is_active,created_by) "
+                               "VALUES ('sara','x','Sara','agent',1,'admin')")
+        remaining = [r['report_number'] for r in nums.get_available_numbers('ali')]
+        okt, mt = nums.transfer_numbers('ali', 'sara', remaining[:2])
+        check('P2T2 transfer ok', okt, mt)
+        check('P2T2 sara has 2', nums.get_available_count('sara') == 2)
+        check('P2T2 ali has 2', nums.get_available_count('ali') == 2)
+        # cannot transfer numbers you do not own
+        okbad, _ = nums.transfer_numbers('ali', 'sara', ['9999/99/999'])
+        check('P2T2 cannot transfer unowned', not okbad)
+        check('P2T2 report_numbers are unique', dbm.execute_with_retry(
+            "SELECT report_number,COUNT(*) c FROM reserved_numbers GROUP BY report_number HAVING c>1") == [])
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -324,5 +356,6 @@ if __name__ == '__main__':
     test_multiclient_stress_and_replay()
     test_serve_forever_survives_poison_command()
     test_reserved_numbers_table()
+    test_block_reservation()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
