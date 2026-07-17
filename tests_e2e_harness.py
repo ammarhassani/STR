@@ -96,6 +96,7 @@ class Client:
         self.approvals = ApprovalService(self.db, self.log, self.auth, self.versions,
                                          self.reports, self.activity)
         self.reports.set_activity_service(self.activity)
+        self.reports.set_report_number_service(self.numbers)
         self.versions.set_activity_service(self.activity)
         self.restore = RestoreService(self.db, self.log)
 
@@ -104,24 +105,30 @@ class Client:
         return ok, user, msg
 
     def make_report(self, extra=None):
-        """Reserve numbers then create a minimal valid report. Returns (ok, report_id, resv, msg)."""
+        """Ensure the user owns an available reserved number (reserve a block of
+        20 on first use), then create a minimal valid report WITHOUT passing
+        report_number/sn — create_report auto-consumes the lowest available
+        owned number. Returns (ok, report_id, resv, msg) where resv is the
+        {report_number, serial_number} that got consumed, or None on failure."""
         u = self.auth.get_current_user()['username']
-        ok, resv, msg = self.numbers.reserve_next_numbers(u)
-        if not ok:
-            return False, None, None, f"reserve: {msg}"
+        if self.numbers.get_available_count(u) < 1:
+            ok, nums, msg = self.numbers.reserve_block(u, 20)
+            if not ok:
+                return False, None, None, f"reserve: {msg}"
         data = {
-            'sn': resv['serial_number'],
-            'report_number': resv['report_number'],
             'report_date': datetime.now().strftime('%d/%m/%Y'),
-            'reported_entity_name': f'Entity {resv["report_number"]}',
+            'reported_entity_name': f'Entity {u} {time.time()}',
             'nationality': 'Saudi Arabian',
             'total_transaction': '1000',
         }
         if extra:
             data.update(extra)
         ok, rid, msg = self.reports.create_report(data)
+        resv = None
         if ok:
-            self.numbers.mark_reservation_used(resv['report_number'], u)
+            rep = self.reports.get_report(rid)
+            if rep:
+                resv = {'report_number': rep['report_number'], 'serial_number': rep['sn']}
         return ok, rid, resv, msg
 
 
@@ -213,40 +220,53 @@ def phase1():
     check(F, 'service-level: agent has add_report', agent.auth.has_permission('add_report'))
     check(F, 'service-level: agent lacks manage_users', not agent.auth.has_permission('manage_users'))
 
-    # ------------------------------------------------------------ numbers
+    # ------------------------------------------------------------ numbers (owned-block model)
     F = '03 Report number reservations'
     u = 'agent1'
-    ok, r1, msg = agent.numbers.reserve_next_numbers(u)
-    check(F, 'reserve returns number+sn', ok and r1['report_number'] and r1['serial_number'], msg)
-    ok, r1b, msg = agent.numbers.reserve_next_numbers(u)
-    check(F, 'second reserve denied (max 1 active per user)', not ok, msg)
+    ok, nums, msg = agent.numbers.reserve_block(u, 5)
+    check(F, 'reserve_block returns N numbers', ok and len(nums) == 5, msg)
+    check(F, 'available count reflects reserved block',
+          agent.numbers.get_available_count(u) == 5, agent.numbers.get_available_count(u))
     admin2 = Client('t-admin2'); admin2.login('admin', 'Admin@1234')
-    ok, r2, msg = admin2.numbers.reserve_next_numbers('admin')
-    check(F, 'second user gets different number',
-          ok and r2['report_number'] != r1['report_number'], msg)
-    active = agent.numbers.get_active_reservations()
-    check(F, 'active reservations listed', len(active) >= 2, len(active))
-    ok, msg = agent.numbers.cancel_reservation(r1['report_number'], u)
-    check(F, 'cancel reservation', ok, msg)
-    ok, msg = admin2.numbers.cancel_reservation(r2['report_number'], 'admin')
-    check(F, 'cancel second reservation', ok, msg)
-    # expiry
-    ok, r3, _ = agent.numbers.reserve_next_numbers(u, reservation_minutes=0)
-    time.sleep(1.2)          # expires_at == insert time; must pass strictly
-    agent.numbers.cleanup_expired_reservations_public()
-    active = [a for a in agent.numbers.get_active_reservations()
-              if a.get('report_number') == r3['report_number']]
-    check(F, 'expired reservation cleaned up', len(active) == 0, active)
-    stats = agent.numbers.get_reservation_stats()
-    check(F, 'reservation stats dict', isinstance(stats, dict) and stats, stats)
-    ok, batch, msg = admin2.numbers.reserve_batch_numbers(count=3)
-    check(F, 'batch reserve 3', ok and len(batch) == 3, msg)
-    pool = admin2.numbers.get_pool_size()
-    check(F, 'pool size reflects batch', pool >= 3, pool)
-    ok, nxt, msg = agent.numbers.get_next_from_pool(u)
-    check(F, 'get_next_from_pool hands out pooled number', ok and nxt, msg)
-    if ok and nxt:
-        agent.numbers.cancel_reservation(nxt['report_number'], u)
+    ok, nums2, msg = admin2.numbers.reserve_block('admin', 3)
+    check(F, 'second user gets disjoint numbers',
+          ok and len(nums2) == 3 and not (set(nums) & set(nums2)), msg)
+    check(F, 'invalid count rejected', not agent.numbers.reserve_block(u, 0)[0])
+
+    # consume-on-create: create_report (via make_report, no report_number passed)
+    # must auto-consume the user's lowest available owned number.
+    before_count = agent.numbers.get_available_count(u)
+    ok, rid_n, resv_n, msg = agent.make_report()
+    check(F, 'create_report consumes an owned number', ok and resv_n, msg)
+    check(F, 'available count decrements on consume',
+          agent.numbers.get_available_count(u) == before_count - 1,
+          agent.numbers.get_available_count(u))
+    check(F, 'consumed number matches lowest available',
+          resv_n and resv_n['report_number'] == nums[0], (resv_n, nums))
+
+    # transfer_numbers: moves ownership between two users
+    avail_before = agent.numbers.get_available_numbers(u)
+    to_move = avail_before[0]['report_number']
+    ok, msg = agent.numbers.transfer_numbers(u, 'admin', [to_move])
+    check(F, 'transfer_numbers moves ownership', ok, msg)
+    check(F, 'transferred number leaves sender available list',
+          to_move not in [n['report_number'] for n in agent.numbers.get_available_numbers(u)])
+    check(F, 'transferred number appears in recipient available list',
+          to_move in [n['report_number'] for n in admin2.numbers.get_available_numbers('admin')])
+    ok, msg = agent.numbers.transfer_numbers(u, 'admin', ['2099/99/999'])
+    check(F, 'transfer of unowned number rejected', not ok, msg)
+    ok, msg = agent.numbers.transfer_numbers(u, 'no_such_user', [avail_before[1]['report_number']])
+    check(F, 'transfer to unknown user rejected', not ok, msg)
+
+    # uniqueness: report/serial numbers stay unique across owned-block + reports
+    dup = agent.reports.create_report({'sn': resv_n['serial_number'],
+                                       'report_number': resv_n['report_number'],
+                                       'report_date': 'x', 'reported_entity_name': 'x'})
+    check(F, 'duplicate report/serial number rejected', not dup[0], dup[2])
+    all_nums = agent.numbers.get_available_numbers(u) + admin2.numbers.get_available_numbers('admin')
+    rn_list = [n['report_number'] for n in all_nums]
+    check(F, 'no duplicate report numbers across owners', len(rn_list) == len(set(rn_list)), rn_list)
+
     month = agent.numbers.get_month_with_grace_period()
     check(F, 'grace-period month format YYYY/MM', len(month.split('/')) == 2, month)
 
