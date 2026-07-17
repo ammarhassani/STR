@@ -469,4 +469,9 @@ if __name__ == "__main__":
                     bus_dir, host_id=Config.ensure_host_id()).serve_forever()
         sys.exit(0)
 
+    if "--panel" in sys.argv:
+        from panel.control_panel import main as panel_main
+        panel_main()
+        sys.exit(0)
+
     ft.app(target=main)

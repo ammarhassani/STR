@@ -75,8 +75,34 @@ def test_panel_controller():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_panel_cli_dispatch():
+    from panel.control_panel import run_action
+    from panel.panel_controller import PanelController
+    d, bus, db = _seed_bus_and_db()
+    class _Cfg:
+        MODE = "client"; HOST_ID = "H"
+        @classmethod
+        def ensure_host_id(cls): return cls.HOST_ID
+        @classmethod
+        def save(cls): pass
+    pc = PanelController(bus, db, host_id="H")
+    try:
+        out = run_action(pc, "status", _Cfg)
+        check("cli status prints host state", "host" in out.lower())
+        out2 = run_action(pc, "backup", _Cfg)
+        check("cli backup runs", "backup" in out2.lower())
+        out3 = run_action(pc, "list", _Cfg)
+        check("cli list runs", isinstance(out3, str))
+        out4 = run_action(pc, "designate", _Cfg)
+        check("cli designate sets host mode", _Cfg.MODE == "host", out4)
+        check("cli unknown choice is handled", "unknown" in run_action(pc, "zzz", _Cfg).lower())
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_config_host_id()
     test_panel_controller()
+    test_panel_cli_dispatch()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
