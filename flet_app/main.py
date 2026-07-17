@@ -465,7 +465,8 @@ if __name__ == "__main__":
             "dropdown_service", "validation_service", "report_number_service",
             "activity_service", "version_service", "approval_service")}
         bus_dir = Config.get_bus_dir()
-        HostService(host_services, app_state.db_manager, QueueTransport(bus_dir), bus_dir).serve_forever()
+        HostService(host_services, app_state.db_manager, QueueTransport(bus_dir),
+                    bus_dir, host_id=Config.ensure_host_id()).serve_forever()
         sys.exit(0)
 
     ft.app(target=main)

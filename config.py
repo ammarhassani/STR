@@ -4,7 +4,9 @@ Handles database paths and system settings
 """
 import json
 import os
+import socket
 from pathlib import Path
+from uuid import uuid4
 
 
 class Config:
@@ -17,7 +19,10 @@ class Config:
     # G1 client mode: launch mode and shared folder path
     MODE = "local"          # "local" | "host" | "client"
     SHARE_PATH = None       # shared-folder root (host & client); None in local mode
-    
+
+    # Host mode: stable id for this PC when it serves as host
+    HOST_ID = None
+
     # Application settings
     APP_NAME = "FIU Report Management System"
     APP_VERSION = "2.0.0"
@@ -42,6 +47,7 @@ class Config:
                     cls.MAX_LOGIN_ATTEMPTS = config_data.get('max_login_attempts', 5)
                     cls.MODE = config_data.get('mode', 'local')
                     cls.SHARE_PATH = config_data.get('share_path')
+                    cls.HOST_ID = config_data.get('host_id')
                     return True
             except Exception as e:
                 print(f"Error loading config: {e}")
@@ -53,7 +59,7 @@ class Config:
         """Save configuration to file"""
         try:
             cls.CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-            
+
             config_data = {
                 'database_path': cls.DATABASE_PATH,
                 'backup_path': cls.BACKUP_PATH,
@@ -61,11 +67,12 @@ class Config:
                 'max_login_attempts': cls.MAX_LOGIN_ATTEMPTS,
                 'mode': cls.MODE,
                 'share_path': cls.SHARE_PATH,
+                'host_id': cls.HOST_ID,
             }
-            
+
             with open(cls.CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(config_data, f, indent=2)
-            
+
             return True
         except Exception as e:
             print(f"Error saving config: {e}")
@@ -90,6 +97,24 @@ class Config:
             str(Path(__file__).parent / "database")
         os.makedirs(base, exist_ok=True)
         return os.path.join(base, "client_replica.db")
+
+    @classmethod
+    def ensure_host_id(cls) -> str:
+        """Generate and persist a stable id for this PC when it serves as host.
+        Returns the cached id if already set, otherwise generates, saves, and returns."""
+        if not cls.HOST_ID:
+            cls.HOST_ID = f"{socket.gethostname()}-{uuid4().hex[:8]}"
+            cls.save()
+        return cls.HOST_ID
+
+    @classmethod
+    def get_client_outbox_dir(cls) -> str:
+        """Local dir (next to the client replica) where the outbox persists queued writes."""
+        base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else \
+            str(Path(__file__).parent / "database")
+        d = os.path.join(base, "outbox")
+        os.makedirs(d, exist_ok=True)
+        return d
 
     @classmethod
     def is_configured(cls) -> bool:
