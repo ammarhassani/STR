@@ -1,0 +1,153 @@
+# STR — The 20 (plan of record)
+
+Ground rules: **one item at a time, to 100% — domain-correct AND technically
+tested — before the next.** UI items also need a visual confirm from the owner.
+Nothing here is "done" until it is proven end to end.
+
+Cross-cutting facts already settled:
+- **Platform = native desktop** (flet client vendored in-repo, seeds offline;
+  `STR_VIEW=web` fallback). Shortcuts work again.
+- **Reservation stays** ("$100-bill": a number is owned, never deleted,
+  non-expiring, tied to its assignee until acted on — create a report or
+  transfer it).
+- **Roles (target):** reporter = read/export only · agent = create/reserve/
+  submit/own-queue · supervisor = agent + approve/reject/rework + message ·
+  admin = everything.
+- **BI is config-driven:** widgets are admin-authored read-only SQL stored as
+  rows in the shared DB → reach every client on refresh → no app reship.
+
+Status legend: ☐ not started · ◐ in progress · ☑ done+tested
+
+---
+
+1. **Select-all in reservation management** — ☐
+   *Ask:* bulk-select numbers in the reservation dialog.
+   *Do:* add "Select all / Clear all" to the number list used for transfer.
+   Small UI on top of the existing owned-block reservation.
+
+2. **Agent work queues (find my reworked/returned reports)** — ☐
+   *Ask:* reworked reports are unfindable.
+   *Do:* build an agent **"My Work"** view with clear lanes — Draft, Returned/
+   Rework, Pending Approval, Approved — with counts. Rework lane is front and
+   center. (Depends on #8 roles + #11 messages.)
+
+3. **Submit-for-approval auto-saves (no extra friction)** — ☐
+   *Ask:* submitting shouldn't need a separate Save.
+   *Do:* the Submit action saves the current form first, then submits, as one
+   step.
+
+4. **Productivity chart on the dashboard** — ☐
+   *Ask:* see productivity.
+   *Do:* delivered as config-BI widgets (see #17): reports per agent, throughput
+   over time, aging. Consumed by admin + reporter.
+
+5. **Duplicate-CIC is an INFORMATION banner, never a blocker** — ☐
+   *Ask:* enrich, don't block.
+   *Do:* non-blocking CIC banner showing: live **count** (increments when this
+   one sends) · **last report** (date/number/status/by whom) · **distinct entity
+   names** seen on this CIC · **total_transaction** sum + min–max · **days since
+   last** · any still **pending** · **classifications** seen. (Signal set
+   confirmed.)
+
+6. **Log export is broken ("logs ready for export", nothing happens)** — ☐
+   *Ask:* fix it.
+   *Do:* diagnose + fix the log-export handler so it actually writes the file.
+
+7. **Reporter sees an Add-Report button it can't use (misleading)** — ☐
+   *Ask:* honest affordances.
+   *Do:* with the role rework (#8), reporter = read/export only; hide Add-Report
+   and any action a reporter can't perform.
+
+8. **Agents reserve their own numbers + new `supervisor` role** — ☐
+   *Ask:* agent keeps reservation; move approvals to a supervisor = agent +
+   approval.
+   *Do:* add the `supervisor` role (migration + RBAC), route approvals/rework to
+   supervisors, keep agents reserving their own numbers. Foundational for
+   #2/#3/#7/#11.
+
+9. **Review screen: gender greyed out, value not printed** — ☐
+   *Ask:* it must show the stored value.
+   *Do:* fix the review renderer so gender (and any similarly-disabled field)
+   displays its saved value.
+
+10. **Bigger review screen** — ☐
+    *Ask:* more content visible.
+    *Do:* enlarge the review/report dialog (width/height + layout).
+
+11. **Agent sees the supervisor's message on a reworked report** — ☐
+    *Ask:* read the reviewer's note.
+    *Do:* surface the rework comment on the report inside the agent's queue (#2)
+    and on the report view.
+
+12. **Kill the "-- Select --" placeholder trap** — ☐
+    *Ask:* users pick the empty placeholder; app then reads a bad value.
+    *Do:* no selectable empty option — use non-committable hint text; required
+    dropdowns enforce a real choice; edit-mode defaults to the current value
+    ("keep current"). Baked into the custom searchable dropdown (#SD).
+
+13. **Second reason of suspicion not editable** — ☐
+    *Ask:* it should be editable.
+    *Do:* fix so the field/dropdown accepts input.
+
+14. **Rapid-repeat account banner (multiple entries on one account, 0–2 days)** — ☐
+    *Ask:* flag likely structuring.
+    *Do:* on entering an account number, if ≥2 reports on it within 0–2 days,
+    show a non-blocking banner. Same intelligence layer as #5.
+
+15. **Numbering: drop the grace period; clean month rollover** — ☐
+    *Ask:* month closes → new sequence from 1; reserved numbers stay with owners.
+    *Do:* remove the grace-period logic in `report_number_service`; `_active_month`
+    = true current calendar month; new reservations start `YYYY/MM/001`;
+    already-reserved numbers keep their reservation-month prefix + owner until
+    acted on. Reservation itself untouched.
+
+16. **Export must be xlsx** — ☐
+    *Ask:* xlsx, not the current format.
+    *Do:* report export → xlsx via openpyxl (already a dependency).
+
+17. **Enhanced, config-driven BI (admin + reporter → management)** — ☐
+    *Ask:* real BI, not just productivity; and no reship per new chart.
+    *Do:* build out the existing `dashboard_config` substrate: admin composes
+    widgets (KPI/chart/table) as read-only SQL saved as DB rows → shared DB →
+    every client on refresh, zero app update. Coverage: productivity, aging,
+    rework rate, monthly/SLA trends, CIC & account intelligence, top entities.
+    Guardrail: admin-authored, SELECT-only. (Big item — its own sub-plan.)
+
+18. **Help / documentation not scrollable** — ☐
+    *Ask:* let me scroll it.
+    *Do:* add scroll to the help dialog (same fix class as the wizard scroll bug).
+
+19. **Updater — reflect new app versions without hard refresh** — ☐ (design thread)
+    *Ask:* seamless updates to client PCs.
+    *Do:* separate design. Base mechanism = desktop + `git pull` + restart;
+    discuss an in-app "update available → pull & relaunch" helper. Content
+    updates (charts, dropdown values, dashboards) already covered by config-BI +
+    the shared DB. Park until the build items land.
+
+20. **Keyboard shortcuts didn't work (browser)** — ☑
+    *Fixed by going native desktop* (browser no longer intercepts keys).
+
+---
+
+## Extra foundational item (not in the original 20 but required)
+
+**SD. Custom searchable dropdown** — ☐
+Flet 0.27+ `enable_filter` does NOT render searchable on the desktop client
+(0.28.3) — confirmed on the real client. Build a custom component (text field +
+live-filtered list) that is a **drop-in for `ft.Dropdown`** (same `.value`,
+`.options`, `on_change`, `ref`), behind the existing `searchable_dropdown`
+wrapper, so all 22 sites become searchable with no call-site changes. Bakes in
+the #12 placeholder fix. UI item → needs a visual confirm.
+
+---
+
+## Proposed execution order (each to 100% before the next)
+
+1. **SD** custom searchable dropdown (+ #12 placeholder) — unblocks every form
+2. **#15** numbering grace-removal — isolated, service-layer, high-value
+3. **#8** supervisor role + RBAC — foundation → then **#7, #3, #2, #11**
+4. Bugs: **#9** gender, **#13** second reason, **#18** help scroll, **#6** log export
+5. Intelligence: **#5** CIC banner, **#14** account rapid-repeat
+6. **#16** xlsx export · **#1** select-all · **#10** bigger review screen
+7. **#17 + #4** config-driven BI (its own sub-plan)
+8. **#19** updater (design thread)
