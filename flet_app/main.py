@@ -178,11 +178,25 @@ class FletApp:
                 ok = app_state.initialize_services(local_replica, mode="client", bus_dir=bus_dir)
                 if not ok:
                     return False
-                # keep the local read replica fresh
+                # keep the local read replica fresh; drain queued writes and
+                # refresh the host-down banner each time the replica updates
+                # (the host republishes right after processing an outbox
+                # write, so this is when a drain is most likely to succeed)
+                def _on_replica_update():
+                    try:
+                        app_state.drain_outbox()
+                    except Exception:
+                        pass
+                    if getattr(self, "_host_banner", None) is not None:
+                        self._host_banner.refresh()
+                        try:
+                            self.page.update()
+                        except Exception:
+                            pass
                 if not getattr(self, "_refresher", None):
                     self._refresher = ReplicaRefresher(
                         bus_dir, local_replica, poll=2.0,
-                        on_update=lambda: None)
+                        on_update=_on_replica_update)
                     self._refresher.start()
                 theme_manager.initialize(self.page, app_state.settings_service, app_state.auth_service)
                 return True
@@ -322,16 +336,25 @@ class FletApp:
             on_reservations=handle_reservations,
         )
 
+        # Host-down banner (client mode only; local/host installs have no
+        # host_status and never show it)
+        main_column_controls = []
+        if app_state.host_status:
+            from flet_app.components.host_banner import build_host_banner
+            self._host_banner = build_host_banner(app_state)
+            main_column_controls.append(self._host_banner)
+
         # Main content column
+        main_column_controls += [
+            self.header,
+            ft.Container(
+                content=self.content_area,
+                expand=True,
+                bgcolor=colors["bg_primary"],
+            ),
+        ]
         main_column = ft.Column(
-            controls=[
-                self.header,
-                ft.Container(
-                    content=self.content_area,
-                    expand=True,
-                    bgcolor=colors["bg_primary"],
-                ),
-            ],
+            controls=main_column_controls,
             spacing=0,
             expand=True,
         )
@@ -465,7 +488,13 @@ if __name__ == "__main__":
             "dropdown_service", "validation_service", "report_number_service",
             "activity_service", "version_service", "approval_service")}
         bus_dir = Config.get_bus_dir()
-        HostService(host_services, app_state.db_manager, QueueTransport(bus_dir), bus_dir).serve_forever()
+        HostService(host_services, app_state.db_manager, QueueTransport(bus_dir),
+                    bus_dir, host_id=Config.ensure_host_id()).serve_forever()
+        sys.exit(0)
+
+    if "--panel" in sys.argv:
+        from panel.control_panel import main as panel_main
+        panel_main()
         sys.exit(0)
 
     ft.app(target=main)

@@ -9,6 +9,7 @@ import re
 import asyncio
 
 from theme.theme_manager import theme_manager
+from services.remote_gateway import HostOfflineError
 from components.app_button import app_button
 from components.form_fields import (
     create_text_field,
@@ -420,6 +421,18 @@ def show_report_dialog(
                     on_save()
             else:
                 show_error_dialog(message)
+
+        except HostOfflineError:
+            # Host unreachable: the write was queued in the client outbox
+            # (services.outbox) and will be replayed once the host comes
+            # back. Close the dialog as if saved - it will apply exactly once.
+            show_success_dialog(
+                "Host offline — your entry is queued and will sync when the host returns."
+            )
+            dialog.open = False
+            page.update()
+            if on_save:
+                on_save()
 
         except Exception as ex:
             show_error_dialog(f"Failed to save report: {str(ex)}")
