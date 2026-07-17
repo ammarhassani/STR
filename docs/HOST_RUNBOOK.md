@@ -74,7 +74,7 @@ This runbook covers setup, daily operations, failover procedures, and known limi
 
 ### Opening the Operator Panel
 
-The operator panel provides visibility and control over the STR deployment. Launch it from any workstation:
+The operator panel provides visibility and control over the STR deployment. `status`, `become host`, and failover can be run from any workstation, but **maintenance actions (backup, integrity check, restore) must be run on the HOST PC** — on a client PC they act on that PC's local replica copy, not the authoritative database. Launch the panel:
 
 ```
 deploy\start_panel.bat
@@ -200,12 +200,11 @@ Backups are snapshots of the replica taken at a point in time. Use restoration t
    - In the panel, select "List Backups"
    - Backups are listed with timestamps; choose the newest one known to be good
 
-3. **Restore the selected backup:**
-   - In the panel, select the backup and choose "Restore"
-   - Confirm the operation; the system will:
-     - Replace this PC's local database with the backup snapshot (atomically)
-     - Republish it as the replica on the next host loop, so clients see the restored data on their next refresh
-   - Note: restore only swaps the data; it does not change the host term. Run it on the current host PC (or promote first with "Become Host Now", then restore)
+3. **Restore the selected backup (on the HOST PC):**
+   - **First stop the host:** close the `--host` window (or end the process) on the host PC. Restoring while the host is actively serving is refused by the panel — the host must be stopped so nothing reads the database mid-swap.
+   - In the panel, select the backup and choose "Restore" — it atomically replaces this PC's local database with the backup snapshot.
+   - **Restart the host:** run `deploy\start_host.bat` again. It republishes the restored database as the replica, and clients see the restored data on their next refresh.
+   - Note: restore only swaps the data; it does not change the host term. Always run it on the host PC (or promote this PC first with "Become Host Now", then stop/restore/restart).
 
 4. **Verify the host is online:**
    - After restoration, confirm in the panel: Host Status = ONLINE

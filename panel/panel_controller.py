@@ -20,6 +20,7 @@ class PanelController:
         self.host_id = host_id
         self.backups_dir = os.path.join(bus_dir, "backups")
         os.makedirs(self.backups_dir, exist_ok=True)
+        os.makedirs(os.path.join(bus_dir, ".tmp"), exist_ok=True)  # manual_backup temp dir
 
     def status(self):
         hb = read_heartbeat(self.bus)
@@ -85,16 +86,26 @@ class PanelController:
         files = sorted(glob.glob(os.path.join(self.backups_dir, "*.db")), key=os.path.getmtime, reverse=True)
         return [os.path.basename(f) for f in files]
 
-    def restore_backup(self, name):
+    def restore_backup(self, name, force=False):
+        # Never restore over a DB a live host is actively serving: the host
+        # reopens per command, so a swap landing between commands is clean, but a
+        # command arriving mid-swap could read a half-written file (corruption on
+        # a corruption-fatal app). Refuse unless the host is stale or force=True.
+        if not force and not is_stale(read_heartbeat(self.bus)):
+            return False, ("a live host holds the lease — stop the host (or promote "
+                           "this PC with 'become host') before restoring")
         src = os.path.join(self.backups_dir, name)
         if not os.path.exists(src):
             return False, f"backup not found: {name}"
-        tmp = self.db_path + ".restore-" + uuid.uuid4().hex
-        shutil.copyfile(src, tmp)
-        os.replace(tmp, self.db_path)
-        for sfx in ("-wal", "-shm"):
-            try:
-                os.remove(self.db_path + sfx)
-            except OSError:
-                pass
-        return True, f"restored from {name}"
+        try:
+            tmp = self.db_path + ".restore-" + uuid.uuid4().hex
+            shutil.copyfile(src, tmp)
+            os.replace(tmp, self.db_path)
+            for sfx in ("-wal", "-shm"):
+                try:
+                    os.remove(self.db_path + sfx)
+                except OSError:
+                    pass
+            return True, f"restored from {name}"
+        except OSError as e:
+            return False, f"restore failed: {e}"
