@@ -21,11 +21,11 @@ class HostService:
     def login(self, username, password):
         ok, user, msg = self.auth.authenticate(username, password)
         if not ok:
-            return False, None, msg
+            return False, None, msg, None
         token = uuid.uuid4().hex
         self._sessions[token] = {"user_id": user["user_id"], "username": user["username"],
                                  "role": user["role"], "last_seen": time.time()}
-        return True, token, "ok"
+        return True, token, "ok", user
 
     def _resolve(self, token):
         s = self._sessions.get(token)
@@ -47,8 +47,11 @@ class HostService:
         name = cmd.get("command")
         try:
             if name == "login":
-                ok, token, msg = self.login(cmd["args"][0], cmd["args"][1])
-                resp = {"id": cid, "ok": ok, "result": {"token": token, "message": msg}} if ok \
+                ok, token, msg, user = self.login(cmd["args"][0], cmd["args"][1])
+                resp = {"id": cid, "ok": ok,
+                        "result": {"token": token, "message": msg,
+                                   "user": {"user_id": user["user_id"], "username": user["username"],
+                                            "full_name": user.get("full_name"), "role": user["role"]}}} if ok \
                     else {"id": cid, "ok": False, "error": msg}
             else:
                 user = self._resolve(cmd.get("token"))

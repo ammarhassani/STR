@@ -198,6 +198,14 @@ class AppState:
         self.current_user = user
         self.current_session_id = session_id
 
+        # In client mode auth_service is a proxy; set current_user on the real
+        # local service so has_permission()/RBAC reads work against the replica.
+        try:
+            local_auth = getattr(self.auth_service, "_local", self.auth_service)
+            local_auth.current_user = user
+        except Exception:
+            pass
+
         # Set user context in logging service
         if self.logging_service:
             self.logging_service.set_user_context(
@@ -212,8 +220,14 @@ class AppState:
         """Authenticate against the host in client mode (bypasses the local
         auth_service proxy, which has no real password to check)."""
         if not self._gateway:
-            return False, "Not in client mode (no gateway configured)"
+            return False, None, "Not in client mode (no gateway configured)"
         return self._gateway.login(username, password)
+
+    def authenticate(self, username: str, password: str):
+        """Unified login: host (client mode) or local auth_service."""
+        if self._gateway:
+            return self.login_remote(username, password)
+        return self.auth_service.authenticate(username, password)
 
     def logout(self):
         """Clear authenticated state and perform cleanup."""

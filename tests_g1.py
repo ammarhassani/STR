@@ -27,7 +27,37 @@ def test_config_mode():
     shutil.rmtree(Config.SHARE_PATH, ignore_errors=True)
     Config.MODE = "local"; Config.SHARE_PATH = None
 
+def test_host_login_returns_user():
+    import tempfile, sqlite3
+    from database.init_db import initialize_database
+    from database.db_manager import DatabaseManager
+    from database.migrations import migrate_database
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    from host.host_service import HostService
+    from services.queue_transport import QueueTransport
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    c = sqlite3.connect(db)
+    import bcrypt
+    pw = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
+    c.execute("INSERT INTO users (username,password,full_name,role,is_active,created_by) "
+              "VALUES ('admin',?,'Admin','admin',1,'SYSTEM') ON CONFLICT(username) DO UPDATE SET password=excluded.password",
+              (pw,)); c.commit(); c.close()
+    log = LoggingService(dbm, None)
+    services = {"auth_service": AuthService(dbm, log)}
+    bus = os.path.join(d, "bus"); os.makedirs(bus)
+    host = HostService(services, dbm, QueueTransport(bus), bus)
+    # queued login result must carry the user dict
+    resp = host.handle_command({"id": "L1", "command": "login", "args": ["admin", "Admin@1234"], "kwargs": {}})
+    check("host login result has token", resp["ok"] and resp["result"].get("token"))
+    check("host login result has user", bool(resp["result"].get("user")), resp)
+    check("host login user has role", resp["result"]["user"].get("role") == "admin")
+    shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_config_mode()
+    test_host_login_returns_user()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
