@@ -21,11 +21,11 @@ class HostService:
     def login(self, username, password):
         ok, user, msg = self.auth.authenticate(username, password)
         if not ok:
-            return False, None, msg
+            return False, None, msg, None
         token = uuid.uuid4().hex
         self._sessions[token] = {"user_id": user["user_id"], "username": user["username"],
                                  "role": user["role"], "last_seen": time.time()}
-        return True, token, "ok"
+        return True, token, "ok", user
 
     def _resolve(self, token):
         s = self._sessions.get(token)
@@ -47,8 +47,11 @@ class HostService:
         name = cmd.get("command")
         try:
             if name == "login":
-                ok, token, msg = self.login(cmd["args"][0], cmd["args"][1])
-                resp = {"id": cid, "ok": ok, "result": {"token": token, "message": msg}} if ok \
+                ok, token, msg, user = self.login(cmd["args"][0], cmd["args"][1])
+                resp = {"id": cid, "ok": ok,
+                        "result": {"token": token, "message": msg,
+                                   "user": {"user_id": user["user_id"], "username": user["username"],
+                                            "full_name": user.get("full_name"), "role": user["role"]}}} if ok \
                     else {"id": cid, "ok": False, "error": msg}
             else:
                 user = self._resolve(cmd.get("token"))
@@ -84,11 +87,18 @@ class HostService:
         try:
             with dst:
                 src.backup(dst)  # consistent snapshot
+            # Publish a NON-WAL file: journal_mode lives in the SQLite file
+            # header and src.backup() copies it, so without this the replica is
+            # WAL-tagged and read-only clients still spawn -wal/-shm sidecars
+            # (which get stranded when the refresher swaps the file underneath).
+            dst.execute("PRAGMA journal_mode=DELETE")
         finally:
             dst.close(); src.close()
         os.replace(tmp, dest)
-        with open(os.path.join(self.bus, "replica", "version.txt"), "w") as f:
+        vtmp = os.path.join(self.bus, ".tmp", uuid.uuid4().hex + ".ver")
+        with open(vtmp, "w") as f:
             f.write(str(int(time.time() * 1000)))
+        os.replace(vtmp, os.path.join(self.bus, "replica", "version.txt"))
 
     # ---- loop ----
     def run_once(self) -> bool:

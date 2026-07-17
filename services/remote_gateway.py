@@ -21,8 +21,8 @@ class RemoteGateway:
         resp = self.t.await_response(cid, timeout=self.timeout)
         if resp.get("ok"):
             self.token = resp["result"]["token"]
-            return True, "ok"
-        return False, resp.get("error", "login failed")
+            return True, resp["result"].get("user"), "ok"
+        return False, None, resp.get("error", "login failed")
 
     def call(self, command_name, args, kwargs):
         cid = uuid.uuid4().hex

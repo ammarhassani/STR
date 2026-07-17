@@ -105,7 +105,7 @@ def test_host_login_and_command():
     box = tempfile.mkdtemp()
     try:
         host, t, dbm = _build_host(box)
-        ok, token, msg = host.login('admin', 'Admin@1234')
+        ok, token, msg, _u = host.login('admin', 'Admin@1234')
         check('T4 host login issues token', ok and token, msg)
         # a write command: create a user (admin session)
         resp = host.handle_command({'id':'c1','command':'auth_service.create_user',
@@ -119,7 +119,7 @@ def test_host_login_and_command():
         n2 = dbm.execute_with_retry("SELECT COUNT(*) FROM users WHERE username='agentnew1'")[0][0]
         check('T4 idempotent replay does not double-apply', n2 == 1 and resp2['ok'])
         # authz enforced host-side: agent token cannot create users
-        aok, atoken, _ = host.login('agentnew1', 'pass123')
+        aok, atoken, _, _u2 = host.login('agentnew1', 'pass123')
         r3 = host.handle_command({'id':'c2','command':'auth_service.create_user',
                                   'args':['x','y','z','agent'],'kwargs':{},'token':atoken})
         check('T4 host enforces authz (agent cannot create_user)',
@@ -187,7 +187,7 @@ def test_client_proxy_routing():
         client_db = os.path.join(box, 'client_ro.db')
         _sh.copy(os.path.join(bus,'replica','fiu_ro.db'), client_db)
         gw = RemoteGateway(QueueTransport(bus))
-        ok, msg = gw.login('admin', 'Admin@1234')
+        ok, _u, msg = gw.login('admin', 'Admin@1234')
         check('T6 gateway login', ok, msg)
         rdbm = DatabaseManager(client_db)
         rlog = LoggingService(rdbm, Path(os.path.join(box,'clog')))

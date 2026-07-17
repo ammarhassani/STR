@@ -4,6 +4,7 @@ Multi-step wizard for first-time setup.
 """
 import flet as ft
 import asyncio
+import os
 import threading
 from typing import Any, Callable, Optional
 from pathlib import Path
@@ -15,14 +16,14 @@ from utils.file_dialog import choose_directory
 
 def build_setup_wizard(
     page: ft.Page,
-    on_complete: Callable[[str, str], None],
+    on_complete: Callable[[str, str, str, Optional[str]], None],
 ) -> ft.Container:
     """
     Build the setup wizard view.
 
     Args:
         page: Flet page object
-        on_complete: Callback when setup completes (db_path, backup_path)
+        on_complete: Callback when setup completes (db_path, backup_path, mode, share_path)
 
     Returns:
         Container with setup wizard
@@ -49,6 +50,17 @@ def build_setup_wizard(
         label="Backup Directory",
         value=default_backup_path,
         hint_text="Select directory for backups",
+    )
+
+    mode_group = ft.RadioGroup(value="local", content=ft.Column([
+        ft.Radio(value="local", label="Single PC (local database)"),
+        ft.Radio(value="host",  label="Host PC (this PC serves the shared team)"),
+        ft.Radio(value="client", label="Client PC (connect to a host over the shared folder)"),
+    ]))
+    share_path_input = ft.TextField(
+        label="Shared folder path (host/client)",
+        value="",
+        hint_text="Path to the shared network folder",
     )
 
     progress_bar = ft.ProgressBar(value=0, visible=False)
@@ -210,6 +222,62 @@ def build_setup_wizard(
             # Run in background thread to avoid blocking UI
             threading.Thread(target=run_dialog, daemon=True).start()
 
+        # Database path section (hidden in client mode - client has no local DB to create)
+        db_section = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("Database File Location", weight=ft.FontWeight.W_600, size=13),
+                    ft.Text(
+                        "Choose where to store the main database file",
+                        size=11,
+                        color=colors["text_muted"],
+                    ),
+                    ft.Container(height=8),
+                    ft.Row(
+                        controls=[
+                            ft.Container(content=db_path_input, expand=True),
+                            ft.ElevatedButton("Browse...", on_click=browse_db),
+                        ],
+                        spacing=8,
+                    ),
+                ],
+                spacing=4,
+            ),
+            bgcolor=colors["bg_secondary"],
+            padding=20,
+            border_radius=4,
+            visible=mode_group.value != "client",
+        )
+
+        # Shared folder path section (host publishes here, client reads from here)
+        share_section = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("Shared Folder Path", weight=ft.FontWeight.W_600, size=13),
+                    ft.Text(
+                        "Network folder used to exchange data with the host",
+                        size=11,
+                        color=colors["text_muted"],
+                    ),
+                    ft.Container(height=8),
+                    share_path_input,
+                ],
+                spacing=4,
+            ),
+            bgcolor=colors["bg_secondary"],
+            padding=20,
+            border_radius=4,
+            visible=mode_group.value in ("host", "client"),
+        )
+
+        def on_mode_change(e):
+            client = mode_group.value == "client"
+            db_section.visible = not client
+            share_section.visible = mode_group.value in ("host", "client")
+            page.update()
+
+        mode_group.on_change = on_mode_change
+
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -226,24 +294,12 @@ def build_setup_wizard(
                     ),
                     ft.Container(height=24),
 
-                    # Database path
+                    # Deployment mode
                     ft.Container(
                         content=ft.Column(
                             controls=[
-                                ft.Text("Database File Location", weight=ft.FontWeight.W_600, size=13),
-                                ft.Text(
-                                    "Choose where to store the main database file",
-                                    size=11,
-                                    color=colors["text_muted"],
-                                ),
-                                ft.Container(height=8),
-                                ft.Row(
-                                    controls=[
-                                        ft.Container(content=db_path_input, expand=True),
-                                        ft.ElevatedButton("Browse...", on_click=browse_db),
-                                    ],
-                                    spacing=8,
-                                ),
+                                ft.Text("Deployment Mode", weight=ft.FontWeight.W_600, size=13),
+                                mode_group,
                             ],
                             spacing=4,
                         ),
@@ -251,6 +307,13 @@ def build_setup_wizard(
                         padding=20,
                         border_radius=4,
                     ),
+                    ft.Container(height=16),
+
+                    share_section,
+                    ft.Container(height=16),
+
+                    # Database path
+                    db_section,
                     ft.Container(height=16),
 
                     # Backup path
@@ -327,6 +390,9 @@ def build_setup_wizard(
 
     def build_complete_step() -> ft.Container:
         """Build completion step content."""
+        # No local admin exists in client mode (the real admin is on the
+        # host) - don't show local default credentials.
+        show_creds = mode_group.value != "client"
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -354,9 +420,10 @@ def build_setup_wizard(
                                     "Default admin credentials:",
                                     size=13,
                                     weight=ft.FontWeight.BOLD,
+                                    visible=show_creds,
                                 ),
-                                ft.Text("Username: admin", size=13, color=colors["text_secondary"]),
-                                ft.Text("Password: admin123", size=13, color=colors["text_secondary"]),
+                                ft.Text("Username: admin", size=13, color=colors["text_secondary"], visible=show_creds),
+                                ft.Text("Password: admin123", size=13, color=colors["text_secondary"], visible=show_creds),
                                 ft.Container(height=12),
                                 ft.Row(
                                     controls=[
@@ -423,6 +490,16 @@ def build_setup_wizard(
     def validate_paths() -> tuple:
         """Validate path inputs."""
         nonlocal use_existing_db
+
+        if mode_group.value == "client":
+            # Client mode has no local database to create/validate - just
+            # needs a reachable shared folder to bootstrap the replica from.
+            share_path = share_path_input.value.strip() if share_path_input.value else ""
+            if not share_path:
+                return False, "Please specify the shared folder path."
+            if not os.path.isdir(share_path):
+                return False, "Shared folder path does not exist or is not accessible."
+            return True, "client"
 
         db_path = db_path_input.value.strip() if db_path_input.value else ""
         backup_path = backup_path_input.value.strip() if backup_path_input.value else ""
@@ -585,16 +662,27 @@ def build_setup_wizard(
                 page.update()
                 return
 
+            if message == "client":
+                # No local database to create - go straight to completion.
+                current_step = 3
+                update_content()
+                return
+
             current_step = 2
             update_content()
 
         elif current_step == 3:
             # Complete -> Finish
+            mode = mode_group.value
+            share_path = share_path_input.value.strip() or None
+            if mode == "client":
+                on_complete(None, None, mode, share_path)
+                return
             db_path = db_path_input.value.strip()
             if not db_path.lower().endswith('.db'):
                 db_path = db_path + '.db'
             backup_path = backup_path_input.value.strip()
-            on_complete(db_path, backup_path)
+            on_complete(db_path, backup_path, mode, share_path)
 
     back_btn.on_click = on_back
     next_btn.on_click = on_next

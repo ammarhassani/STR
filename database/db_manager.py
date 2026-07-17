@@ -12,54 +12,69 @@ from typing import Any, List, Tuple, Optional
 class DatabaseManager:
     """Manages SQLite database connections with WAL mode enabled"""
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, read_only: bool = False):
         """
         Initialize database manager
-        
+
         Args:
             db_path: Path to SQLite database file
+            read_only: True for a client-mode read replica (no WAL, never
+                written to). A real writable connection is never opened.
         """
         self.db_path = db_path
+        self.read_only = read_only
         self.connection_timeout = 10.0  # 10 seconds
         self._init_connection()
-    
+
     def _init_connection(self):
         """Initialize database with WAL mode (one-time setup)"""
         try:
+            if self.read_only:
+                # Read replica: verify it opens read-only, no WAL/PRAGMA setup
+                # (a read-only handle can't run PRAGMAs that write anyway).
+                conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+                conn.close()
+                return
+
             conn = sqlite3.connect(self.db_path)
-            
+
             # Enable WAL mode for better concurrency
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=10000")
             conn.execute("PRAGMA temp_store=MEMORY")
             conn.execute("PRAGMA foreign_keys=ON")
-            
+
             conn.close()
         except Exception as e:
             raise Exception(f"Failed to initialize database: {e}")
-    
+
     @contextmanager
     def get_connection(self):
         """
         Context manager for database connections
         Automatically handles commit/rollback
-        
+
         Yields:
             sqlite3.Connection: Database connection
         """
-        conn = sqlite3.connect(
-            self.db_path,
-            timeout=self.connection_timeout,
-            isolation_level='DEFERRED'  # Optimal for WAL mode
-        )
+        if self.read_only:
+            conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, timeout=self.connection_timeout)
+        else:
+            conn = sqlite3.connect(
+                self.db_path,
+                timeout=self.connection_timeout,
+                isolation_level='DEFERRED'  # Optimal for WAL mode
+            )
         conn.row_factory = sqlite3.Row  # Access columns by name
-        
+
         try:
             yield conn
-            conn.commit()
+            if not self.read_only:
+                conn.commit()
         except Exception:
-            conn.rollback()
+            if not self.read_only:
+                conn.rollback()
             raise
         finally:
             conn.close()

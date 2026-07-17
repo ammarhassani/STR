@@ -13,6 +13,10 @@ class Config:
     # Database and backup paths (set by admin during first run)
     DATABASE_PATH = None
     BACKUP_PATH = None
+
+    # G1 client mode: launch mode and shared folder path
+    MODE = "local"          # "local" | "host" | "client"
+    SHARE_PATH = None       # shared-folder root (host & client); None in local mode
     
     # Application settings
     APP_NAME = "FIU Report Management System"
@@ -36,6 +40,8 @@ class Config:
                     cls.BACKUP_PATH = config_data.get('backup_path')
                     cls.SESSION_TIMEOUT = config_data.get('session_timeout', 30)
                     cls.MAX_LOGIN_ATTEMPTS = config_data.get('max_login_attempts', 5)
+                    cls.MODE = config_data.get('mode', 'local')
+                    cls.SHARE_PATH = config_data.get('share_path')
                     return True
             except Exception as e:
                 print(f"Error loading config: {e}")
@@ -53,6 +59,8 @@ class Config:
                 'backup_path': cls.BACKUP_PATH,
                 'session_timeout': cls.SESSION_TIMEOUT,
                 'max_login_attempts': cls.MAX_LOGIN_ATTEMPTS,
+                'mode': cls.MODE,
+                'share_path': cls.SHARE_PATH,
             }
             
             with open(cls.CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -68,7 +76,7 @@ class Config:
         """Shared folder client/host processes exchange commands through.
         Lives under the configured backup/share path; falls back to a
         folder next to the DB (or the CWD) if that isn't set yet."""
-        base = cls.BACKUP_PATH
+        base = cls.SHARE_PATH or cls.BACKUP_PATH
         if not base:
             base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else "."
         bus_dir = os.path.join(base, "str_bus")
@@ -76,18 +84,22 @@ class Config:
         return bus_dir
 
     @classmethod
+    def get_client_replica_path(cls) -> str:
+        """Local file a client keeps its copy of the host replica in."""
+        base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else \
+            str(Path(__file__).parent / "database")
+        os.makedirs(base, exist_ok=True)
+        return os.path.join(base, "client_replica.db")
+
+    @classmethod
     def is_configured(cls) -> bool:
         """Check if configuration exists and is valid"""
-        # Check if paths are configured
+        if cls.MODE == "client":
+            return bool(cls.SHARE_PATH) and os.path.isdir(cls.SHARE_PATH)
+        # local / host: need a real local DB (existing behavior)
         if cls.DATABASE_PATH is None or cls.BACKUP_PATH is None:
             return False
-        
-        # Check if database file actually exists
-        db_path = Path(cls.DATABASE_PATH)
-        if not db_path.exists():
-            return False
-        
-        return True
+        return Path(cls.DATABASE_PATH).exists()
     
     @classmethod
     def validate_paths(cls) -> tuple[bool, str]:

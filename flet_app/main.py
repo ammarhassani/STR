@@ -167,6 +167,27 @@ class FletApp:
     def _initialize_services(self) -> bool:
         """Initialize application services."""
         try:
+            if Config.MODE == "client":
+                from services.replica_sync import bootstrap_replica, ReplicaRefresher
+                bus_dir = Config.get_bus_dir()
+                local_replica = Config.get_client_replica_path()
+                if not bootstrap_replica(bus_dir, local_replica, timeout=30.0):
+                    self._show_error("Cannot reach the host replica on the shared folder.\n"
+                                     "Make sure a host PC is running and the share is available.")
+                    return False
+                ok = app_state.initialize_services(local_replica, mode="client", bus_dir=bus_dir)
+                if not ok:
+                    return False
+                # keep the local read replica fresh
+                if not getattr(self, "_refresher", None):
+                    self._refresher = ReplicaRefresher(
+                        bus_dir, local_replica, poll=2.0,
+                        on_update=lambda: None)
+                    self._refresher.start()
+                theme_manager.initialize(self.page, app_state.settings_service, app_state.auth_service)
+                return True
+
+            # local / host (unchanged)
             db_path = Config.DATABASE_PATH
             if not db_path:
                 return False
@@ -183,14 +204,17 @@ class FletApp:
 
         except Exception as e:
             print(f"Error initializing services: {e}")
+            import traceback; traceback.print_exc()
             return False
 
     def _show_setup_wizard(self):
         """Show the setup wizard for first-time configuration."""
-        def on_setup_complete(db_path: str, backup_path: str):
+        def on_setup_complete(db_path: str, backup_path: str, mode: str = "local", share_path: str = None):
             """Handle setup completion."""
             Config.DATABASE_PATH = db_path
             Config.BACKUP_PATH = backup_path
+            Config.MODE = mode
+            Config.SHARE_PATH = share_path
             Config.save()
 
             if self._initialize_services():
