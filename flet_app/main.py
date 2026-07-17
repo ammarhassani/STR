@@ -506,9 +506,47 @@ if __name__ == "__main__":
         panel_main()
         sys.exit(0)
 
-    # Web-browser view: serves the UI on a local port and opens the default
-    # browser. Avoids the native desktop-client binary download, which a
-    # locked-down corporate proxy blocks (Tunnel connection failed: 403). Same
-    # UI, fully offline. Override the port with STR_PORT if 8550 is taken.
+    # View selection. Default is the NATIVE desktop window (shortcuts work, no
+    # browser refresh). On the locked-down Windows workstation the flet desktop
+    # client can't be downloaded (org proxy 403s the CDN), so we ship it in the
+    # repo (vendor/flet-client/) and seed it into flet's cache here. If anything
+    # about desktop fails, fall back to the web-browser view (always works).
+    # Force either explicitly with STR_VIEW=desktop | web.
     import os
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("STR_PORT", "8550")))
+
+    def _ensure_desktop_client():
+        """Windows only: extract the vendored flet client into ~/.flet/bin so the
+        native window launches offline (no CDN download)."""
+        if not sys.platform.startswith("win"):
+            return  # mac/linux download their own client (dev machines have net)
+        import zipfile
+        try:
+            import flet_desktop.version
+            ver = flet_desktop.version.version
+        except Exception:
+            ver = "0.28.3"
+        dest = Path.home() / ".flet" / "bin" / f"flet-{ver}"
+        if (dest / "flet" / "flet.exe").exists():
+            return  # already seeded
+        vendored = project_root / "vendor" / "flet-client" / f"flet-windows-{ver}.zip"
+        if not vendored.exists():
+            vendored = project_root / "vendor" / "flet-client" / "flet-windows-0.28.3.zip"
+        if not vendored.exists():
+            raise FileNotFoundError("vendored flet windows client not found")
+        dest.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(vendored) as z:
+            z.extractall(dest)
+
+    forced = os.environ.get("STR_VIEW", "").lower()
+    use_web = forced in ("web", "browser")
+    if not use_web:
+        try:
+            _ensure_desktop_client()
+        except Exception as e:
+            print(f"[VIEW] desktop client unavailable ({e}); falling back to web")
+            use_web = True
+
+    if use_web:
+        ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("STR_PORT", "8550")))
+    else:
+        ft.app(target=main)  # native desktop window
