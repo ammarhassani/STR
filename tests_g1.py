@@ -84,9 +84,25 @@ def test_replica_sync():
     check("refresher fired on_update", hits["n"] >= 1)
     shutil.rmtree(d, ignore_errors=True); shutil.rmtree(d2, ignore_errors=True)
 
+def test_logging_no_db_handler_client():
+    from database.init_db import initialize_database
+    from database.db_manager import DatabaseManager
+    from services.logging_service import LoggingService
+    d = tempfile.mkdtemp(); db = os.path.join(d, "l.db"); initialize_database(db)
+    dbm = DatabaseManager(db)
+    from services.logging_service import DatabaseLogHandler
+    ls = LoggingService(dbm, None, db_logging=False)
+    has_db = any(isinstance(h, DatabaseLogHandler) for h in ls.logger.handlers)
+    check("client logging has no DB handler", not has_db)
+    ls2 = LoggingService(dbm, None)  # default keeps DB handler (host/local)
+    has_db2 = any(isinstance(h, DatabaseLogHandler) for h in ls2.logger.handlers)
+    check("default logging keeps DB handler", has_db2)
+    shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_config_mode()
     test_host_login_returns_user()
     test_replica_sync()
+    test_logging_no_db_handler_client()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

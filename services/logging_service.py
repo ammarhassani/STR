@@ -113,13 +113,14 @@ class LoggingService:
     Provides convenient methods for logging throughout the application.
     """
 
-    def __init__(self, db_manager, log_dir: Optional[Path] = None):
+    def __init__(self, db_manager, log_dir: Optional[Path] = None, db_logging: bool = True):
         """
         Initialize the logging service.
 
         Args:
             db_manager: DatabaseManager instance
             log_dir: Optional directory for file logs (defaults to ~/.fiu_system/)
+            db_logging: If False, skip the database log handler (client mode with throwaway replica)
         """
         self.db_manager = db_manager
         self.log_dir = log_dir or Path.home() / '.fiu_system'
@@ -154,12 +155,15 @@ class LoggingService:
         console_handler.setFormatter(console_formatter)
         self.logger.addHandler(console_handler)
 
-        # Add database handler
-        self.db_handler = DatabaseLogHandler(db_manager)
-        self.db_handler.setLevel(logging.INFO)
-        db_formatter = logging.Formatter('%(message)s')
-        self.db_handler.setFormatter(db_formatter)
-        self.logger.addHandler(self.db_handler)
+        # Add database handler only if db_logging is True
+        if db_logging:
+            self.db_handler = DatabaseLogHandler(db_manager)
+            self.db_handler.setLevel(logging.INFO)
+            db_formatter = logging.Formatter('%(message)s')
+            self.db_handler.setFormatter(db_formatter)
+            self.logger.addHandler(self.db_handler)
+        else:
+            self.db_handler = None
 
         self.logger.info("Logging service initialized")
 
@@ -171,12 +175,14 @@ class LoggingService:
             user_id: User ID
             username: Username
         """
-        self.db_handler.update_user_context(user_id, username)
+        if self.db_handler:
+            self.db_handler.update_user_context(user_id, username)
         self.logger.info(f"User context set: {username} (ID: {user_id})")
 
     def clear_user_context(self):
         """Clear the current user context."""
-        self.db_handler.clear_user_context()
+        if self.db_handler:
+            self.db_handler.clear_user_context()
         self.logger.info("User context cleared")
 
     def debug(self, message: str, **kwargs):
@@ -217,8 +223,8 @@ class LoggingService:
 
         # Also log to audit_log table for permanent audit trail
         try:
-            user_id = self.db_handler.user_context.get('user_id')
-            username = self.db_handler.user_context.get('username')
+            user_id = self.db_handler.user_context.get('user_id') if self.db_handler else None
+            username = self.db_handler.user_context.get('username') if self.db_handler else None
 
             if user_id and username:
                 query = """

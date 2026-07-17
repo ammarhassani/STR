@@ -95,7 +95,9 @@ class AppState:
 
             # Initialize logging service first (other services depend on it)
             log_dir = project_root / 'logs'
-            self.logging_service = LoggingService(self.db_manager, log_dir)
+            self.logging_service = LoggingService(
+                self.db_manager, log_dir,
+                db_logging=(mode != "client" or not bus_dir))
 
             # Run migrations
             success, migration_msg = migrate_database(db_path)
