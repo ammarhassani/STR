@@ -343,6 +343,7 @@ def build_setup_wizard(
                     ),
                 ],
                 spacing=8,
+                scroll=ft.ScrollMode.AUTO,   # let Configure Paths scroll when it overflows
             ),
             expand=True,
             padding=20,
