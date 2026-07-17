@@ -72,18 +72,18 @@ class Client:
         return self.auth.authenticate(u, p)
     def make_report(self, extra=None):
         u = self.auth.get_current_user()['username']
-        ok, r, m = self.numbers.reserve_next_numbers(u)
+        ok, allocated, m = self.numbers.reserve_block(u, 1)
         if not ok: return False, None, m
+        avail = self.numbers.get_available_numbers(u)
+        if not avail: return False, None, "no available number"
+        r = avail[0]
         d = {'sn': r['serial_number'], 'report_number': r['report_number'],
              'report_date': datetime.now().strftime('%d/%m/%Y'),
              'reported_entity_name': f'E{r["report_number"]}'}
         if extra: d.update(extra)
         ok, rid, m = self.reports.create_report(d)
         if ok:
-            self.numbers.mark_reservation_used(r['report_number'], u)
-        else:
-            # release the hold so the next attempt isn't blocked by max-1 rule
-            self.numbers.cancel_reservation(r['report_number'], u)
+            self.numbers.consume_next_available(u, rid)
         return ok, rid, m
 
 def q1(sql, params=()):
@@ -313,9 +313,9 @@ def prosecute_races(admin):
     def reserver(u):
         c = Client(); c.login(u, 'pass123')
         b2.wait()
-        ok, r, m = c.numbers.reserve_next_numbers(u)
+        ok, allocated, m = c.numbers.reserve_block(u, 1)
         if ok:
-            with l2: got.append(r['report_number'])
+            with l2: got.append(allocated[0])
     ts = [threading.Thread(target=reserver, args=(u,)) for u in users]
     [t.start() for t in ts]; [t.join() for t in ts]
     charge(CAT, 'concurrent reservations collide (dup numbers handed out)',
@@ -373,11 +373,11 @@ def prosecute_logic(admin):
     ok, msg = admin.reports.restore_report(rid3)
     charge(CAT, 'restore of non-deleted report succeeds silently', ok, msg)
 
-    # reserve with negative minutes -> instantly-expired but reserved?
+    # reserve_block with a negative count -> should be rejected, not silently clamped
     admin.auth.create_user('negres', 'pass123', 'x', 'agent')
     nc = Client(); nc.login('negres', 'pass123')
-    ok, r, msg = nc.numbers.reserve_next_numbers('negres', reservation_minutes=-100)
-    charge(CAT, 'reservation with negative minutes accepted', ok, msg)
+    ok, allocated, msg = nc.numbers.reserve_block('negres', -100)
+    charge(CAT, 'reserve_block with negative count accepted', ok, msg)
 
     # settings: inject a giant value / weird key
     try:

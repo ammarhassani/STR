@@ -194,13 +194,11 @@ def run_basic_tests():
         logger = LoggingService(db)
         service = ReportNumberService(db, logger)
 
-        # Test reservation
-        success, reservation, message = service.reserve_next_numbers("test_deployment")
+        # Test owned-block reservation
+        ok, block, message = service.reserve_block("test_deployment", 1)
 
-        if success:
-            print(f"  ✅ Reservation system works: {reservation['report_number']}")
-            # Clean up
-            service.cancel_reservation(reservation['report_number'], "test_deployment")
+        if ok:
+            print(f"  ✅ Reservation system works: {block[0]}")
         else:
             print(f"  ❌ Reservation system failed: {message}")
             return False
