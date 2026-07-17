@@ -84,6 +84,68 @@ def test_replica_sync():
     check("refresher fired on_update", hits["n"] >= 1)
     shutil.rmtree(d, ignore_errors=True); shutil.rmtree(d2, ignore_errors=True)
 
+def test_client_replica_readonly():
+    """C1: the client's local replica must be opened read-only (no WAL
+    sidecars), must pick up a host republish, and must reject writes."""
+    import sqlite3
+    from services.replica_sync import bootstrap_replica, ReplicaRefresher
+    from database.db_manager import DatabaseManager
+
+    def make_db(path, vals):
+        c = sqlite3.connect(path)
+        c.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)")
+        c.executemany("INSERT INTO t (val) VALUES (?)", [(v,) for v in vals])
+        c.commit(); c.close()
+
+    d = tempfile.mkdtemp()
+    bus = os.path.join(d, "bus"); os.makedirs(os.path.join(bus, "replica"))
+    rep = os.path.join(bus, "replica", "fiu_ro.db")
+    ver = os.path.join(bus, "replica", "version.txt")
+
+    make_db(rep, ["row1"])
+    with open(ver, "w") as f: f.write("1")
+
+    local = os.path.join(d, "client_replica.db")
+    check("g1ro bootstrap ok", bootstrap_replica(bus, local, timeout=2.0) and os.path.exists(local))
+
+    dbm = DatabaseManager(local, read_only=True)
+    rows = dbm.execute_with_retry("SELECT val FROM t ORDER BY id")
+    check("g1ro reads seed row", [r[0] for r in rows] == ["row1"], rows)
+    check("g1ro no wal/shm after read",
+          not os.path.exists(local + "-wal") and not os.path.exists(local + "-shm"))
+
+    # Start the refresher BEFORE bumping the version (it snapshots "current"
+    # version at construction time - it must see "1" here, not "2").
+    r = ReplicaRefresher(bus, local, poll=0.1)
+    r.start()
+
+    # Simulate a host republish: a brand-new sqlite file (full swap, like
+    # HostService.publish_replica) with a second row, plus a version bump.
+    new_rep = rep + ".new"
+    make_db(new_rep, ["row1", "row2"])
+    os.replace(new_rep, rep)
+    with open(ver, "w") as f: f.write("2")
+
+    for _ in range(50):
+        if dbm.execute_with_retry("SELECT COUNT(*) FROM t")[0][0] == 2:
+            break
+        time.sleep(0.1)
+    r.stop()
+
+    n = dbm.execute_with_retry("SELECT COUNT(*) FROM t")[0][0]
+    check("g1ro sees republished row after refresh", n == 2, n)
+    check("g1ro no wal/shm after refresh",
+          not os.path.exists(local + "-wal") and not os.path.exists(local + "-shm"))
+
+    try:
+        dbm.execute_write("INSERT INTO t (val) VALUES ('nope')")
+        check("g1ro write rejected", False, "write succeeded on read-only handle")
+    except sqlite3.OperationalError as e:
+        check("g1ro write rejected", "readonly" in str(e).lower(), str(e))
+
+    shutil.rmtree(d, ignore_errors=True)
+
+
 def test_logging_no_db_handler_client():
     from database.init_db import initialize_database
     from database.db_manager import DatabaseManager
@@ -149,6 +211,7 @@ if __name__ == "__main__":
     test_config_mode()
     test_host_login_returns_user()
     test_replica_sync()
+    test_client_replica_readonly()
     test_logging_no_db_handler_client()
     test_client_roundtrip()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")

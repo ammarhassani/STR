@@ -179,10 +179,11 @@ class FletApp:
                 if not ok:
                     return False
                 # keep the local read replica fresh
-                self._refresher = ReplicaRefresher(
-                    bus_dir, local_replica, poll=2.0,
-                    on_update=lambda: None)
-                self._refresher.start()
+                if not getattr(self, "_refresher", None):
+                    self._refresher = ReplicaRefresher(
+                        bus_dir, local_replica, poll=2.0,
+                        on_update=lambda: None)
+                    self._refresher.start()
                 theme_manager.initialize(self.page, app_state.settings_service, app_state.auth_service)
                 return True
 

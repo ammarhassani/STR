@@ -390,6 +390,9 @@ def build_setup_wizard(
 
     def build_complete_step() -> ft.Container:
         """Build completion step content."""
+        # No local admin exists in client mode (the real admin is on the
+        # host) - don't show local default credentials.
+        show_creds = mode_group.value != "client"
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -417,9 +420,10 @@ def build_setup_wizard(
                                     "Default admin credentials:",
                                     size=13,
                                     weight=ft.FontWeight.BOLD,
+                                    visible=show_creds,
                                 ),
-                                ft.Text("Username: admin", size=13, color=colors["text_secondary"]),
-                                ft.Text("Password: admin123", size=13, color=colors["text_secondary"]),
+                                ft.Text("Username: admin", size=13, color=colors["text_secondary"], visible=show_creds),
+                                ft.Text("Password: admin123", size=13, color=colors["text_secondary"], visible=show_creds),
                                 ft.Container(height=12),
                                 ft.Row(
                                     controls=[
@@ -672,7 +676,7 @@ def build_setup_wizard(
             mode = mode_group.value
             share_path = share_path_input.value.strip() or None
             if mode == "client":
-                on_complete("", "", mode, share_path)
+                on_complete(None, None, mode, share_path)
                 return
             db_path = db_path_input.value.strip()
             if not db_path.lower().endswith('.db'):

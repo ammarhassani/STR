@@ -90,8 +90,10 @@ class HostService:
         finally:
             dst.close(); src.close()
         os.replace(tmp, dest)
-        with open(os.path.join(self.bus, "replica", "version.txt"), "w") as f:
+        vtmp = os.path.join(self.bus, ".tmp", uuid.uuid4().hex + ".ver")
+        with open(vtmp, "w") as f:
             f.write(str(int(time.time() * 1000)))
+        os.replace(vtmp, os.path.join(self.bus, "replica", "version.txt"))
 
     # ---- loop ----
     def run_once(self) -> bool:

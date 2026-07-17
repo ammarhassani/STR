@@ -48,7 +48,7 @@ class AppState:
     _auth_listeners: List[Callable] = field(default_factory=list)
     _route_listeners: List[Callable] = field(default_factory=list)
 
-    def initialize_services(self, db_path: str, mode: str = "client", bus_dir: str = None) -> bool:
+    def initialize_services(self, db_path: str, mode: str = "local", bus_dir: str = None) -> bool:
         """
         Initialize all services with proper dependency injection.
 
@@ -90,8 +90,12 @@ class AppState:
                 print(f"Database validation failed: {message}")
                 return False
 
-            # Initialize database manager
-            self.db_manager = DatabaseManager(db_path)
+            # Initialize database manager. In client mode the db_path is the
+            # client's local copy of the host replica: open it read-only (no
+            # WAL sidecars) so the background refresher can swap the file
+            # underneath us and the single-writer rule holds client-side.
+            is_client = (mode == "client" and bool(bus_dir))
+            self.db_manager = DatabaseManager(db_path, read_only=is_client)
 
             # Initialize logging service first (other services depend on it)
             log_dir = project_root / 'logs'
@@ -99,12 +103,14 @@ class AppState:
                 self.db_manager, log_dir,
                 db_logging=(mode != "client" or not bus_dir))
 
-            # Run migrations
-            success, migration_msg = migrate_database(db_path)
-            if not success:
-                self.logging_service.warning(f"Migration warning: {migration_msg}")
-            elif "No migrations needed" not in migration_msg:
-                self.logging_service.info(f"Database migration: {migration_msg}")
+            # Run migrations (skip on the read-only replica - the host
+            # already migrated it, and this connection can't write anyway)
+            if not is_client:
+                success, migration_msg = migrate_database(db_path)
+                if not success:
+                    self.logging_service.warning(f"Migration warning: {migration_msg}")
+                elif "No migrations needed" not in migration_msg:
+                    self.logging_service.info(f"Database migration: {migration_msg}")
 
             self.logging_service.info("=" * 60)
             self.logging_service.info("FIU Report Management System Starting (Flet Edition)")
@@ -154,16 +160,20 @@ class AppState:
             # Wire the number service so create_report enforces the reservation gate
             self.report_service.set_report_number_service(self.report_number_service)
 
-            # Maintenance schedulers: auto-purge (R80) + weekly backup (R107)
-            try:
-                from services.maintenance_service import MaintenanceService
-                from config import Config
-                self.maintenance_service = MaintenanceService(
-                    self.db_manager, self.logging_service, self.report_service,
-                    backup_dir=Config.BACKUP_PATH, settings_service=self.settings_service)
-                self.maintenance_service.start()
-            except Exception as e:
-                self.logging_service.warning(f"Maintenance schedulers not started: {e}")
+            # Maintenance schedulers: auto-purge (R80) + weekly backup (R107).
+            # Client mode reads a throwaway, read-only replica - a local
+            # purge/backup would write to it (and now crash on the ro
+            # handle). Only start these against a real writable DB.
+            if not is_client:
+                try:
+                    from services.maintenance_service import MaintenanceService
+                    from config import Config
+                    self.maintenance_service = MaintenanceService(
+                        self.db_manager, self.logging_service, self.report_service,
+                        backup_dir=Config.BACKUP_PATH, settings_service=self.settings_service)
+                    self.maintenance_service.start()
+                except Exception as e:
+                    self.logging_service.warning(f"Maintenance schedulers not started: {e}")
 
             if mode == "client" and bus_dir:
                 from services.queue_transport import QueueTransport

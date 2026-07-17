@@ -19,6 +19,14 @@ def _atomic_copy(src, dst):
     tmp = dst + ".tmp-" + uuid.uuid4().hex
     shutil.copyfile(src, tmp)
     os.replace(tmp, dst)
+    # Best-effort: a read-only client never creates WAL sidecars itself, but
+    # clean up any stale ones left behind so a swapped-in file is never
+    # shadowed by an old -wal/-shm from a previous (writable) open.
+    for sfx in ("-wal", "-shm"):
+        try:
+            os.remove(dst + sfx)
+        except OSError:
+            pass
 
 
 def bootstrap_replica(bus_dir, local_path, timeout=30.0):
