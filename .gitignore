@@ -60,3 +60,8 @@ tmp/
 *.so
 *.dylib
 issues/nul
+nukebox/
+nukebox_run.log
+uibox/
+EXPORT_DIR/
+nuke.db
