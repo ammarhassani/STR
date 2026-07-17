@@ -149,6 +149,8 @@ class AppState:
             # Wire up activity service to other services for late binding
             self.report_service.set_activity_service(self.activity_service)
             self.version_service.set_activity_service(self.activity_service)
+            # Wire the number service so create_report enforces the reservation gate
+            self.report_service.set_report_number_service(self.report_number_service)
 
             # Maintenance schedulers: auto-purge (R80) + weekly backup (R107)
             try:
