@@ -118,10 +118,24 @@ def test_host_status_and_outbox_depth():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_host_banner_builds():
+    # Structural only — Flet cannot be driven headlessly here.
+    import flet as ft
+    from flet_app.components.host_banner import build_host_banner
+    class _HS:
+        def online(self): return False
+    class _AS:
+        host_status = _HS()
+        def pending_writes(self): return 3
+    ctrl = build_host_banner(_AS())
+    check("host banner builds a Control", isinstance(ctrl, ft.Control))
+
+
 if __name__ == "__main__":
     test_config_host_id()
     test_panel_controller()
     test_panel_cli_dispatch()
     test_host_status_and_outbox_depth()
+    test_host_banner_builds()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
