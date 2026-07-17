@@ -99,10 +99,57 @@ def test_logging_no_db_handler_client():
     check("default logging keeps DB handler", has_db2)
     shutil.rmtree(d, ignore_errors=True)
 
+def test_client_roundtrip():
+    import tempfile, sqlite3, threading, bcrypt
+    from database.init_db import initialize_database
+    from database.db_manager import DatabaseManager
+    from database.migrations import migrate_database
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    from host.host_service import HostService
+    from services.queue_transport import QueueTransport
+    from services.remote_gateway import RemoteGateway, RemoteServiceProxy
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    pw = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO users (username,password,full_name,role,is_active,created_by) "
+              "VALUES ('admin',?,'Admin','admin',1,'SYSTEM') ON CONFLICT(username) DO UPDATE SET password=excluded.password",
+              (pw,)); c.commit(); c.close()
+    log = LoggingService(dbm, None)
+    services = {"auth_service": AuthService(dbm, log)}
+    bus = os.path.join(d, "bus")
+    for sub in ("", "replica", ".tmp", "cmd", "resp", "done"):
+        os.makedirs(os.path.join(bus, sub), exist_ok=True)
+    host = HostService(services, dbm, QueueTransport(bus), bus)
+    stop = threading.Event()
+    def run():
+        host.publish_replica()
+        while not stop.is_set():
+            if not host.run_once():
+                time.sleep(0.02)
+    th = threading.Thread(target=run, daemon=True); th.start()
+    try:
+        gw = RemoteGateway(QueueTransport(bus), timeout=10.0)
+        ok, user, msg = gw.login("admin", "Admin@1234")
+        check("roundtrip login ok", ok and user and user["role"] == "admin", msg)
+        proxy = RemoteServiceProxy("auth_service", AuthService(dbm, log), gw)
+        res = proxy.create_user("agz", "Passw0rd!", "Ag Z", "agent")
+        # create_user returns (ok, msg) business tuple through the queue
+        okc = res[0] if isinstance(res, (list, tuple)) else bool(res)
+        check("roundtrip proxied create_user", okc, res)
+        n = dbm.execute_with_retry("SELECT COUNT(*) FROM users WHERE username='agz'")[0][0]
+        check("roundtrip user created host-side", n == 1)
+    finally:
+        stop.set(); th.join(timeout=2.0); shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_config_mode()
     test_host_login_returns_user()
     test_replica_sync()
     test_logging_no_db_handler_client()
+    test_client_roundtrip()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

@@ -108,7 +108,7 @@ def build_login_view(
             loop = asyncio.get_event_loop()
             success, user, message = await loop.run_in_executor(
                 None,
-                app_state.auth_service.authenticate,
+                app_state.authenticate,
                 username,
                 password
             )
@@ -426,7 +426,7 @@ class LoginView:
             loop = asyncio.get_event_loop()
             success, user, message = await loop.run_in_executor(
                 None,
-                self.app_state.auth_service.authenticate,
+                self.app_state.authenticate,
                 username,
                 password
             )
