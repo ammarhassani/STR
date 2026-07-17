@@ -81,8 +81,14 @@ class HostService:
         except Exception as e:
             resp = {"id": cid, "ok": False, "error": f"{type(e).__name__}: {e}"}
 
-        # record applied (login excluded from idempotency ledger — tokens are one-shot anyway)
-        if name != "login":
+        # record applied ONLY when the command was actually dispatched (ok=True,
+        # whether it returned success or a business (False,msg) rejection). A
+        # host-level failure (ok=False: not-authenticated, dispatch exception →
+        # txn rolled back) means the command did NOT apply, so it must stay
+        # retryable — recording it would poison the stable id and make a later
+        # resubmit (after re-login / session-timeout / failover) replay the
+        # failure instead of applying the write. Login excluded (tokens one-shot).
+        if name != "login" and resp.get("ok"):
             try:
                 self.db.execute_with_retry(
                     "INSERT OR IGNORE INTO applied_commands (command_id, response_json) VALUES (?, ?)",

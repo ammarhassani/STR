@@ -169,6 +169,134 @@ def test_become_host():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_outbox_drain_exactly_once():
+    from services.queue_transport import QueueTransport
+    from services.remote_gateway import RemoteGateway, HostOfflineError
+    from services.outbox import Outbox
+    from host.host_service import HostService
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    import threading, bcrypt
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    pw = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO users (username,password,full_name,role,is_active,created_by) "
+              "VALUES ('admin',?,'Admin','admin',1,'SYSTEM') ON CONFLICT(username) DO UPDATE SET password=excluded.password", (pw,))
+    c.commit(); c.close()
+    bus = os.path.join(d, "bus")
+    ob = Outbox(os.path.join(d, "outbox"))
+
+    # host DOWN: a write times out and is queued (stable id, HostOfflineError)
+    gw = RemoteGateway(QueueTransport(bus), timeout=0.3, outbox=ob)
+    # log in requires a host; with none, login also times out -> simulate a token directly
+    gw.token = "pretend"  # drain re-sends; host will reject auth, so use a no-auth command path:
+    raised = False
+    try:
+        gw.call("auth_service.create_user", ["u1", "p", "U One", "agent"], {})
+    except HostOfflineError:
+        raised = True
+    check("host-down write raises HostOffline + queues", raised and len(ob.pending()) == 1)
+    queued_id = ob.pending()[0]["id"]
+
+    # ponytail: gw.token="pretend" above stands in for "no host to log into
+    # yet" (there is none running). But call() must submit before it can time
+    # out, so that placeholder-token copy is still sitting in the transport's
+    # own queue/pending. A genuinely offline host never claims anything; drop
+    # that artifact so it can't be claimed by the real host below with a bad
+    # token (which would permanently poison this id's applied_commands entry
+    # before the outbox's correctly-tokened resubmit ever gets a chance).
+    for name in os.listdir(os.path.join(bus, "queue", "pending")):
+        if name.endswith(f"_{queued_id}.json"):
+            os.remove(os.path.join(bus, "queue", "pending", name))
+
+    # bring host UP and give the gateway a real admin token
+    class _Svc(dict): pass
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    log = LoggingService(dbm, None)
+    services = {"auth_service": AuthService(dbm, log)}
+    host = HostService(services, dbm, QueueTransport(bus), bus)
+    stop = threading.Event()
+    def run():
+        host.startup()
+        while not stop.is_set():
+            if not host.run_once():
+                time.sleep(0.02)
+    th = threading.Thread(target=run, daemon=True); th.start()
+    try:
+        ok, _u, _m = gw.login("admin", "Admin@1234")
+        check("login once host is up", ok)
+        # the queued create_user carries no token; drain resends verbatim. Give it the token:
+        pend = ob.pending()[0]; pend["token"] = gw.token; ob.add(pend)
+        sent, remaining = gw.drain()
+        check("drain sends the queued command", sent == 1 and remaining == 0)
+        n = dbm.execute_with_retry("SELECT COUNT(*) FROM users WHERE username='u1'")[0][0]
+        check("queued write applied exactly once", n == 1, n)
+        check("same id kept (idempotent)", ob.pending() == [] and queued_id)
+    finally:
+        stop.set(); th.join(timeout=2.0); shutil.rmtree(d, ignore_errors=True)
+
+def test_authfail_not_poisoned():
+    """A host-level failure (bad/expired token) must NOT be recorded in the
+    idempotency ledger — otherwise a resubmit after re-login replays the failure
+    and the write is lost. Direct handle_command, no threads/races."""
+    from host.host_service import HostService
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    import bcrypt
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    pw = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
+    c = sqlite3.connect(db)
+    c.execute("INSERT INTO users (username,password,full_name,role,is_active,created_by) "
+              "VALUES ('admin',?,'Admin','admin',1,'SYSTEM') ON CONFLICT(username) DO UPDATE SET password=excluded.password", (pw,))
+    c.commit(); c.close()
+    log = LoggingService(dbm, None)
+    host = HostService({"auth_service": AuthService(dbm, log)}, dbm, QueueTransport(os.path.join(d, "bus")), os.path.join(d, "bus"))
+    try:
+        cmd = {"id": "poison1", "command": "auth_service.create_user",
+               "args": ["nu", "Passw0rd!", "N U", "agent"], "kwargs": {}, "token": "BOGUS"}
+        r1 = host.handle_command(cmd)
+        check("bad-token command fails (ok=False)", r1["ok"] is False, r1)
+        ledgered = dbm.execute_with_retry("SELECT COUNT(*) FROM applied_commands WHERE command_id='poison1'")[0][0]
+        check("auth-failed command NOT in ledger", ledgered == 0, ledgered)
+        # resubmit SAME id under a real admin session -> must actually apply
+        ok, tok, _m, _u = host.login("admin", "Admin@1234")
+        cmd["token"] = tok
+        r2 = host.handle_command(cmd)
+        check("resubmit same id under valid token applies", r2["ok"] is True, r2)
+        n = dbm.execute_with_retry("SELECT COUNT(*) FROM users WHERE username='nu'")[0][0]
+        check("write applied after re-auth (not lost)", n == 1, n)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+def test_outbox_ordering():
+    """pending() must replay oldest-first by queued_at, NOT by (random-id)
+    filename; re-add of the same id overwrites (no duplicate)."""
+    from services.outbox import Outbox
+    d = tempfile.mkdtemp()
+    ob = Outbox(os.path.join(d, "ob"))
+    try:
+        ob.add({"id": "zzz", "command": "c", "_queued_at": 100})
+        ob.add({"id": "aaa", "command": "c", "_queued_at": 50})
+        ob.add({"id": "mmm", "command": "c", "_queued_at": 200})
+        order = [c["id"] for c in ob.pending()]
+        check("outbox replays oldest-first (queued_at, not filename)", order == ["aaa", "zzz", "mmm"], order)
+        ob.add({"id": "aaa", "command": "c", "token": "T2", "_queued_at": 50})  # token refresh re-add
+        check("re-add same id does not duplicate", [c["id"] for c in ob.pending()].count("aaa") == 1)
+        ob.remove("aaa")
+        check("remove by id works", "aaa" not in [c["id"] for c in ob.pending()])
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
     test_heartbeat()
@@ -176,5 +304,8 @@ if __name__ == "__main__":
     test_session_timeout()
     test_step_down()
     test_become_host()
+    test_outbox_drain_exactly_once()
+    test_authfail_not_poisoned()
+    test_outbox_ordering()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
