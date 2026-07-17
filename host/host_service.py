@@ -6,6 +6,9 @@ import json
 import time
 import uuid
 import sqlite3
+import socket
+from host.lease import read_lease
+from host import heartbeat as hb
 
 
 class HostService:
@@ -16,6 +19,11 @@ class HostService:
         self.bus = bus_dir
         self.auth = services["auth_service"]
         self._sessions = {}  # token -> {"user_id","username","role","last_seen"}
+        self.hostname = socket.gethostname()
+        self.pid = os.getpid()
+        self.host_id = f"{self.hostname}-{uuid.uuid4().hex[:8]}"
+        _hid, self.term = read_lease(self.db)   # term this host serves under
+        self._db_version = 0
 
     # ---- sessions ----
     def login(self, username, password):
@@ -95,10 +103,15 @@ class HostService:
         finally:
             dst.close(); src.close()
         os.replace(tmp, dest)
+        version = int(time.time() * 1000)
         vtmp = os.path.join(self.bus, ".tmp", uuid.uuid4().hex + ".ver")
         with open(vtmp, "w") as f:
-            f.write(str(int(time.time() * 1000)))
+            f.write(str(version))
         os.replace(vtmp, os.path.join(self.bus, "replica", "version.txt"))
+        self._db_version = version
+
+    def _beat(self):
+        hb.write_heartbeat(self.bus, self.host_id, self.term, self._db_version, self.pid, self.hostname)
 
     # ---- loop ----
     def run_once(self) -> bool:
@@ -109,13 +122,16 @@ class HostService:
         self.t.respond(cmd["id"], resp)
         self.t.complete(cmd["id"])
         self.publish_replica()
+        self._beat()
         return True
 
     def serve_forever(self, poll: float = 0.1):
         self.publish_replica()
+        self._beat()
         while True:
             try:
                 if not self.run_once():
+                    self._beat()
                     time.sleep(poll)
             except Exception as e:
                 print(f"[HOST][ERROR] run_once failed, continuing: {e}")

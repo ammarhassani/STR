@@ -44,7 +44,24 @@ def test_lease():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_heartbeat():
+    from host.heartbeat import write_heartbeat, read_heartbeat, is_stale
+    from services.queue_transport import QueueTransport
+    d = tempfile.mkdtemp()
+    bus = os.path.join(d, "bus"); QueueTransport(bus)  # creates host/ + .tmp/
+    try:
+        check("no heartbeat -> stale", is_stale(read_heartbeat(bus)) is True)
+        write_heartbeat(bus, "hostA", 3, 1234, 999, "PC1")
+        hb = read_heartbeat(bus)
+        check("heartbeat round-trips", hb["host_id"] == "hostA" and hb["term"] == 3 and hb["db_version"] == 1234, hb)
+        check("fresh heartbeat not stale", is_stale(hb, stale_seconds=60) is False)
+        old = dict(hb); old["epoch_ms"] = int(time.time() * 1000) - 120000
+        check("old heartbeat is stale", is_stale(old, stale_seconds=60) is True)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
+    test_heartbeat()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

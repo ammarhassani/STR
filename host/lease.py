@@ -4,7 +4,13 @@ term (via the heartbeat) steps down. Stored in each host's LOCAL DB."""
 
 
 def read_lease(db_manager):
-    rows = db_manager.execute_with_retry("SELECT host_id, term FROM host_lease WHERE id = 1")
+    # Tolerate a DB that predates the host_lease table (or is otherwise
+    # unmigrated): no lease == term 0, the safe starting point.
+    import sqlite3
+    try:
+        rows = db_manager.execute_with_retry("SELECT host_id, term FROM host_lease WHERE id = 1")
+    except sqlite3.OperationalError:
+        return (None, 0)
     if not rows:
         return (None, 0)
     return (rows[0][0], rows[0][1])
