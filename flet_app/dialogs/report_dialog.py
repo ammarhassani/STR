@@ -408,20 +408,11 @@ def show_report_dialog(
                         f"Modified by {current_user['username']}"
                     )
             else:
+                form_data.pop('report_number', None)
+                form_data.pop('sn', None)
                 success, report_id, message = report_service.create_report(form_data)
 
             if success:
-                # Mark reservation as used
-                if not is_edit_mode and reservation_info["value"] and report_number_service:
-                    try:
-                        report_number_service.mark_reservation_used(
-                            reservation_info["value"]['report_number'],
-                            current_user['username']
-                        )
-                        reservation_info["value"] = None
-                    except Exception as ex:
-                        logging_service.error(f"Error marking reservation as used: {ex}")
-
                 show_success_dialog(message)
                 dialog.open = False
                 page.update()
@@ -524,16 +515,7 @@ def show_report_dialog(
         page.update()
 
     def close_dialog(e):
-        """Close dialog, cancel reservation and release any edit lock (R28)."""
-        if not is_edit_mode and reservation_info["value"] and report_number_service:
-            try:
-                report_number_service.cancel_reservation(
-                    reservation_info["value"]['report_number'],
-                    current_user['username']
-                )
-            except Exception as ex:
-                logging_service.error(f"Error cancelling reservation: {ex}")
-
+        """Close dialog and release any edit lock (R28)."""
         if is_edit_mode and report_data:
             rid = report_data.get('report_id') or report_data.get('id')
             if rid:
@@ -642,64 +624,18 @@ def show_report_dialog(
         page.update()
 
     def reserve_numbers():
-        """Reserve report numbers for new reports."""
+        """Show (read-only) the reserved number this new report will consume."""
         if is_edit_mode or not report_number_service:
             return
-
-        try:
-            success, reservation, message = report_number_service.reserve_next_numbers(
-                current_user['username']
-            )
-
-            if success and reservation:
-                reservation_info["value"] = reservation
-
-                if sn_ref.current:
-                    sn_ref.current.value = str(reservation['serial_number'])
-                    sn_ref.current.read_only = True
-                if report_number_ref.current:
-                    report_number_ref.current.value = reservation['report_number']
-                    report_number_ref.current.read_only = True
-
-                page.update()
-
-                if reservation.get('has_gap') and reservation.get('gap_info'):
-                    gap_info = reservation['gap_info']
-                    show_gap_notice(gap_info)
-
-                logging_service.info(
-                    f"Reserved numbers for {current_user['username']}: "
-                    f"Report# {reservation['report_number']}, SN {reservation['serial_number']}"
-                )
-            else:
-                logging_service.warning(f"Could not reserve report number: {message}")
-
-        except Exception as ex:
-            logging_service.error(f"Error reserving numbers: {ex}")
-
-    def show_gap_notice(gap_info):
-        """Show gap notice dialog."""
-        gap_dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Gap Detected"),
-            content=ft.Text(
-                f"📋 Gap Notice:\n\n{gap_info['message']}\n\n"
-                f"The system is reusing this number to fill the gap in the sequence.\n\n"
-                f"Deleted on: {gap_info.get('deleted_at', 'Unknown')}\n"
-                f"Deleted by: {gap_info.get('deleted_by', 'Unknown')}"
-            ),
-            actions=[
-                ft.TextButton("OK", on_click=lambda e: close_gap_dialog()),
-            ],
-        )
-
-        def close_gap_dialog():
-            gap_dialog.open = False
+        avail = report_number_service.get_available_numbers(current_user['username'])
+        if avail:
+            nxt = avail[0]
+            reservation_info["value"] = nxt  # display only
+            if sn_ref.current:
+                sn_ref.current.value = str(nxt['serial_number']); sn_ref.current.read_only = True
+            if report_number_ref.current:
+                report_number_ref.current.value = nxt['report_number']; report_number_ref.current.read_only = True
             page.update()
-
-        page.overlay.append(gap_dialog)
-        gap_dialog.open = True
-        page.update()
 
     # Build tabs
     def build_basic_info_tab():
