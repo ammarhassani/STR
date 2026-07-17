@@ -28,7 +28,7 @@ def build_setup_wizard(
     Returns:
         Container with setup wizard
     """
-    colors = Colors.DARK  # Use dark theme for setup
+    colors = Colors.get_palette("light")  # app is light-only (was Colors.DARK -> dark-on-dark, invisible)
 
     # State
     current_step = 0

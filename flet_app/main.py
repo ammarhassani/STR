@@ -435,7 +435,7 @@ class FletApp:
     def _show_error(self, message: str):
         """Show error dialog."""
         from theme.colors import Colors
-        colors = Colors.DARK
+        colors = Colors.get_palette("light")   # app is light-only
 
         error_content = ft.Container(
             content=ft.Column(
