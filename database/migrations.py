@@ -1251,6 +1251,24 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"reserved_numbers table skipped: {str(e)}")
 
+        # host_lease: single-row monotonic term for manual failover (Phase 3a)
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='host_lease'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    CREATE TABLE host_lease (
+                        id INTEGER PRIMARY KEY CHECK(id = 1),
+                        host_id TEXT,
+                        term INTEGER NOT NULL DEFAULT 0,
+                        updated_at TEXT DEFAULT (datetime('now'))
+                    )
+                """)
+                cursor.execute("INSERT OR IGNORE INTO host_lease (id, host_id, term) VALUES (1, NULL, 0)")
+                conn.commit()
+                messages.append("Created host_lease table")
+        except Exception as e:
+            messages.append(f"host_lease table skipped: {str(e)}")
+
         conn.close()
 
         if messages:
