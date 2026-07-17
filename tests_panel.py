@@ -21,7 +21,62 @@ def test_config_host_id():
     ob = Config.get_client_outbox_dir()
     check("client outbox dir derived + created", os.path.isdir(ob))
 
+def _seed_bus_and_db():
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    d = tempfile.mkdtemp()
+    bus = os.path.join(d, "bus"); QueueTransport(bus)
+    db = os.path.join(d, "local.db"); initialize_database(db); migrate_database(db)
+    return d, bus, db
+
+
+def test_panel_controller():
+    from panel.panel_controller import PanelController
+    from host.heartbeat import write_heartbeat
+    d, bus, db = _seed_bus_and_db()
+    pc = PanelController(bus, db, host_id="PANEL-PC")
+    try:
+        st = pc.status()
+        check("status: host offline when no heartbeat", st["host_online"] is False)
+        write_heartbeat(bus, "HOSTX", 7, 123, 1, "PC1")
+        st2 = pc.status()
+        check("status: host online + term from heartbeat", st2["host_online"] and st2["term"] == 7, st2)
+        # queue depth
+        open(os.path.join(bus, "queue", "pending", "0000000000001_a.json"), "w").write("{}")
+        check("status: counts pending", pc.status()["queue_pending"] == 1)
+        # manual backup + list + restore
+        ok, msg = pc.manual_backup()
+        check("manual backup ok", ok, msg)
+        check("list_backups sees it", len(pc.list_backups()) == 1)
+        okr, msgr = pc.restore_backup(pc.list_backups()[0])
+        check("restore ok", okr, msgr)
+        check("restore refuses unknown", pc.restore_backup("nope.db")[0] is False)
+        # integrity on a healthy db
+        oki, _ = pc.run_integrity()
+        check("integrity ok", oki)
+        # start_host uses injected spawn (no real host)
+        calls = {}
+        def fake_spawn(cmd, **kw): calls["cmd"] = cmd; return type("P", (), {"pid": 4321})()
+        oks, msgs = pc.start_host(spawn=fake_spawn)
+        check("start_host launches --host detached", oks and "--host" in " ".join(calls["cmd"]), (msgs, calls))
+        # become_host on a stale heartbeat
+        stale = __import__("json").load(open(os.path.join(bus, "host", "heartbeat.json")))
+        stale["epoch_ms"] -= 120000
+        open(os.path.join(bus, "host", "heartbeat.json"), "w").write(__import__("json").dumps(stale))
+        # need a replica to adopt
+        import sqlite3
+        src = sqlite3.connect(db); dst = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db"))
+        with dst: src.backup(dst)
+        dst.execute("PRAGMA journal_mode=DELETE"); dst.close(); src.close()
+        okb, msgb, term = pc.become_host_now()
+        check("become_host_now promotes on stale hb", okb and term >= 8, (msgb, term))
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_config_host_id()
+    test_panel_controller()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
