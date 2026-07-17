@@ -56,8 +56,37 @@ def test_host_login_returns_user():
     check("host login user has role", resp["result"]["user"].get("role") == "admin")
     shutil.rmtree(d, ignore_errors=True)
 
+def test_replica_sync():
+    from services.replica_sync import bootstrap_replica, ReplicaRefresher
+    d = tempfile.mkdtemp()
+    bus = os.path.join(d, "bus"); os.makedirs(os.path.join(bus, "replica"))
+    rep = os.path.join(bus, "replica", "fiu_ro.db")
+    ver = os.path.join(bus, "replica", "version.txt")
+    with open(rep, "wb") as f: f.write(b"DBv1")
+    with open(ver, "w") as f: f.write("1")
+    local = os.path.join(d, "client_replica.db")
+    check("bootstrap copies replica", bootstrap_replica(bus, local, timeout=2.0) and os.path.exists(local))
+    check("bootstrap content v1", open(local, "rb").read() == b"DBv1")
+    # bootstrap timeout when no replica
+    d2 = tempfile.mkdtemp(); bus2 = os.path.join(d2, "bus"); os.makedirs(os.path.join(bus2, "replica"))
+    check("bootstrap times out cleanly", bootstrap_replica(bus2, os.path.join(d2, "x.db"), timeout=0.5) is False)
+    # refresher picks up a version bump
+    hits = {"n": 0}
+    r = ReplicaRefresher(bus, local, poll=0.1, on_update=lambda: hits.__setitem__("n", hits["n"] + 1))
+    r.start()
+    with open(rep, "wb") as f: f.write(b"DBv2")
+    with open(ver, "w") as f: f.write("2")
+    for _ in range(50):
+        if open(local, "rb").read() == b"DBv2": break
+        time.sleep(0.1)
+    r.stop()
+    check("refresher hot-swaps to v2", open(local, "rb").read() == b"DBv2")
+    check("refresher fired on_update", hits["n"] >= 1)
+    shutil.rmtree(d, ignore_errors=True); shutil.rmtree(d2, ignore_errors=True)
+
 if __name__ == "__main__":
     test_config_mode()
     test_host_login_returns_user()
+    test_replica_sync()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
