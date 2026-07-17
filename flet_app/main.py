@@ -497,4 +497,9 @@ if __name__ == "__main__":
         panel_main()
         sys.exit(0)
 
-    ft.app(target=main)
+    # Web-browser view: serves the UI on a local port and opens the default
+    # browser. Avoids the native desktop-client binary download, which a
+    # locked-down corporate proxy blocks (Tunnel connection failed: 403). Same
+    # UI, fully offline. Override the port with STR_PORT if 8550 is taken.
+    import os
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("STR_PORT", "8550")))
