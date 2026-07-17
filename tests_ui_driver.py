@@ -130,6 +130,8 @@ def run():
     # ============================================== REPORT DIALOG (validate + save)
     B = 'UI Report dialog'
     st.login(st.auth_service.authenticate('admin', 'Admin@1234')[1])
+    # Add-report gate (Task 5) requires a reserved number to open the create form.
+    st.report_number_service.reserve_block('admin', 5)
     from flet_app.dialogs.report_dialog import show_report_dialog
     page2 = FakePage()
     saved = {'called': False}
@@ -215,6 +217,11 @@ def run():
     hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py')).read()
     finding(E, 'header still has a theme toggle (dark mode removed)',
             'toggle_theme' in hdr_src or 'theme_button' in hdr_src)
+    rsv = open(os.path.join(REPO, 'flet_app/dialogs/reservation_dialog.py')).read()
+    finding(E, 'reservation dialog still runs raw SQL (must use service methods)',
+            'execute_with_retry' in rsv or 'DELETE FROM' in rsv)
+    finding(E, 'reservation dialog missing reserve_block wiring',
+            'reserve_block' not in rsv)
 
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')

@@ -1288,6 +1288,13 @@ def show_report_dialog(
         shape=ft.RoundedRectangleBorder(radius=6),
     )
 
+    # Add-report gate (Task 5): a user must hold at least one reserved number
+    # before the create form is allowed to open.
+    if not is_edit_mode and report_number_service and current_user:
+        if report_number_service.get_available_count(current_user['username']) < 1:
+            show_error_dialog("You have no reserved numbers — reserve numbers first (Ctrl+R).")
+            return
+
     # Record-edit lock (R28): one editor per report. Acquire before opening in
     # edit mode; if another user holds it, refuse and tell the user who.
     if is_edit_mode and report_data:
