@@ -131,11 +131,21 @@ def test_host_banner_builds():
     check("host banner builds a Control", isinstance(ctrl, ft.Control))
 
 
+def test_deploy_artifacts_exist():
+    root = os.path.dirname(os.path.abspath(__file__))
+    for rel in ("deploy/start_host.bat", "deploy/start_panel.bat", "docs/HOST_RUNBOOK.md"):
+        check(f"{rel} exists", os.path.exists(os.path.join(root, rel)), rel)
+    runbook = open(os.path.join(root, "docs/HOST_RUNBOOK.md")).read().lower()
+    for term in ("become host", "restore", "startup folder", "integrity", "session"):
+        check(f"runbook covers '{term}'", term in runbook)
+
+
 if __name__ == "__main__":
     test_config_host_id()
     test_panel_controller()
     test_panel_cli_dispatch()
     test_host_status_and_outbox_depth()
     test_host_banner_builds()
+    test_deploy_artifacts_exist()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
