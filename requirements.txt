@@ -1,7 +1,12 @@
 # FIU Report Management System - Flet Edition
 # Requirements
 
-flet>=0.21.0
+# Pinned: the UI (21 dialog/view files) uses the Flet 0.28 dialog lifecycle
+# (page.overlay.append + page.update). Flet 0.70+ (incl. 0.86) made page.update
+# assert on unmounted controls -> AssertionError on every dialog. Stay on 0.28.3
+# until/unless the whole UI is ported to page.open()/page.close(). Runs on
+# Python 3.11 (the workstation). Web-browser view avoids the desktop download.
+flet==0.28.3
 plotly>=5.18.0
 bcrypt>=4.1.2
 openpyxl>=3.1.2
