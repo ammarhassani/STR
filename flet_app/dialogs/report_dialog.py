@@ -47,6 +47,10 @@ def show_report_dialog(
     approval_service = app_state.approval_service
     version_service = app_state.version_service
     current_user = app_state.current_user
+    if not current_user:            # no session -> the form can't function
+        from components.toast import show_error
+        show_error(page, "Please log in first.")
+        return
 
     # State
     reservation_info = {"value": None}

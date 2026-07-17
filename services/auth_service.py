@@ -40,7 +40,8 @@ class AuthService:
             # Get user from database
             query = """
                 SELECT user_id, username, password, full_name, role, is_active,
-                       failed_login_attempts
+                       failed_login_attempts,
+                       COALESCE(must_change_password, 0)
                 FROM users
                 WHERE username = ? COLLATE NOCASE
             """
@@ -51,7 +52,7 @@ class AuthService:
                 return False, None, "Invalid username or password"
 
             user = result[0]
-            user_id, db_username, db_password, full_name, role, is_active, failed_attempts = user
+            user_id, db_username, db_password, full_name, role, is_active, failed_attempts, must_change_password = user
 
             # Check if user is active
             if not is_active:
@@ -128,7 +129,8 @@ class AuthService:
                 'username': db_username,
                 'full_name': full_name,
                 'role': role,
-                'last_login': datetime.now().isoformat()
+                'last_login': datetime.now().isoformat(),
+                'must_change_password': bool(must_change_password),
             }
 
             # Update logging service user context
@@ -494,7 +496,8 @@ class AuthService:
             # Hash the new password with bcrypt
             hashed_password = SecurityService.hash_password(new_password)
 
-            query = "UPDATE users SET password = ?, updated_by = ?, updated_at = ? WHERE user_id = ?"
+            query = ("UPDATE users SET password = ?, must_change_password = 0, "
+                     "updated_by = ?, updated_at = ? WHERE user_id = ?")
             self.db_manager.execute_with_retry(
                 query,
                 (hashed_password,
@@ -502,6 +505,9 @@ class AuthService:
                  datetime.now().isoformat(),
                  user_id)
             )
+            # keep the in-memory session flag in sync so the login flow stops nagging
+            if self.current_user and self.current_user.get('user_id') == user_id:
+                self.current_user['must_change_password'] = False
 
             self.logger.log_user_action("PASSWORD_CHANGED", {'user_id': user_id})
             self.logger.info(f"Password changed successfully for user_id: {user_id}")

@@ -33,6 +33,10 @@ def build():
                  "VALUES ('admin','x','Admin','admin',1,'SYSTEM') ON CONFLICT(username) DO NOTHING")
     conn.execute("UPDATE users SET password=?, role='admin', is_active=1 WHERE username='admin'",
                  (SecurityService.hash_password('Admin@1234'),))
+    # test fixtures (shipped schema no longer ships demo agent1/reporter1)
+    conn.execute("INSERT OR IGNORE INTO users (username,password,full_name,role,is_active,created_by) "
+                 "VALUES ('agent1','pass123','Test Agent','agent',1,'SYSTEM'),"
+                 "('reporter1','pass123','Test Reporter','reporter',1,'SYSTEM')")
     conn.commit(); conn.close()
 
 class Client:

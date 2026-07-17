@@ -260,6 +260,15 @@ class FletApp:
         """Handle successful login."""
         app_state.logging_service.info(f"User logged in: {user['username']}")
         self._show_main_app()
+        # Force the default/reset account to set a new password immediately.
+        if user.get('must_change_password'):
+            try:
+                from dialogs.change_password_dialog import show_change_password_dialog
+                from components.toast import show_error
+                show_error(self.page, "You are using a default password — please set a new one now.")
+                show_change_password_dialog(self.page, app_state)
+            except Exception as e:
+                app_state.logging_service.warning(f"Could not open forced password change: {e}")
 
     def _show_main_app(self):
         """Show the main application with navigation."""

@@ -30,10 +30,11 @@ INSERT OR REPLACE INTO system_metadata (key, value) VALUES ('db_initialized', da
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL COLLATE NOCASE,
-    password TEXT NOT NULL, -- Plain text as per client requirement
+    password TEXT NOT NULL, -- bcrypt hash (never plaintext)
     full_name TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('admin', 'agent', 'reporter')),
     is_active INTEGER DEFAULT 1,
+    must_change_password INTEGER DEFAULT 0, -- 1 = force a password change at next login
     failed_login_attempts INTEGER DEFAULT 0,
     last_login TEXT,
     theme_preference TEXT DEFAULT 'light' CHECK(theme_preference IN ('light', 'dark')),
@@ -298,9 +299,11 @@ CREATE INDEX idx_system_logs_timestamp_level ON system_logs(timestamp, log_level
 -- DEFAULT DATA INSERTION
 -- ============================================================================
 
--- Default Admin User
-INSERT OR IGNORE INTO users (user_id, username, password, full_name, role, is_active, created_at, created_by)
-VALUES (1, 'admin', 'admin123', 'System Administrator', 'admin', 1, datetime('now'), 'SYSTEM');
+-- Default Admin User. Password is a bcrypt hash of the default "admin123", and
+-- must_change_password=1 forces the operator to set a new password at first
+-- login (see auth_service + login flow). No plaintext credential is shipped.
+INSERT OR IGNORE INTO users (user_id, username, password, full_name, role, is_active, must_change_password, created_at, created_by)
+VALUES (1, 'admin', '$2b$12$v3l5idAWjDTjUhu2leHep.LElBH2E5L/w76feM/WJywirNVKezghi', 'System Administrator', 'admin', 1, 1, datetime('now'), 'SYSTEM');
 
 -- Default System Config Settings
 INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, display_order) VALUES
@@ -366,34 +369,6 @@ INSERT OR IGNORE INTO dashboard_config (widget_type, title, title_ar, sql_query,
 -- SAMPLE DATA (For Testing and Demo)
 -- ============================================================================
 
--- Sample Users
-INSERT OR IGNORE INTO users (username, password, full_name, role, is_active, created_at, created_by) VALUES
-('agent1', 'pass123', 'Mohammed Al-Rashid', 'agent', 1, datetime('now'), 'admin'),
-('reporter1', 'pass123', 'Sara Al-Khalid', 'reporter', 1, datetime('now'), 'admin');
-
--- Sample Reports
-INSERT OR IGNORE INTO reports (
-    sn, report_number, report_date, outgoing_letter_number, reported_entity_name,
-    legal_entity_owner, gender, nationality, id_cr, account_membership,
-    branch_id, cic, first_reason_for_suspicion, second_reason_for_suspicion,
-    type_of_suspected_transaction, arb_staff, total_transaction, report_classification,
-    report_source, reporting_entity, reporter_initials,
-    sending_date, original_copy_confirmation, fiu_number, fiu_letter_receive_date,
-    fiu_feedback, fiu_letter_number, fiu_date, created_by
-) VALUES
-(1, '2025/11/001', '04/11/2025', '3333', 'Example Financial Entity', 
- 'Owner Name', 'Ø°ÙƒØ±', 'Saudi Arabian', '1122334455', '606051234567', 
- '55', '22554411', 'Suspicious transaction patterns detected during review period',
- 'Potential fraud and deception indicators', 'Internal Transfers', 'Ù„Ø§', '605040 SAR',
- 'Crime', 'INCIDENT REPORT', 'Compliance Department', 'ZM',
- '04/11/2025', 'CONFIRMED', '416158', '04/11/2025',
- 'Entity added to database for monitoring', '5040', '04/11/2025', 'admin'),
-(2, '2025/11/002', '04/11/2025', '3334', 'Second Entity Example', 
- 'Second Owner', 'Ø£Ù†Ø«Ù‰', 'Egyptian', '2233445566', '606051234568', 
- '56', '22554412', 'Unusual cash deposit patterns', 'Large transactions without clear business purpose', 
- 'Cash Deposits', 'Ù†Ø¹Ù…', '1250000 SAR', 'Crime', 'INCIDENT REPORT', 
- 'Branch Compliance', 'AK', '04/11/2025', 'PENDING', '416159', 
- '04/11/2025', 'Under review', '5041', '04/11/2025', 'agent1');
 
 -- ============================================================================
 -- VIEWS (For Reporting and Analytics)

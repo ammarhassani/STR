@@ -1269,6 +1269,16 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"host_lease table skipped: {str(e)}")
 
+        # must_change_password: force a password change at next login (security)
+        try:
+            cursor.execute("PRAGMA table_info(users)")
+            if 'must_change_password' not in [r[1] for r in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0")
+                conn.commit()
+                messages.append("Added must_change_password column to users")
+        except Exception as e:
+            messages.append(f"must_change_password column skipped: {str(e)}")
+
         conn.close()
 
         if messages:

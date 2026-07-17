@@ -26,6 +26,9 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
     report_number_service = app_state.report_number_service
     approval_service = app_state.approval_service
     current_user = app_state.current_user
+    if not current_user:            # no session -> nothing to reserve against
+        show_error(page, "Please log in first.")
+        return
     username = current_user['username']
 
     # State
