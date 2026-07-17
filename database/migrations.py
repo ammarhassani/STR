@@ -1228,6 +1228,29 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"applied_commands table skipped: {str(e)}")
 
+        # Migration 34: owned, transferable, non-expiring reserved number blocks (Phase 2)
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reserved_numbers'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    CREATE TABLE reserved_numbers (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        report_number TEXT UNIQUE NOT NULL,
+                        serial_number INTEGER UNIQUE NOT NULL,
+                        owned_by TEXT NOT NULL,
+                        status TEXT CHECK(status IN ('available','used')) DEFAULT 'available',
+                        used_by_report_id INTEGER,
+                        reserved_at TEXT DEFAULT (datetime('now')),
+                        transferred_from TEXT
+                    )
+                """)
+                cursor.execute("CREATE INDEX idx_reserved_owner_status ON reserved_numbers(owned_by, status)")
+                cursor.execute("CREATE INDEX idx_reserved_number ON reserved_numbers(report_number)")
+                conn.commit()
+                messages.append("Created reserved_numbers table")
+        except Exception as e:
+            messages.append(f"reserved_numbers table skipped: {str(e)}")
+
         conn.close()
 
         if messages:

@@ -300,6 +300,20 @@ def test_serve_forever_survives_poison_command():
     finally:
         shutil.rmtree(box2, ignore_errors=True)
 
+def test_reserved_numbers_table():
+    import sqlite3
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    box = tempfile.mkdtemp()
+    try:
+        db = os.path.join(box, 'r.db')
+        initialize_database(db); migrate_database(db)
+        cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(reserved_numbers)")}
+        need = {'id','report_number','serial_number','owned_by','status','used_by_report_id','reserved_at','transferred_from'}
+        check('P2T1 reserved_numbers table exists', need <= cols, cols)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -309,5 +323,6 @@ if __name__ == '__main__':
     test_client_proxy_routing()
     test_multiclient_stress_and_replay()
     test_serve_forever_survives_poison_command()
+    test_reserved_numbers_table()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)
