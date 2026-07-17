@@ -3,6 +3,7 @@ Log Management View for FIU Report Management System.
 Admin view for viewing, filtering, and managing system logs.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
@@ -274,7 +275,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         content=ft.Row(
             controls=[
                 ft.Text("Level:", color=colors["text_secondary"]),
-                ft.Dropdown(
+                searchable_dropdown(
                     ref=level_ref,
                     value="All",
                     options=[ft.dropdown.Option(key=lvl, text=lvl) for lvl in LOG_LEVELS],

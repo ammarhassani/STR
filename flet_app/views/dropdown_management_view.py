@@ -3,6 +3,7 @@ Dropdown Management View for FIU Report Management System.
 Admin panel for managing dropdown values (CRUD operations).
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
 
@@ -459,7 +460,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         content=ft.Row(
             controls=[
                 ft.Text("Category:", color=colors["text_secondary"]),
-                ft.Dropdown(
+                searchable_dropdown(
                     ref=category_ref,
                     value="",
                     options=[ft.dropdown.Option("-- Select Category --", "")],

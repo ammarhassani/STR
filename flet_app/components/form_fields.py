@@ -3,6 +3,7 @@ Form Field Components for FIU Report Management System.
 Reusable form input components with validation support.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 from typing import List, Optional, Callable, Any
 from datetime import datetime
 
@@ -110,7 +111,7 @@ def create_dropdown(
 
     label_text = f"{label} *" if required else label
 
-    dropdown = ft.Dropdown(
+    dropdown = searchable_dropdown(
         ref=ref,
         value=value,
         options=[ft.dropdown.Option(key=opt, text=opt) for opt in options],

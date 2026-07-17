@@ -3,6 +3,7 @@ Approval Panel View for FIU Report Management System.
 Admin-only view for managing report approval requests.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
 from datetime import datetime
@@ -258,7 +259,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 # All fields start as readonly (locked)
                 if field_type == 'dropdown':
                     options = field.get('options', [])
-                    control = ft.Dropdown(
+                    control = searchable_dropdown(
                         label=label,
                         value=value if value in options else '',
                         options=[ft.dropdown.Option(o) for o in options],
@@ -577,7 +578,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
                         # Rework reassignment (R36): optionally hand off to a
                         # different active agent. Only relevant for Rework.
-                        ft.Dropdown(
+                        searchable_dropdown(
                             ref=reassign_ref,
                             label="Reassign rework to (optional)",
                             hint_text="Keep current agent",

@@ -3,6 +3,7 @@ Report Dialog for FIU Report Management System.
 Comprehensive 35-field tabbed form for creating and editing reports.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
 from datetime import datetime
 import re
@@ -744,7 +745,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Gender", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=gender_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=g, text=g) for g in genders],
                                 text_size=13,
@@ -756,7 +757,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Nationality", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=nationality_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=n, text=n) for n in nationalities],
                                 text_size=13,
@@ -886,7 +887,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Second Reason for Suspicion", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=second_reason_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=r, text=r) for r in second_reasons],
                                 text_size=13,
@@ -898,7 +899,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Type of Suspected Transaction", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=transaction_type_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=t, text=t) for t in transaction_types],
                                 text_size=13,
@@ -910,7 +911,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("ARB Staff", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=arb_staff_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=a, text=a) for a in arb_staff_values],
                                 text_size=13,
@@ -946,7 +947,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Report Classification", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=classification_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=c, text=c) for c in classifications],
                                 text_size=13,
@@ -958,7 +959,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Report Source", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=report_source_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=s, text=s) for s in report_sources],
                                 text_size=13,
@@ -970,7 +971,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("Reporting Entity", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=reporting_entity_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=val, text=val) for val in reporting_entities],
                                 text_size=13,
@@ -1044,7 +1045,7 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text("FIU Feedback", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.Dropdown(
+                            searchable_dropdown(
                                 ref=fiu_feedback_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=f, text=f) for f in fiu_feedbacks],
                                 text_size=13,

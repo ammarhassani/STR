@@ -3,6 +3,7 @@ Field Validation Management View for FIU Report Management System.
 Admin panel for managing field validation rules and required status.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
 
@@ -303,7 +304,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=120,
             )
-            type_dropdown = ft.Dropdown(
+            type_dropdown = searchable_dropdown(
                 label="Type",
                 value=rules.get('type', 'text'),
                 options=[

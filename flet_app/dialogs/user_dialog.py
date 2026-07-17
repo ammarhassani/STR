@@ -3,6 +3,7 @@ User Dialog for FIU Report Management System.
 Dialog for creating and editing users.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
 
 from theme.theme_manager import theme_manager
@@ -200,7 +201,7 @@ def show_user_dialog(
                 ft.Column(
                     controls=[
                         ft.Text("Role *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                        ft.Dropdown(
+                        searchable_dropdown(
                             ref=role_ref,
                             value=user_data.get('role', 'reporter') if is_edit_mode else "reporter",
                             options=[
@@ -218,7 +219,7 @@ def show_user_dialog(
                 ft.Column(
                     controls=[
                         ft.Text("Status", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                        ft.Dropdown(
+                        searchable_dropdown(
                             ref=status_ref,
                             value="Active" if (not is_edit_mode or user_data.get('is_active', 1)) else "Inactive",
                             options=[

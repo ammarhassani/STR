@@ -3,6 +3,7 @@ Export View for FIU Report Management System.
 Export reports to CSV with filtering and customization options.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 import threading
 from typing import Any, Dict
@@ -325,7 +326,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Row(
                     controls=[
                         ft.Text("Status:", width=100, color=colors["text_secondary"]),
-                        ft.Dropdown(
+                        searchable_dropdown(
                             ref=status_ref,
                             value="All Statuses",
                             options=[ft.dropdown.Option(key=s, text=s) for s in status_options],

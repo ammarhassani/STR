@@ -3,6 +3,7 @@ Admin Panel View for FIU Report Management System.
 User management interface for administrators.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
 
@@ -317,7 +318,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
     filter_row = ft.Row(
         controls=[
             ft.Text("Role:", color=colors["text_secondary"]),
-            ft.Dropdown(
+            searchable_dropdown(
                 ref=role_filter_ref,
                 value="All Roles",
                 options=[ft.dropdown.Option(key=r, text=r) for r in ROLE_OPTIONS],
@@ -326,7 +327,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 on_change=handle_role_filter_change,
             ),
             ft.Text("Status:", color=colors["text_secondary"]),
-            ft.Dropdown(
+            searchable_dropdown(
                 ref=status_filter_ref,
                 value="All",
                 options=[ft.dropdown.Option(key=s, text=s) for s in STATUS_OPTIONS],

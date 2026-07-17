@@ -3,6 +3,7 @@ Activity View for FIU Report Management System.
 Displays GitHub-style activity feed with filtering and pagination.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Optional, List
 from datetime import datetime, timedelta
@@ -355,7 +356,7 @@ def build_activity_view(
                 content=ft.Row(
                     controls=[
                         # Action type filter
-                        ft.Dropdown(
+                        searchable_dropdown(
                             label="Action Type",
                             width=180,
                             options=[ft.dropdown.Option(key=label, text=label) for label, _ in ACTION_TYPE_OPTIONS],

@@ -7,6 +7,7 @@ selected numbers to another active agent. All data access goes through
 report_number_service / approval_service — no raw SQL here.
 """
 import flet as ft
+from components.searchable_dropdown import searchable_dropdown
 from typing import Any
 
 from theme.theme_manager import theme_manager
@@ -46,7 +47,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
 
     numbers_list = ft.Column(spacing=4, scroll=ft.ScrollMode.AUTO)
 
-    target_dropdown = ft.Dropdown(
+    target_dropdown = searchable_dropdown(
         label="Transfer To",
         width=260,
         options=[],
