@@ -39,6 +39,7 @@ class AppState:
     report_number_service: Any = None
     activity_service: Any = None
     _gateway: Any = None  # RemoteGateway, set only in client mode
+    host_status: Any = None  # HostStatus, set only in client mode
 
     # ==================== UI State ====================
     theme: str = "dark"
@@ -178,8 +179,12 @@ class AppState:
             if mode == "client" and bus_dir:
                 from services.queue_transport import QueueTransport
                 from services.remote_gateway import RemoteGateway, RemoteServiceProxy
-                gw = RemoteGateway(QueueTransport(bus_dir))
+                from services.outbox import Outbox
+                from services.host_status import HostStatus
+                from config import Config
+                gw = RemoteGateway(QueueTransport(bus_dir), outbox=Outbox(Config.get_client_outbox_dir()))
                 self._gateway = gw
+                self.host_status = HostStatus(bus_dir)
                 for attr in ("auth_service", "report_service", "approval_service",
                              "version_service", "report_number_service", "dropdown_service",
                              "validation_service", "settings_service"):
@@ -240,6 +245,21 @@ class AppState:
         if self._gateway:
             return self.login_remote(username, password)
         return self.auth_service.authenticate(username, password)
+
+    def pending_writes(self) -> int:
+        """Outbox depth: writes queued while the host was unreachable."""
+        gw = self._gateway
+        if gw is not None and getattr(gw, "outbox", None) is not None:
+            return len(gw.outbox.pending())
+        return 0
+
+    def drain_outbox(self):
+        """Resubmit queued outbox writes to the host. Safe to call when the
+        host is offline (drain no-ops/returns quickly in that case)."""
+        gw = self._gateway
+        if gw is not None and getattr(gw, "outbox", None) is not None:
+            return gw.drain()
+        return (0, 0)
 
     def logout(self):
         """Clear authenticated state and perform cleanup."""

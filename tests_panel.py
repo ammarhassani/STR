@@ -100,9 +100,28 @@ def test_panel_cli_dispatch():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_host_status_and_outbox_depth():
+    from services.host_status import HostStatus
+    from host.heartbeat import write_heartbeat
+    from services.queue_transport import QueueTransport
+    from services.outbox import Outbox
+    d = tempfile.mkdtemp(); bus = os.path.join(d, "bus"); QueueTransport(bus)
+    hs = HostStatus(bus, stale_seconds=60)
+    try:
+        check("host offline with no heartbeat", hs.online() is False)
+        write_heartbeat(bus, "H", 1, 0, 1, "PC")
+        check("host online with fresh heartbeat", hs.online() is True)
+        ob = Outbox(os.path.join(d, "ob"))
+        ob.add({"id": "w1", "command": "c", "args": [], "kwargs": {}})
+        check("outbox depth reflects queued write", len(ob.pending()) == 1)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 if __name__ == "__main__":
     test_config_host_id()
     test_panel_controller()
     test_panel_cli_dispatch()
+    test_host_status_and_outbox_depth()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
