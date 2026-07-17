@@ -1228,7 +1228,11 @@ def show_report_dialog(
     # before the create form is allowed to open.
     if not is_edit_mode and report_number_service and current_user:
         if report_number_service.get_available_count(current_user['username']) < 1:
-            show_error_dialog("You have no reserved numbers — reserve numbers first (Ctrl+R).")
+            # Dialog isn't mounted to page.overlay yet, so show_error_dialog
+            # (which targets error_banner_ref.current) would silently no-op.
+            # Use a toast instead — it works pre-mount.
+            from components.toast import show_error
+            show_error(page, "You have no reserved numbers — reserve numbers first (Ctrl+R).")
             return
 
     # Record-edit lock (R28): one editor per report. Acquire before opening in

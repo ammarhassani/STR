@@ -367,6 +367,38 @@ def test_create_report_gate():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_self_heal_stranded_number():
+    """FIX 1: a prior partial failure can leave a reserved row 'available'
+    whose report_number already exists in reports. create_report must not
+    re-pick that number forever — it should retire the stranded row and
+    fall through to the next available one."""
+    from datetime import datetime
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        host.services['report_service'].set_report_number_service(host.services['report_number_service'])
+        host.services['auth_service'].current_user = {'user_id': 1, 'username': 'admin', 'role': 'admin'}
+        R = host.services['report_service']; N = host.services['report_number_service']
+        ok, block, msg = N.reserve_block('admin', 2)
+        check('P2T5 reserve_block allocates 2', ok and len(block) == 2, msg)
+        # Simulate a stranded row: a report already exists using the block's
+        # FIRST (lowest) number, but its reserved_numbers row is still
+        # 'available' (as if consume_next_available never ran after insert).
+        dbm.execute_with_retry(
+            "INSERT INTO reports (sn, report_number, report_date, reported_entity_name, created_by, created_at) "
+            "VALUES (900001, ?, '04/11/2025', 'Stranded', 'admin', ?)",
+            (block[0], datetime.now().isoformat()))
+        ok, rid, msg = R.create_report({'report_date': '04/11/2025', 'reported_entity_name': 'Y', 'cic': '3' * 16})
+        check('P2T5 self-heal does not fail with already exists',
+              ok and 'already exists' not in (msg or '').lower(), msg)
+        rn = dbm.execute_with_retry("SELECT report_number FROM reports WHERE report_id=?", (rid,))[0][0]
+        check('P2T5 self-heal skips stranded number and uses next', rn == block[1], (rn, block))
+        stranded_status = dbm.execute_with_retry(
+            "SELECT status FROM reserved_numbers WHERE report_number=?", (block[0],))[0][0]
+        check('P2T5 stranded row retired to used', stranded_status == 'used', stranded_status)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 def test_registry_reservation_commands():
     from services import command_registry as cr
     check('P2T4 reserve_block is a write command', cr.is_write_command('report_number_service.reserve_block'))
@@ -385,6 +417,7 @@ if __name__ == '__main__':
     test_reserved_numbers_table()
     test_block_reservation()
     test_create_report_gate()
+    test_self_heal_stranded_number()
     test_registry_reservation_commands()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

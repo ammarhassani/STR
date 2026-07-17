@@ -194,13 +194,14 @@ def run_basic_tests():
         logger = LoggingService(db)
         service = ReportNumberService(db, logger)
 
-        # Test owned-block reservation
-        ok, block, message = service.reserve_block("test_deployment", 1)
-
-        if ok:
-            print(f"  ✅ Reservation system works: {block[0]}")
-        else:
-            print(f"  ❌ Reservation system failed: {message}")
+        # Test owned-block reservation plumbing without burning a live number
+        # (reserve_block would allocate a real report_number/serial_number in
+        # the prod DB on every deploy, leaving a dangling reservation + gap).
+        try:
+            count = service.get_available_count("test_deployment")
+            print(f"  ✅ Reservation system works: {count} available for test_deployment")
+        except Exception as e:
+            print(f"  ❌ Reservation system failed: {e}")
             return False
 
         # Test 2: Dropdown service
@@ -298,7 +299,7 @@ def main():
     print("  3. Test concurrent access (open multiple dialogs)")
     print("  4. Review DEPLOYMENT_GUIDE.md for comprehensive testing")
     print("\nOptional:")
-    print("  - Run test_concurrent_reservations.py for stress testing")
+    print("  - Run tests_e2e_harness.py for stress testing")
     print("  - Check system_logs table for any errors")
 
     print("\n" + "="*70)

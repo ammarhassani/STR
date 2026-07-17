@@ -80,13 +80,29 @@ class ReportService:
             if rns and not report_data.get('report_number'):
                 if rns.get_available_count(current_user['username']) < 1:
                     return False, None, "You have no reserved numbers — reserve first"
-                # Host is single-writer: the lowest available now is the same
-                # one consume_next_available takes after insert below.
+                # Self-heal: a prior partial failure can leave a reserved row
+                # 'available' whose report_number already exists in reports.
+                # Skip (and retire) any such stranded rows instead of
+                # re-picking them forever. Host is single-writer, so the
+                # lowest still-available row after retiring stranded ones is
+                # the same one consume_next_available takes after insert below.
                 avail = rns.get_available_numbers(current_user['username'])
-                consumed_number = avail[0]['report_number']
-                report_data = dict(report_data)
-                report_data['report_number'] = consumed_number
-                report_data['sn'] = avail[0]['serial_number']
+                for cand in avail:
+                    exists = self.db_manager.execute_with_retry(
+                        "SELECT 1 FROM reports WHERE report_number = ?", (cand['report_number'],))
+                    if exists:
+                        # stranded row from a prior partial failure — retire it, keep looking
+                        self.db_manager.execute_write(
+                            "UPDATE reserved_numbers SET status='used' WHERE report_number=? AND status='available'",
+                            (cand['report_number'],))
+                        continue
+                    consumed_number = cand['report_number']
+                    report_data = dict(report_data)
+                    report_data['report_number'] = consumed_number
+                    report_data['sn'] = cand['serial_number']
+                    break
+                if consumed_number is None:
+                    return False, None, "You have no reserved numbers — reserve first"
 
             # Reject absurdly long field values (storage/DoS guard). Field-level
             # format rules live in column_settings; this is a coarse backstop.
