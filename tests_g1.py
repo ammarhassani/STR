@@ -90,20 +90,30 @@ def test_client_replica_readonly():
     import sqlite3
     from services.replica_sync import bootstrap_replica, ReplicaRefresher
     from database.db_manager import DatabaseManager
-
-    def make_db(path, vals):
-        c = sqlite3.connect(path)
-        c.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)")
-        c.executemany("INSERT INTO t (val) VALUES (?)", [(v,) for v in vals])
-        c.commit(); c.close()
+    from services.queue_transport import QueueTransport
+    from host.host_service import HostService
 
     d = tempfile.mkdtemp()
-    bus = os.path.join(d, "bus"); os.makedirs(os.path.join(bus, "replica"))
-    rep = os.path.join(bus, "replica", "fiu_ro.db")
-    ver = os.path.join(bus, "replica", "version.txt")
+    bus = os.path.join(d, "bus")
+    # Real host DB in WAL mode (DatabaseManager forces WAL, like production).
+    # journal_mode is stored in the file header, so publish_replica() must emit
+    # a NON-WAL replica or read-only clients spawn -wal/-shm sidecars. Seeding
+    # via a plain connect() would hide that bug (the file would never be WAL) —
+    # this test drives the REAL host publish pipeline instead.
+    host_db = os.path.join(d, "host.db")
+    hdbm = DatabaseManager(host_db)  # writable -> WAL
+    hdbm.execute_write("CREATE TABLE t (id INTEGER PRIMARY KEY, val TEXT)")
+    hdbm.execute_write("INSERT INTO t (val) VALUES ('row1')")
 
-    make_db(rep, ["row1"])
-    with open(ver, "w") as f: f.write("1")
+    class _DummyAuth: pass
+    transport = QueueTransport(bus)  # creates replica/.tmp/... dirs
+    host = HostService({"auth_service": _DummyAuth()}, hdbm, transport, bus)
+    host.publish_replica()  # writes bus/replica/fiu_ro.db (DELETE mode) + version.txt
+
+    # Confirm the published replica is NOT WAL-tagged (the actual C1 root cause).
+    pubjm = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db")).execute(
+        "PRAGMA journal_mode").fetchone()[0]
+    check("g1ro published replica is non-WAL", pubjm.lower() != "wal", pubjm)
 
     local = os.path.join(d, "client_replica.db")
     check("g1ro bootstrap ok", bootstrap_replica(bus, local, timeout=2.0) and os.path.exists(local))
@@ -114,17 +124,15 @@ def test_client_replica_readonly():
     check("g1ro no wal/shm after read",
           not os.path.exists(local + "-wal") and not os.path.exists(local + "-shm"))
 
-    # Start the refresher BEFORE bumping the version (it snapshots "current"
-    # version at construction time - it must see "1" here, not "2").
+    # Start the refresher BEFORE the host republishes (it snapshots the current
+    # version at construction time — it must see the first version, not the second).
     r = ReplicaRefresher(bus, local, poll=0.1)
     r.start()
 
-    # Simulate a host republish: a brand-new sqlite file (full swap, like
-    # HostService.publish_replica) with a second row, plus a version bump.
-    new_rep = rep + ".new"
-    make_db(new_rep, ["row1", "row2"])
-    os.replace(new_rep, rep)
-    with open(ver, "w") as f: f.write("2")
+    # Real host republish: another row, then publish_replica() (full atomic swap
+    # + version bump) exactly as the running host would.
+    hdbm.execute_write("INSERT INTO t (val) VALUES ('row2')")
+    host.publish_replica()
 
     for _ in range(50):
         if dbm.execute_with_retry("SELECT COUNT(*) FROM t")[0][0] == 2:

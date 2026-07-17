@@ -87,6 +87,11 @@ class HostService:
         try:
             with dst:
                 src.backup(dst)  # consistent snapshot
+            # Publish a NON-WAL file: journal_mode lives in the SQLite file
+            # header and src.backup() copies it, so without this the replica is
+            # WAL-tagged and read-only clients still spawn -wal/-shm sidecars
+            # (which get stranded when the refresher swaps the file underneath).
+            dst.execute("PRAGMA journal_mode=DELETE")
         finally:
             dst.close(); src.close()
         os.replace(tmp, dest)
