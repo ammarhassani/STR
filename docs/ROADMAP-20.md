@@ -117,15 +117,42 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Ask:* let me scroll it.
     *Do:* add scroll to the help dialog (same fix class as the wizard scroll bug).
 
-19. **Updater — reflect new app versions without hard refresh** — ☐ (design thread)
-    *Ask:* seamless updates to client PCs.
-    *Do:* separate design. Base mechanism = desktop + `git pull` + restart;
-    discuss an in-app "update available → pull & relaunch" helper. Content
-    updates (charts, dropdown values, dashboards) already covered by config-BI +
-    the shared DB. Park until the build items land.
+19. **Updater — push once, every client self-updates (no per-PC visits)** — ☐ (subsystem)
+    *Ask:* when the codebase changes (add/retire a feature, a fix), clients must
+    NOT be told to manually fetch/delete their copy — that's friction + defects.
+    *Do:* distribute app code through the **shared folder** (clients have no
+    internet but all reach the share). Host = update hub: you push to Codeberg →
+    `git pull` on the host → a "publish app" step snapshots code to
+    `share/app/<version>/` + writes `share/app/latest.txt` (version + hash). Each
+    client on launch compares its local `VERSION` to `latest.txt`; if newer,
+    copies the new files, smoke-checks boot, swaps, relaunches — keeping the
+    prior version for auto-rollback if the new one fails. A small stable
+    **launcher** does the swap (can't overwrite running Python files in place on
+    Windows). Content (dashboards/dropdowns) already syncs via the shared DB, so
+    many changes need no code update. Own sub-plan.
 
 20. **Keyboard shortcuts didn't work (browser)** — ☑
     *Fixed by going native desktop* (browser no longer intercepts keys).
+
+21. **Runbook: a clear "do this first" golden path** — ☐
+    *Ask:* stop the setup tangling.
+    *Do:* rewrite `HOST_RUNBOOK.md` with a strict numbered Day-0 order (pick host
+    → set share → hard-reset to clean data → real users → run host windowless →
+    each client → autostart) + a quickstart at the top.
+
+22. **Hard reset (test → production), documented** — ☐
+    *Ask:* wipe test state and start fresh for production.
+    *Do:* a guarded `--reset` (typed confirmation; destructive): wipes DB + bus
+    (queue/replica/backups/outbox) + local replicas + config + logs → fresh
+    install (schema's clean admin only, forced password change). Documented as
+    the pre-go-live step.
+
+23. **No CMD window kept open (host/panel/client run hidden)** — ☐
+    *Ask:* host shouldn't need a console window sitting open.
+    *Do:* `pythonw.exe` + hidden `.vbs` launchers for host, panel, and client;
+    Startup-folder shortcut auto-starts hidden. Honest limit (no admin, no
+    service): a user process still dies on logoff/reboot until login — manual
+    failover covers the host; documented.
 
 ---
 
@@ -150,4 +177,4 @@ the #12 placeholder fix. UI item → needs a visual confirm.
 5. Intelligence: **#5** CIC banner, **#14** account rapid-repeat
 6. **#16** xlsx export · **#1** select-all · **#10** bigger review screen
 7. **#17 + #4** config-driven BI (its own sub-plan)
-8. **#19** updater (design thread)
+8. **Ops phase:** **#23** windowless runtime · **#22** hard-reset · **#19** shared-folder auto-update (subsystem) · **#21** runbook golden-path (written last, once the above are real)
