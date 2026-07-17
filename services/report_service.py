@@ -160,6 +160,22 @@ class ReportService:
             )
             report_id = result[0][0] if result else None
 
+            if not report_id:
+                self.logger.error("Failed to get report_id after insert")
+                return False, None, "Failed to get report ID after creation"
+
+            # Consume the reserved number we injected above, linking it to the
+            # new report. This runs immediately after the insert (no throwing
+            # user code in between) so the reservation can't be orphaned by a
+            # later exception; skipped for explicit report_number.
+            if consumed_number and rns:
+                consume_ok, _, consume_msg = rns.consume_next_available(current_user['username'], report_id)
+                if not consume_ok:
+                    self.logger.warning(
+                        f"Failed to consume reserved number {consumed_number} "
+                        f"for report_id {report_id}: {consume_msg} — number may remain 'available'"
+                    )
+
             # Log the creation in change history
             change_query = """
                 INSERT INTO change_history (table_name, record_id, field_name, old_value, new_value, change_type, changed_by)
@@ -189,15 +205,6 @@ class ReportService:
                 )
 
             # Handle approval workflow based on user role
-            if not report_id:
-                self.logger.error("Failed to get report_id after insert")
-                return False, None, "Failed to get report ID after creation"
-
-            # Consume the reserved number we injected above, linking it to
-            # the new report (marks it used; skipped for explicit report_number).
-            if consumed_number and rns:
-                rns.consume_next_available(current_user['username'], report_id)
-
             user_role = current_user.get('role', '')
             print(f"[DEBUG] Report {report_id} created by '{current_user['username']}' with role: '{user_role}'")
             self.logger.info(f"Report {report_id} approval workflow - user role: '{user_role}'")

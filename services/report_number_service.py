@@ -1124,8 +1124,10 @@ class ReportNumberService:
 
     def consume_next_available(self, username, report_id):
         """Atomically flip the user's lowest 'available' number to 'used',
-        linking used_by_report_id=report_id. Used by create_report inside
-        the same transaction."""
+        linking used_by_report_id=report_id. Called by create_report as a
+        separate, single-statement atomic update immediately after the
+        report insert — there is no shared transaction (db_manager
+        auto-commits per statement)."""
         n = self.db_manager.execute_write(
             "UPDATE reserved_numbers SET status='used', used_by_report_id=? "
             "WHERE id = (SELECT id FROM reserved_numbers WHERE owned_by=? AND status='available' "
