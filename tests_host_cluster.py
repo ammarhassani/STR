@@ -346,6 +346,27 @@ def test_block_reservation():
     finally:
         shutil.rmtree(box, ignore_errors=True)
 
+def test_create_report_gate():
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        host.services['report_service'].set_report_number_service(host.services['report_number_service'])
+        host.services['auth_service'].current_user = {'user_id':1,'username':'admin','role':'admin'}
+        R = host.services['report_service']; N = host.services['report_number_service']
+        # no reserved numbers -> gated
+        ok, rid, msg = R.create_report({'report_date':'04/11/2025','reported_entity_name':'X','cic':'1'*16})
+        check('P2T3 create blocked without reserved number', not ok and 'reserve' in msg.lower(), msg)
+        # reserve then create -> uses the reserved number
+        N.reserve_block('admin', 2)
+        block = [x['report_number'] for x in N.get_available_numbers('admin')]
+        ok, rid, msg = R.create_report({'report_date':'04/11/2025','reported_entity_name':'X','cic':'2'*16})
+        check('P2T3 create ok after reserve', ok, msg)
+        rn = dbm.execute_with_retry("SELECT report_number FROM reports WHERE report_id=?", (rid,))[0][0]
+        check('P2T3 report uses reserved number', rn == block[0], (rn, block[0]))
+        check('P2T3 reserved number consumed', N.get_available_count('admin') == 1)
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -357,5 +378,6 @@ if __name__ == '__main__':
     test_serve_forever_survives_poison_command()
     test_reserved_numbers_table()
     test_block_reservation()
+    test_create_report_gate()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

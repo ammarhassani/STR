@@ -63,18 +63,19 @@ class Client:
         self.approvals = ApprovalService(self.db, self.log, self.auth, self.versions, self.reports, self.activity)
         self.reports.set_activity_service(self.activity)
         self.versions.set_activity_service(self.activity)
+        self.reports.set_report_number_service(self.numbers)
     def login(self, u, p): return self.auth.authenticate(u, p)
     def make_report(self, extra=None):
+        # New model: create_report gates on + auto-consumes an owned reserved
+        # number, so reserve one first (if not already holding one) instead
+        # of building sn/report_number by hand.
         u = self.auth.get_current_user()['username']
-        ok, r, m = self.numbers.reserve_next_numbers(u)
-        if not ok: return False, None, m
-        d = {'sn': r['serial_number'], 'report_number': r['report_number'],
-             'report_date': '04/11/2025', 'reported_entity_name': 'E'}
+        if self.numbers.get_available_count(u) < 1:
+            ok, _, m = self.numbers.reserve_block(u, 1)
+            if not ok: return False, None, m
+        d = {'report_date': '04/11/2025', 'reported_entity_name': 'E'}
         if extra: d.update(extra)
-        ok, rid, m = self.reports.create_report(d)
-        if ok: self.numbers.mark_reservation_used(r['report_number'], u)
-        else: self.numbers.cancel_reservation(r['report_number'], u)
-        return ok, rid, m
+        return self.reports.create_report(d)
 
 def q1(sql, p=()):
     c = sqlite3.connect(DB); r = c.execute(sql, p).fetchone(); c.close()

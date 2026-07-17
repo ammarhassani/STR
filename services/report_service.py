@@ -44,10 +44,15 @@ class ReportService:
         self.logger = logging_service
         self.auth_service = auth_service
         self.activity_service = activity_service
+        self._report_number_service = None
 
     def set_activity_service(self, activity_service):
         """Set activity service (for late binding to avoid circular imports)."""
         self.activity_service = activity_service
+
+    def set_report_number_service(self, svc):
+        """Set report number service (for late binding to avoid circular imports)."""
+        self._report_number_service = svc
 
     def create_report(self, report_data: Dict[str, Any]) -> Tuple[bool, Optional[int], str]:
         """
@@ -67,6 +72,21 @@ class ReportService:
             # Authorization: only roles with add_report may create (reporters cannot)
             if not self.auth_service.has_permission('add_report'):
                 return False, None, "You do not have permission to create reports"
+
+            # Gate on an owned reserved number unless the caller supplied an
+            # explicit report_number (admin/import path bypasses the gate).
+            rns = self._report_number_service
+            consumed_number = None
+            if rns and not report_data.get('report_number'):
+                if rns.get_available_count(current_user['username']) < 1:
+                    return False, None, "You have no reserved numbers — reserve first"
+                # Host is single-writer: the lowest available now is the same
+                # one consume_next_available takes after insert below.
+                avail = rns.get_available_numbers(current_user['username'])
+                consumed_number = avail[0]['report_number']
+                report_data = dict(report_data)
+                report_data['report_number'] = consumed_number
+                report_data['sn'] = avail[0]['serial_number']
 
             # Reject absurdly long field values (storage/DoS guard). Field-level
             # format rules live in column_settings; this is a coarse backstop.
@@ -172,6 +192,11 @@ class ReportService:
             if not report_id:
                 self.logger.error("Failed to get report_id after insert")
                 return False, None, "Failed to get report ID after creation"
+
+            # Consume the reserved number we injected above, linking it to
+            # the new report (marks it used; skipped for explicit report_number).
+            if consumed_number and rns:
+                rns.consume_next_available(current_user['username'], report_id)
 
             user_role = current_user.get('role', '')
             print(f"[DEBUG] Report {report_id} created by '{current_user['username']}' with role: '{user_role}'")
