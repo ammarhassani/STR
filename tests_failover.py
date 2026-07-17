@@ -128,11 +128,53 @@ def test_step_down():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_become_host():
+    from host.failover import become_host
+    from host.heartbeat import write_heartbeat, read_heartbeat
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    d = tempfile.mkdtemp()
+    bus = os.path.join(d, "bus"); QueueTransport(bus)
+
+    # Publish a real replica (host DB) so there is something to adopt.
+    hostdb = os.path.join(d, "orig_host.db"); initialize_database(hostdb); migrate_database(hostdb)
+    # emulate publish_replica output: a DELETE-mode copy at replica/fiu_ro.db
+    src = sqlite3.connect(hostdb); dst = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db"))
+    with dst: src.backup(dst)
+    dst.execute("PRAGMA journal_mode=DELETE"); dst.close(); src.close()
+
+    # a stale in-flight command sitting in processing/
+    with open(os.path.join(bus, "queue", "processing", "0000000000001_abc.json"), "w") as f:
+        json.dump({"id": "abc", "command": "noop"}, f)
+
+    local = os.path.join(d, "backup_pc.db")
+    try:
+        # live host present -> refuse
+        write_heartbeat(bus, "LIVE-HOST", 4, 0, 1, "PC1")
+        ok, msg, _ = become_host(bus, local, "BACKUP-PC", stale_seconds=60, force=False)
+        check("refuses while a live host holds lease", ok is False, msg)
+
+        # host goes stale -> promote
+        stale = read_heartbeat(bus); stale["epoch_ms"] -= 120000
+        with open(os.path.join(bus, "host", "heartbeat.json"), "w") as f: json.dump(stale, f)
+        ok2, msg2, term2 = become_host(bus, local, "BACKUP-PC", stale_seconds=60, force=False)
+        check("promotes on stale heartbeat", ok2 and term2 == 5, (ok2, msg2, term2))
+        check("adopted replica exists locally", os.path.exists(local))
+        check("in-flight command re-queued to pending",
+              any(n.endswith("_abc.json") for n in os.listdir(os.path.join(bus, "queue", "pending"))))
+        check("processing drained", os.listdir(os.path.join(bus, "queue", "processing")) == [])
+        hb = read_heartbeat(bus)
+        check("new heartbeat carries new host + term", hb["host_id"] == "BACKUP-PC" and hb["term"] == 5, hb)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
     test_heartbeat()
     test_integrity_and_session()
     test_session_timeout()
     test_step_down()
+    test_become_host()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
