@@ -16,7 +16,7 @@ BACKUP_KEEP = 20
 
 
 class HostService:
-    def __init__(self, services: dict, db_manager, transport, bus_dir: str):
+    def __init__(self, services: dict, db_manager, transport, bus_dir: str, host_id: str = None):
         self.services = services
         self.db = db_manager
         self.t = transport
@@ -25,7 +25,11 @@ class HostService:
         self._sessions = {}  # token -> {"user_id","username","role","last_seen"}
         self.hostname = socket.gethostname()
         self.pid = os.getpid()
-        self.host_id = f"{self.hostname}-{uuid.uuid4().hex[:8]}"
+        # A promoted host MUST serve under the SAME host_id it wrote to the
+        # heartbeat during become_host (else it could read its own heartbeat as
+        # a rival and refuse to start / mis-tiebreak). Callers that fail over
+        # pass that host_id in; standalone hosts get a stable-per-process one.
+        self.host_id = host_id or f"{self.hostname}-{uuid.uuid4().hex[:8]}"
         _hid, self.term = read_lease(self.db)   # term this host serves under
         self._db_version = 0
 
@@ -130,7 +134,23 @@ class HostService:
         beat = hb.read_heartbeat(self.bus)
         if not beat:
             return False
-        return beat.get("host_id") != self.host_id and beat.get("term", 0) > self.term
+        if beat.get("host_id") == self.host_id:
+            return False  # our own heartbeat is never a rival
+        other_term = beat.get("term", 0)
+        if other_term > self.term:
+            return True
+        # Equal-term collision — only possible if TWO operators promote two
+        # backups simultaneously, which is OUTSIDE the operational model (failover
+        # is single-operator manual confirmed; the org has no lock server and SMB
+        # byte-range locking is exactly what this architecture avoids, so hard
+        # mutual exclusion is not achievable here). Best-effort tiebreak: the
+        # higher host_id wins. This is CONVERGENT, not instantaneous — the loser
+        # retires as soon as its loop reads the winner's heartbeat (the step-down
+        # check runs before every beat, so it stops clobbering once it sees the
+        # winner). Worst case is a bounded (~1 poll) two-writer window that
+        # reconciles (each host writes only its own local DB; the queue is
+        # idempotent), never corruption.
+        return other_term == self.term and beat.get("host_id", "") > self.host_id
 
     # ---- startup / self-heal ----
     def startup(self):
@@ -139,6 +159,9 @@ class HostService:
         backups_dir = os.path.join(self.bus, "backups")
         ok, msg = check_and_restore(self.db.db_path, backups_dir)
         print(f"[HOST] integrity: {msg}")
+        if not ok:
+            # Corruption-fatal app: never serve (or publish) an unrecoverable DB.
+            raise RuntimeError(f"[HOST] DB integrity unrecoverable, refusing to serve: {msg}")
         prevent_sleep()
         self.publish_replica()
         self._beat()
@@ -176,13 +199,22 @@ class HostService:
         if cmd is None:
             return False
         resp = self.handle_command(cmd)
-        self.t.respond(cmd["id"], resp)
-        self.t.complete(cmd["id"])
+        # Publish the replica BEFORE the client ACK: the client only sees success
+        # once the write is in the replica a failover would adopt, so a host
+        # crash in this window can never lose an acknowledged write.
         self.publish_replica()
         self._beat()
+        self.t.respond(cmd["id"], resp)
+        self.t.complete(cmd["id"])
         return True
 
     def serve_forever(self, poll: float = 0.1):
+        # Retire BEFORE publishing/serving if a newer term already holds the
+        # lease — a restarted old host must not clobber the current heartbeat or
+        # apply commands against its stale local DB.
+        if self.should_step_down():
+            print(f"[HOST] not starting: a newer term holds the lease (mine={self.term})")
+            return
         self.startup()
         while True:
             if self.should_step_down():

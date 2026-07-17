@@ -115,7 +115,7 @@ def test_step_down():
     dbm = DatabaseManager(db)
     bus = os.path.join(d, "bus"); QueueTransport(bus)
     class _A: pass
-    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus)
+    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="zzz-self")
     host.term = 1
     try:
         check("no rival -> stay", host.should_step_down() is False)
@@ -123,8 +123,9 @@ def test_step_down():
         check("own higher heartbeat -> stay", host.should_step_down() is False)
         write_heartbeat(bus, "OTHER-HOST", 2, 0, 1, "PC2")   # different host, higher term
         check("rival higher term -> step down", host.should_step_down() is True)
-        write_heartbeat(bus, "OTHER-HOST", 1, 0, 1, "PC2")   # different host, equal term
-        check("rival equal term -> stay", host.should_step_down() is False)
+        # equal term, LOWER rival host_id -> stay (higher-id "zzz-self" wins the tiebreak)
+        write_heartbeat(bus, "aaa-other", 1, 0, 1, "PC2")
+        check("rival equal term (lower id) -> stay", host.should_step_down() is False)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
@@ -297,6 +298,64 @@ def test_outbox_ordering():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_failover_hardening():
+    """Whole-branch review fixes: (1) rival term retires BEFORE startup/serve;
+    (3) equal-term collision has a deterministic tiebreak; (4) startup aborts on
+    unrecoverable corruption."""
+    from host.host_service import HostService
+    from host.heartbeat import write_heartbeat
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    class _A: pass
+
+    def _mk():
+        d = tempfile.mkdtemp()
+        db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+        bus = os.path.join(d, "bus"); QueueTransport(bus)
+        return d, DatabaseManager(db), bus
+
+    # (1) restarted old host, rival higher term -> refuses to start (no serve, no publish)
+    d, dbm, bus = _mk()
+    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="OLD")
+    host.term = 1
+    write_heartbeat(bus, "NEW", 2, 0, 1, "PC2")
+    with open(os.path.join(bus, "queue", "pending", "0000000000001_x.json"), "w") as f:
+        json.dump({"id": "x", "command": "noop"}, f)
+    host.serve_forever()  # must return immediately (step-down before startup) — no hang
+    check("rival term: serve_forever refuses, no command served",
+          os.path.exists(os.path.join(bus, "queue", "pending", "0000000000001_x.json")))
+    check("rival term: no replica published before step-down",
+          not os.path.exists(os.path.join(bus, "replica", "fiu_ro.db")))
+    shutil.rmtree(d, ignore_errors=True)
+
+    # (3) equal-term collision -> higher host_id wins, lower retires
+    d, dbm, bus = _mk()
+    ha = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="aaa"); ha.term = 5
+    hbb = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="bbb"); hbb.term = 5
+    # Convergent tiebreak: whoever currently owns the slot, the loser retires the
+    # moment it reads the winner's beat; the winner never retires.
+    write_heartbeat(bus, "bbb", 5, 0, 1, "PC")   # winner's beat is current
+    check("equal term: loser (aaa) retires on reading winner's beat", ha.should_step_down() is True)
+    check("equal term: winner (bbb) reading own beat stays", hbb.should_step_down() is False)
+    write_heartbeat(bus, "aaa", 5, 0, 1, "PC")   # loser's own beat is current
+    check("equal term: winner (bbb) reading loser's beat still stays", hbb.should_step_down() is False)
+    check("equal term: loser (aaa) reading own beat stays this cycle (retires next)", ha.should_step_down() is False)
+    shutil.rmtree(d, ignore_errors=True)
+
+    # (4) unrecoverable corruption -> startup aborts (never serves/publishes)
+    d, dbm, bus = _mk()
+    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="H")
+    with open(dbm.db_path, "wb") as f: f.write(b"corrupt not a sqlite file")
+    raised = False
+    try:
+        host.startup()
+    except Exception:
+        raised = True
+    check("startup aborts on unrecoverable corruption", raised)
+    shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
     test_heartbeat()
@@ -307,5 +366,6 @@ if __name__ == "__main__":
     test_outbox_drain_exactly_once()
     test_authfail_not_poisoned()
     test_outbox_ordering()
+    test_failover_hardening()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
