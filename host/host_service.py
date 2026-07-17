@@ -10,6 +10,10 @@ import socket
 from host.lease import read_lease
 from host import heartbeat as hb
 
+SESSION_TIMEOUT_SECONDS = 1800
+BACKUP_EVERY_SECONDS = 300
+BACKUP_KEEP = 20
+
 
 class HostService:
     def __init__(self, services: dict, db_manager, transport, bus_dir: str):
@@ -38,6 +42,9 @@ class HostService:
     def _resolve(self, token):
         s = self._sessions.get(token)
         if not s:
+            return None
+        if time.time() - s["last_seen"] > SESSION_TIMEOUT_SECONDS:
+            self._sessions.pop(token, None)
             return None
         s["last_seen"] = time.time()
         # rebuild the auth context this command runs under
@@ -113,6 +120,44 @@ class HostService:
     def _beat(self):
         hb.write_heartbeat(self.bus, self.host_id, self.term, self._db_version, self.pid, self.hostname)
 
+    # ---- startup / self-heal ----
+    def startup(self):
+        from host.integrity import check_and_restore
+        from host.sleep_guard import prevent_sleep
+        backups_dir = os.path.join(self.bus, "backups")
+        ok, msg = check_and_restore(self.db.db_path, backups_dir)
+        print(f"[HOST] integrity: {msg}")
+        prevent_sleep()
+        self.publish_replica()
+        self._beat()
+        self._last_backup = 0.0
+
+    def _maybe_backup(self):
+        now = time.time()
+        if now - getattr(self, "_last_backup", 0.0) < BACKUP_EVERY_SECONDS:
+            return
+        self._last_backup = now
+        try:
+            backups_dir = os.path.join(self.bus, "backups")
+            dest = os.path.join(backups_dir, f"fiu_{int(now * 1000)}.db")
+            tmp = os.path.join(self.bus, ".tmp", uuid.uuid4().hex + ".bak")
+            src = sqlite3.connect(self.db.db_path); dst = sqlite3.connect(tmp)
+            try:
+                with dst:
+                    src.backup(dst)
+                dst.execute("PRAGMA journal_mode=DELETE")
+            finally:
+                dst.close(); src.close()
+            os.replace(tmp, dest)
+            # prune to newest BACKUP_KEEP
+            import glob
+            files = sorted(glob.glob(os.path.join(backups_dir, "*.db")), key=os.path.getmtime, reverse=True)
+            for old in files[BACKUP_KEEP:]:
+                try: os.remove(old)
+                except OSError: pass
+        except Exception as e:
+            print(f"[HOST][WARN] backup failed: {e}")
+
     # ---- loop ----
     def run_once(self) -> bool:
         cmd = self.t.claim_next()
@@ -126,13 +171,15 @@ class HostService:
         return True
 
     def serve_forever(self, poll: float = 0.1):
-        self.publish_replica()
-        self._beat()
+        self.startup()
         while True:
             try:
                 if not self.run_once():
                     self._beat()
+                    self._maybe_backup()
                     time.sleep(poll)
+                else:
+                    self._maybe_backup()
             except Exception as e:
                 print(f"[HOST][ERROR] run_once failed, continuing: {e}")
                 time.sleep(poll)

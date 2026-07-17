@@ -60,8 +60,52 @@ def test_heartbeat():
     finally:
         shutil.rmtree(d, ignore_errors=True)
 
+def test_integrity_and_session():
+    from host.integrity import check_and_restore
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    backups = os.path.join(d, "backups"); os.makedirs(backups)
+    try:
+        ok, msg = check_and_restore(db, backups)
+        check("integrity ok on healthy db", ok and msg == "ok", msg)
+        # make a good backup, then corrupt the db, then restore
+        shutil.copyfile(db, os.path.join(backups, "fiu_1.db"))
+        with open(db, "wb") as f:
+            f.write(b"this is not a sqlite file at all, totally corrupt")
+        ok2, msg2 = check_and_restore(db, backups)
+        check("corrupt db restored from backup", ok2 and "restored" in msg2.lower(), msg2)
+        # restored db is usable again
+        ok3, _ = check_and_restore(db, backups)
+        check("restored db passes integrity", ok3)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+def test_session_timeout():
+    from host.host_service import HostService
+    from services.queue_transport import QueueTransport
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    bus = os.path.join(d, "bus")
+    class _A: pass
+    host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus)
+    try:
+        host._sessions["tok"] = {"user_id": 1, "username": "u", "role": "admin", "last_seen": time.time()}
+        check("fresh session resolves", host._resolve("tok") is not None)
+        host._sessions["tok"]["last_seen"] = time.time() - 4000  # >30 min
+        check("idle session expires", host._resolve("tok") is None)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     test_lease()
     test_heartbeat()
+    test_integrity_and_session()
+    test_session_timeout()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)
