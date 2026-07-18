@@ -42,6 +42,12 @@ WRITE_COMMANDS = {
     "auth_service.set_user_language": ("auth_service", "set_user_language"),
     "settings_service.save_settings": ("settings_service", "save_settings"),
     "settings_service.save_setting": ("settings_service", "save_setting"),
+    # These three write via self.save_setting(s)/DELETE. Self-delegation runs on
+    # the real local service, never the proxy, so they must route in their own
+    # right or a client silently writes to the read-only replica.
+    "settings_service.reset_to_defaults": ("settings_service", "reset_to_defaults"),
+    "settings_service.delete_settings": ("settings_service", "delete_settings"),
+    "settings_service.set_theme": ("settings_service", "set_theme"),
 }
 
 

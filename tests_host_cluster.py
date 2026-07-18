@@ -440,10 +440,62 @@ def test_onboarding_through_host():
         shutil.rmtree(box, ignore_errors=True)
 
 
+# Methods that match a write verb but must NOT route to the host. Each needs a
+# reason — an unexplained entry here is how a real write goes missing.
+REGISTRY_EXEMPT = {
+    # pre-auth special: handled by RemoteGateway.complete_onboarding, no token yet
+    'auth_service.complete_onboarding',
+    # dependency injection, not a DB write
+    'report_service.set_activity_service',
+    'report_service.set_report_number_service',
+    'approval_service.set_activity_service',
+    'version_service.set_activity_service',
+    # pure static factories returning rule objects
+    'validation_service.create_report_validation_rules',
+    'validation_service.create_user_validation_rules',
+    # host-only: MaintenanceService is never started in client mode (app_state.py)
+    'report_service.purge_expired_deleted_reports',
+}
+
+def test_registry_covers_every_write_method():
+    """Every write-shaped public method on a proxied service must be in
+    WRITE_COMMANDS or explicitly exempt. Without this, adding a write method and
+    forgetting the registry entry silently routes it to the read-only replica in
+    client mode — RemoteServiceProxy defaults unknown names to the local service.
+    Parsed with ast so this runs without the services' third-party deps."""
+    import ast, re, pathlib
+    from services import command_registry as cr
+    proxied = {  # the attrs app_state.py wraps in RemoteServiceProxy
+        'auth_service': 'AuthService', 'report_service': 'ReportService',
+        'approval_service': 'ApprovalService', 'version_service': 'VersionService',
+        'report_number_service': 'ReportNumberService', 'dropdown_service': 'DropdownService',
+        'validation_service': 'ValidationService', 'settings_service': 'SettingsService',
+    }
+    verbs = re.compile(r'^(add|acquire|approve|bulk|change|complete|create|delete|hard_delete'
+                       r'|mark|purge|reject|release|remove|reorder|request|reserve|reset'
+                       r'|restore|save|set|soft_delete|transfer|unlock|update)_')
+    missing = []
+    for attr, cls in proxied.items():
+        tree = ast.parse(pathlib.Path('services', attr + '.py').read_text(encoding='utf-8'))
+        node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls)
+        for m in node.body:
+            if not isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            full = f'{attr}.{m.name}'
+            if m.name.startswith('_') or not verbs.match(m.name) or full in REGISTRY_EXEMPT:
+                continue
+            if not cr.is_write_command(full):
+                missing.append(full)
+    check('T3b every write method is registered or exempt', not missing, missing)
+    stale = [n for n in REGISTRY_EXEMPT if cr.is_write_command(n)]
+    check('T3b no exemption shadows a registered command', not stale, stale)
+
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
     test_command_registry()
+    test_registry_covers_every_write_method()
     test_host_login_and_command()
     test_end_to_end_via_queue()
     test_client_proxy_routing()
