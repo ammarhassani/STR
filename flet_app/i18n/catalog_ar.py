@@ -13,6 +13,24 @@ STRINGS = {
     "common.no_entity": "(بدون جهة)",
     "common.reviewer": "المُراجع",
     "common.loading": "جارٍ التحميل...",
+    "common.actions": "إجراءات",
+    "common.search": "بحث",
+    "common.refresh": "تحديث",
+    "common.view": "عرض",
+
+    # approval status
+    "status.draft": "مسودة",
+    "status.pending_approval": "قيد الاعتماد",
+    "status.approved": "معتمد",
+    "status.rejected": "مرفوض",
+    "status.rework": "إعادة عمل",
+
+    # reports list
+    "reports.add_new": "إضافة تقرير جديد",
+    "reports.search": "بحث:",
+    "reports.search_hint": "ابحث برقم التقرير أو الجهة أو رقم CIC...",
+    "reports.none": "لا توجد تقارير",
+    "reports.loading": "جارٍ تحميل التقارير...",
 
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",

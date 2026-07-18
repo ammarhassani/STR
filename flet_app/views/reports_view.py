@@ -118,6 +118,30 @@ def build_reports_view(
     colors = theme_manager.get_colors()
     is_admin = app_state.is_admin()
 
+    # #3 localization helpers
+    from i18n import t, get_language
+    from i18n.fields import field_label
+    _lang = get_language()
+    _db = app_state.db_manager
+    _dd = app_state.dropdown_service
+    # report columns backed by a dropdown category -> localize their display value
+    _DROPDOWN_COLS = {
+        'gender': 'gender', 'nationality': 'nationality',
+        'type_of_suspected_transaction': 'type_of_suspected_transaction',
+        'report_classification': 'report_classification', 'report_source': 'report_source',
+        'reporting_entity': 'reporting_entity', 'fiu_feedback': 'fiu_feedback',
+    }
+    def _cell_display(col_key, value):
+        if not value:
+            return value
+        if col_key == 'approval_status':
+            k = f"status.{value}"
+            tr = t(k)
+            return tr if tr != k else str(value).replace('_', ' ').title()
+        if col_key in _DROPDOWN_COLS and _dd:
+            return _dd.resolve_label(_DROPDOWN_COLS[col_key], value, _lang)
+        return value
+
     # State
     state = {
         "reports_data": [],
@@ -320,7 +344,7 @@ def build_reports_view(
                 content=ft.Column(
                     controls=[
                         ft.Icon(ft.Icons.DESCRIPTION, size=48, color=colors["text_muted"]),
-                        ft.Text("No reports found", color=colors["text_muted"]),
+                        ft.Text(t("reports.none"), color=colors["text_muted"]),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -358,7 +382,7 @@ def build_reports_view(
                             icon=ft.Icons.MORE_VERT,
                             icon_color=colors["text_muted"],
                             icon_size=20,
-                            tooltip="Actions",
+                            tooltip=t("common.actions"),
                             items=[
                                 ft.PopupMenuItem(
                                     icon=ft.Icons.RESTORE,
@@ -389,7 +413,7 @@ def build_reports_view(
                     menu_items.append(
                         ft.PopupMenuItem(
                             icon=ft.Icons.EDIT,
-                            text="Edit",
+                            text=t("common.edit"),
                             on_click=lambda e, r=report: handle_row_click(r),
                         )
                     )
@@ -408,7 +432,7 @@ def build_reports_view(
                     menu_items.append(
                         ft.PopupMenuItem(
                             icon=ft.Icons.DELETE_OUTLINE,
-                            text="Delete",
+                            text=t("common.delete"),
                             on_click=lambda e, r=report: handle_delete_report(r),
                         )
                     )
@@ -418,7 +442,7 @@ def build_reports_view(
                         icon=ft.Icons.MORE_VERT,
                         icon_color=colors["primary"] if can_edit else colors["text_secondary"],
                         icon_size=20,
-                        tooltip="Actions",
+                        tooltip=t("common.actions"),
                         items=menu_items,
                     )
                 )
@@ -430,6 +454,7 @@ def build_reports_view(
                 value = report.get(col['key'], '')
                 if value is None:
                     value = ''
+                value = _cell_display(col['key'], value)
 
                 # Format approval status with color
                 cell_color = colors["text_muted"] if is_deleted else colors["text_primary"]
@@ -507,7 +532,8 @@ def build_reports_view(
         columns.extend([
             ft.DataColumn(
                 ft.Text(
-                    col['header'],
+                    field_label(_db, col['key'], _lang, default=col['header'])
+                        if _lang == 'ar' else col['header'],
                     weight=ft.FontWeight.BOLD,
                     size=11,
                     color=colors["text_primary"],
@@ -1047,7 +1073,7 @@ def build_reports_view(
             ) if not is_admin else ft.Container(),
             # #7: only roles that may add reports see the button (reporters don't)
             ft.ElevatedButton(
-                "Add New Report",
+                t("reports.add_new"),
                 icon=ft.Icons.ADD,
                 on_click=handle_add_report,
                 style=ft.ButtonStyle(
@@ -1062,10 +1088,10 @@ def build_reports_view(
 
     # Filter row
     filter_controls = [
-        ft.Text("Search:", color=colors["text_secondary"]),
+        ft.Text(t("reports.search"), color=colors["text_secondary"]),
         ft.TextField(
             ref=search_ref,
-            hint_text="Search by report number, entity, or CIC...",
+            hint_text=t("reports.search_hint"),
             width=350,
             height=40,
             text_size=13,
@@ -1207,7 +1233,7 @@ def build_reports_view(
         content=ft.Column(
             controls=[
                 ft.ProgressRing(width=32, height=32, color=colors["primary"]),
-                ft.Text("Loading reports...", color=colors["text_secondary"]),
+                ft.Text(t("reports.loading"), color=colors["text_secondary"]),
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             alignment=ft.MainAxisAlignment.CENTER,

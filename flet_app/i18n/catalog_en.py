@@ -12,6 +12,24 @@ STRINGS = {
     "common.no_entity": "(no entity)",
     "common.reviewer": "Reviewer",
     "common.loading": "Loading...",
+    "common.actions": "Actions",
+    "common.search": "Search",
+    "common.refresh": "Refresh",
+    "common.view": "View",
+
+    # approval status
+    "status.draft": "Draft",
+    "status.pending_approval": "Pending Approval",
+    "status.approved": "Approved",
+    "status.rejected": "Rejected",
+    "status.rework": "Rework",
+
+    # reports list
+    "reports.add_new": "Add New Report",
+    "reports.search": "Search:",
+    "reports.search_hint": "Search by report number, entity, or CIC...",
+    "reports.none": "No reports found",
+    "reports.loading": "Loading reports...",
 
     # My Work
     "mywork.lane.rework": "Returned for Rework",
