@@ -180,6 +180,85 @@ def test_admin_reports_skip_the_basket():
           rep['approval_status'] == 'approved', rep['approval_status'])
 
 
+def test_dialog_exposes_every_required_fiu_field():
+    """The form must actually be able to satisfy REQUIRED_FIU_FIELDS.
+
+    fiu_date is a real column and gates submission, but the dialog had no field
+    for it -- so through the UI a report could never be submitted at all. This
+    walks the REAL dialog and checks every gating field is reachable, and that
+    date fields come with a calendar to pick from.
+    """
+    import asyncio
+    import flet as ft
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
+
+    class FakePage:
+        def __init__(self):
+            self.overlay = []
+            self.snack_bar = None
+        def update(self): pass
+        def run_task(self, fn, *a): pass
+
+    def walk(control):
+        seen, stack = set(), [control]
+        while stack:
+            c = stack.pop()
+            if c is None or id(c) in seen:
+                continue
+            seen.add(id(c)); yield c
+            for attr in ('controls', 'content', 'actions', 'title', 'tabs'):
+                v = getattr(c, attr, None)
+                if isinstance(v, (list, tuple)):
+                    stack.extend(v)
+                elif v is not None and 'flet' in str(type(v)):
+                    stack.append(v)
+
+    auth, reports, nums, appr, dbm = _setup()
+    auth.authenticate('agent1', 'Pass@123')
+    nums.reserve_block('agent1', 2)
+
+    class _State:
+        pass
+    st = _State()
+    st.report_service = reports
+    st.approval_service = appr
+    st.report_number_service = nums
+    st.auth_service = auth
+    st.db_manager = dbm
+    st.current_user = auth.get_current_user()
+    st.dropdown_service = None
+    st.validation_service = None
+    st.logging_service = None
+    st.version_service = None
+    st.intelligence_service = None
+
+    from dialogs.report_dialog import show_report_dialog
+    page = FakePage()
+    show_report_dialog(page, st, report_data=None)
+    check("the report dialog opens", bool(page.overlay))
+    if not page.overlay:
+        return
+    tree = page.overlay[-1]
+
+    hints = [(getattr(c, 'hint_text', '') or '').lower()
+             for c in walk(tree) if isinstance(c, ft.TextField)]
+    date_fields = [h for h in hints if 'dd/mm/yyyy' in h]
+    check("the form still exposes date fields", len(date_fields) >= 3, hints)
+
+    # every field that gates submission must be reachable in the form
+    labels = " ".join(str(getattr(c, 'value', '') or '') for c in walk(tree)
+                      if isinstance(c, ft.Text)).lower()
+    for field in reports.REQUIRED_FIU_FIELDS:
+        pretty = field.replace('fiu_', 'fiu ').replace('_', ' ')
+        check(f"the form has a field for {field}", pretty in labels or field in labels,
+              f"'{pretty}' not among the form labels")
+
+    # date fields come with a calendar button
+    pickers = [c for c in walk(tree)
+               if isinstance(c, ft.IconButton) and c.icon == ft.Icons.CALENDAR_MONTH]
+    check("date fields offer a calendar to pick from", len(pickers) >= 3, len(pickers))
+
+
 if __name__ == "__main__":
     test_saving_does_not_submit()
     test_cannot_submit_without_fiu_details()
@@ -189,5 +268,6 @@ if __name__ == "__main__":
     test_basket_is_shared()
     test_waiting_report_stays_editable()
     test_admin_reports_skip_the_basket()
+    test_dialog_exposes_every_required_fiu_field()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail) + ' FAILED'}")
     sys.exit(1 if _fail else 0)

@@ -132,6 +132,7 @@ def show_report_dialog(
     fiu_receive_date_ref = ft.Ref[ft.TextField]()
     fiu_feedback_ref = ft.Ref[ft.Dropdown]()
     fiu_letter_number_ref = ft.Ref[ft.TextField]()
+    fiu_date_ref = ft.Ref[ft.TextField]()
     case_id_ref = ft.Ref[ft.TextField]()
 
     def update_id_type_display(e):
@@ -570,6 +571,7 @@ def show_report_dialog(
             'fiu_letter_receive_date': get_value(fiu_receive_date_ref) or None,
             'fiu_feedback': get_dropdown_value(fiu_feedback_ref),
             'fiu_letter_number': get_value(fiu_letter_number_ref) or None,
+            'fiu_date': get_value(fiu_date_ref) or None,
         }
 
     def save_report(e):
@@ -827,6 +829,8 @@ def show_report_dialog(
             fiu_feedback_ref.current.value = report_data.get('fiu_feedback', '')
         if fiu_letter_number_ref.current:
             fiu_letter_number_ref.current.value = report_data.get('fiu_letter_number', '')
+        if fiu_date_ref.current:
+            fiu_date_ref.current.value = report_data.get('fiu_date', '')
 
         page.update()
         # surface intelligence for the already-populated CIC / account on open
@@ -891,18 +895,13 @@ def show_report_dialog(
                         ],
                         spacing=4,
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("report_date", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=report_date_ref,
-                                hint_text=t("form.hint.date"),
-                                value=datetime.now().strftime("%d/%m/%Y"),
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    create_date_picker(
+                        label=_flabel("report_date"),
+                        value=datetime.now(),
+                        required=True,
+                        ref=report_date_ref,
+                        page=page,
+                        hint_text=t("form.hint.date"),
                     ),
                 ],
                 spacing=16,
@@ -1193,17 +1192,11 @@ def show_report_dialog(
                         ],
                         spacing=4,
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("sending_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=sending_date_ref,
-                                hint_text=t("form.hint.date_optional"),
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    create_date_picker(
+                        label=_flabel("sending_date"),
+                        ref=sending_date_ref,
+                        page=page,
+                        hint_text=t("form.hint.date_optional"),
                     ),
                 ],
                 spacing=16,
@@ -1229,17 +1222,17 @@ def show_report_dialog(
                         ],
                         spacing=4,
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("fiu_letter_receive_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=fiu_receive_date_ref,
-                                hint_text=t("form.hint.date_optional"),
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    create_date_picker(
+                        label=_flabel("fiu_date"),
+                        ref=fiu_date_ref,
+                        page=page,
+                        hint_text=t("form.hint.date_optional"),
+                    ),
+                    create_date_picker(
+                        label=_flabel("fiu_letter_receive_date"),
+                        ref=fiu_receive_date_ref,
+                        page=page,
+                        hint_text=t("form.hint.date_optional"),
                     ),
                     ft.Column(
                         controls=[

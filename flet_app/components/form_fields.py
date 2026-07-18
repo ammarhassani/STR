@@ -144,39 +144,72 @@ def create_date_picker(
     width: Optional[int] = None,
     on_change: Optional[Callable] = None,
     ref: Optional[ft.Ref] = None,
+    page: Optional[ft.Page] = None,
+    hint_text: str = "DD/MM/YYYY",
 ) -> ft.Column:
-    """
-    Create a labeled date picker.
+    """A labelled date field: type it, or pick it off a calendar.
 
-    Args:
-        label: Field label
-        value: Initial date value
-        required: Whether field is required
-        width: Field width
-        on_change: Change callback
-        ref: Optional reference
+    Analysts enter dates fast from a letter in front of them, so the text field
+    stays fully typeable -- the calendar is an alternative, not a replacement.
+    Whatever route is used, the value stored is always DD/MM/YYYY, which is what
+    the rest of the app reads and writes.
 
-    Returns:
-        Column with label and date picker
+    `page` is needed to show the calendar (Flet mounts it in the page overlay).
+    Without it the field still works as a typed field.
     """
     colors = theme_manager.get_colors()
-
     label_text = f"{label} *" if required else label
-
-    # Format date for display
-    date_str = value.strftime("%d/%m/%Y") if value else ""
 
     date_field = ft.TextField(
         ref=ref,
-        value=date_str,
-        hint_text="DD/MM/YYYY",
+        value=value.strftime("%d/%m/%Y") if value else "",
+        hint_text=hint_text,
         width=width,
         text_size=13,
         content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
         border_radius=4,
-        suffix=ft.Icon(ft.Icons.CALENDAR_TODAY, size=18, color=colors["text_secondary"]),
         on_change=on_change,
+        expand=True,
     )
+
+    def open_calendar(e):
+        if page is None:
+            return
+
+        def picked(ev):
+            picked_value = getattr(ev.control, "value", None)
+            if picked_value:
+                date_field.value = picked_value.strftime("%d/%m/%Y")
+                if on_change:
+                    try:
+                        on_change(ev)
+                    except Exception:
+                        pass
+                try:
+                    date_field.update()
+                except Exception:
+                    page.update()
+
+        # start the calendar on whatever is already typed, so opening it to
+        # correct a date does not throw the analyst back to today
+        current = None
+        raw = (date_field.value or "").strip()
+        if raw:
+            try:
+                current = datetime.strptime(raw, "%d/%m/%Y")
+            except ValueError:
+                current = None
+
+        picker = ft.DatePicker(
+            value=current or datetime.now(),
+            first_date=datetime(2000, 1, 1),
+            # a report can be dated today or in the past, never in the future
+            last_date=datetime.now(),
+            on_change=picked,
+        )
+        page.overlay.append(picker)
+        picker.open = True
+        page.update()
 
     return ft.Column(
         controls=[
@@ -186,7 +219,21 @@ def create_date_picker(
                 weight=ft.FontWeight.W_500,
                 color=colors["text_secondary"],
             ),
-            date_field,
+            ft.Row(
+                controls=[
+                    date_field,
+                    ft.IconButton(
+                        icon=ft.Icons.CALENDAR_MONTH,
+                        icon_size=18,
+                        tooltip="Pick a date",
+                        icon_color=colors["text_secondary"],
+                        on_click=open_calendar,
+                        disabled=page is None,
+                    ),
+                ],
+                spacing=2,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
         ],
         spacing=4,
     )
