@@ -144,56 +144,38 @@ Only users with Admin role can approve reports.
         alignment=ft.MainAxisAlignment.CENTER,
     )
 
+    # #18: each tab must scroll — content routinely exceeds the fixed 450px
+    # dialog height, and without a scroll wrapper the overflow is unreachable.
+    def scroll_pane(inner, center=False):
+        return ft.Container(
+            content=ft.Column(
+                controls=[inner],
+                scroll=ft.ScrollMode.AUTO,
+                expand=True,
+                horizontal_alignment=(ft.CrossAxisAlignment.CENTER if center
+                                      else ft.CrossAxisAlignment.START),
+            ),
+            padding=20,
+            expand=True,
+        )
+
+    def md(text):
+        return ft.Markdown(text, selectable=True,
+                           extension_set=ft.MarkdownExtensionSet.GITHUB_WEB)
+
     # Tabs
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=200,
         tabs=[
-            ft.Tab(
-                text="Getting Started",
-                icon=ft.Icons.ROCKET_LAUNCH,
-                content=ft.Container(
-                    content=ft.Markdown(
-                        getting_started_content,
-                        selectable=True,
-                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                    ),
-                    padding=20,
-                ),
-            ),
-            ft.Tab(
-                text="Shortcuts",
-                icon=ft.Icons.KEYBOARD,
-                content=ft.Container(
-                    content=ft.Markdown(
-                        shortcuts_content,
-                        selectable=True,
-                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                    ),
-                    padding=20,
-                ),
-            ),
-            ft.Tab(
-                text="FAQ",
-                icon=ft.Icons.HELP_OUTLINE,
-                content=ft.Container(
-                    content=ft.Markdown(
-                        faq_content,
-                        selectable=True,
-                        extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
-                    ),
-                    padding=20,
-                ),
-            ),
-            ft.Tab(
-                text="About",
-                icon=ft.Icons.INFO_OUTLINE,
-                content=ft.Container(
-                    content=about_content,
-                    padding=20,
-                    alignment=ft.alignment.center,
-                ),
-            ),
+            ft.Tab(text="Getting Started", icon=ft.Icons.ROCKET_LAUNCH,
+                   content=scroll_pane(md(getting_started_content))),
+            ft.Tab(text="Shortcuts", icon=ft.Icons.KEYBOARD,
+                   content=scroll_pane(md(shortcuts_content))),
+            ft.Tab(text="FAQ", icon=ft.Icons.HELP_OUTLINE,
+                   content=scroll_pane(md(faq_content))),
+            ft.Tab(text="About", icon=ft.Icons.INFO_OUTLINE,
+                   content=scroll_pane(about_content, center=True)),
         ],
     )
 

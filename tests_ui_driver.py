@@ -262,6 +262,11 @@ def run():
     finding(E, "second reason still saved via get_dropdown_value",
             "'second_reason_for_suspicion': get_dropdown_value" in rd_src)
 
+    # #18: help/documentation tabs must scroll (content exceeds the dialog height)
+    help_src = open(os.path.join(REPO, 'flet_app/dialogs/help_dialog.py')).read()
+    finding(E, "help dialog tabs are not scrollable",
+            'ScrollMode.AUTO' not in help_src or 'scroll_pane' not in help_src)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]

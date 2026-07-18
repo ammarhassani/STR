@@ -109,7 +109,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     rework rate, monthly/SLA trends, CIC & account intelligence, top entities.
     Guardrail: admin-authored, SELECT-only. (Big item — its own sub-plan.)
 
-18. **Help / documentation not scrollable** — ☐
+18. **Help / documentation not scrollable** — ☑ (each help tab wrapped in a scrollable Column via scroll_pane helper; long content now reachable in the fixed-height dialog; ui_driver guard)
     *Ask:* let me scroll it.
     *Do:* add scroll to the help dialog (same fix class as the wizard scroll bug).
 
