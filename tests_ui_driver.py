@@ -257,6 +257,19 @@ def run():
     finding(E, "report dialog does not surface the rework/review comment (#11)",
             'get_review_comment' not in rd_src)
 
+    # #5 + #14: non-blocking intelligence banners for CIC history + account repeat
+    finding(E, "CIC info banner (#5) not wired",
+            'update_cic_intel' not in rd_src or 'cic_history' not in open(
+                os.path.join(REPO, 'services/intelligence_service.py')).read())
+    finding(E, "account rapid-repeat banner (#14) not wired",
+            'update_account_intel' not in rd_src or 'account_rapid_repeat' not in open(
+                os.path.join(REPO, 'services/intelligence_service.py')).read())
+    # non-blocking by design: the submit/validate path must NOT consult the
+    # intelligence layer — it lives only in the on-blur banner updaters.
+    finding(E, "intelligence must be info-only (validate_form must not call it)",
+            'cic_history' in rd_src.split('def validate_form')[-1][:1500]
+            or 'account_rapid_repeat' in rd_src.split('def validate_form')[-1][:1500])
+
     # #13: second reason for suspicion is a narrative (schema TEXT) — must be a
     # free-text field like the first reason, NOT a constrained dropdown.
     _sr = rd_src.split('Second Reason for Suspicion')[-1][:700]

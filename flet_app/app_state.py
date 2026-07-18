@@ -38,6 +38,7 @@ class AppState:
     settings_service: Any = None
     report_number_service: Any = None
     activity_service: Any = None
+    intelligence_service: Any = None
     _gateway: Any = None  # RemoteGateway, set only in client mode
     host_status: Any = None  # HostStatus, set only in client mode
 
@@ -127,6 +128,8 @@ class AppState:
             self.dashboard_service = DashboardService(self.db_manager, self.logging_service)
             self.dropdown_service = DropdownService(self.db_manager, self.logging_service, self.auth_service)
             self.validation_service = ValidationService(self.db_manager, self.logging_service)
+            from services.intelligence_service import IntelligenceService
+            self.intelligence_service = IntelligenceService(self.db_manager, self.logging_service)
             self.report_number_service = ReportNumberService(
                 self.db_manager, self.logging_service
             )

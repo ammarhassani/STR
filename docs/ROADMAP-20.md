@@ -41,13 +41,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    *Do:* delivered as config-BI widgets (see #17): reports per agent, throughput
    over time, aging. Consumed by admin + reporter.
 
-5. **Duplicate-CIC is an INFORMATION banner, never a blocker** — ☐
-   *Ask:* enrich, don't block.
-   *Do:* non-blocking CIC banner showing: live **count** (increments when this
-   one sends) · **last report** (date/number/status/by whom) · **distinct entity
-   names** seen on this CIC · **total_transaction** sum + min–max · **days since
-   last** · any still **pending** · **classifications** seen. (Signal set
-   confirmed.)
+5. **Duplicate-CIC is an INFORMATION banner, never a blocker** — ☑ (new IntelligenceService.cic_history + on-blur non-blocking info banner under CIC; shows count, distinct entities, total_transaction sum + min–max, days since last, pending count, classifications, then the recent reports; never touches validate_form; tests_intelligence.py)
 
 6. **Log export is broken ("logs ready for export", nothing happens)** — ☑ (was a TODO stub; now writes a timestamped UTF-8-BOM CSV via new utils.export.export_logs — all columns, Arabic-safe, union of keys — to Downloads/home, then offers to open the folder like the reports export; tests_log_export.py + ui_driver guards)
    *Ask:* fix it.
@@ -85,10 +79,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
 
 13. **Second reason of suspicion not editable** — ☑ (root cause: rendered as a constrained dropdown while the schema declares it TEXT and the column is TEXT — a narrative like the first reason; now a free-text multiline field identical to the first reason, saved via get_value; dead second_reasons fetch removed; ui_driver structural guards)
 
-14. **Rapid-repeat account banner (multiple entries on one account, 0–2 days)** — ☐
-    *Ask:* flag likely structuring.
-    *Do:* on entering an account number, if ≥2 reports on it within 0–2 days,
-    show a non-blocking banner. Same intelligence layer as #5.
+14. **Rapid-repeat account banner (multiple entries on one account, 0–2 days)** — ☑ (IntelligenceService.account_rapid_repeat windows same-account reports on report_date ±2 days; on-blur non-blocking warning banner listing the repeats; ≥1 other report in window = structuring signal; shares the #5 layer; tests_intelligence.py)
 
 15. **Numbering: drop the grace period; clean month rollover** — ☑ (calendar-driven; grace + manual close removed everywhere; rollover + $100-bill persistence proven in tests_numbering.py)
     *Ask:* month closes → new sequence from 1; reserved numbers stay with owners.

@@ -47,6 +47,7 @@ def show_report_dialog(
     logging_service = app_state.logging_service
     approval_service = app_state.approval_service
     version_service = app_state.version_service
+    intelligence_service = app_state.intelligence_service
     current_user = app_state.current_user
     if not current_user:            # no session -> the form can't function
         from components.toast import show_error
@@ -64,6 +65,11 @@ def show_report_dialog(
 
     # Error banner ref (for inline error display)
     error_banner_ref = ft.Ref[ft.Container]()
+
+    # #5 / #14: non-blocking intelligence banners under CIC and Account.
+    cic_intel_ref = ft.Ref[ft.Container]()
+    account_intel_ref = ft.Ref[ft.Container]()
+    _edit_report_id = (report_data.get('report_id') or report_data.get('id')) if is_edit_mode else None
 
     # Load dropdown values
     genders = dropdown_service.get_active_dropdown_values('gender') if dropdown_service else []
@@ -127,13 +133,90 @@ def show_report_dialog(
                 cic_ref.current.value = cic_text[:16]
                 page.update()
 
-    def finalize_cic(e):
-        """Finalize CIC formatting on blur."""
-        if cic_ref.current:
-            cic_text = cic_ref.current.value.replace(' ', '').replace('-', '')
-            if cic_text and cic_text.isdigit():
-                cic_ref.current.value = cic_text.zfill(16)
-                page.update()
+    def _fill_intel_banner(ref, icon, color, title, lines):
+        """Render (or hide) a non-blocking info banner into `ref`'s container."""
+        if not ref.current:
+            return
+        if not lines:
+            ref.current.visible = False
+            ref.current.content = None
+        else:
+            ref.current.visible = True
+            ref.current.bgcolor = ft.Colors.with_opacity(0.08, color)
+            ref.current.border = ft.border.all(1, ft.Colors.with_opacity(0.4, color))
+            ref.current.content = ft.Column(
+                controls=[
+                    ft.Row([ft.Icon(icon, size=15, color=color),
+                            ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color=color)],
+                           spacing=6),
+                ] + [ft.Text(f"• {ln}", size=11, color=colors["text_secondary"], selectable=True)
+                     for ln in lines],
+                spacing=2, tight=True,
+            )
+        try:
+            ref.current.update()
+        except Exception:
+            pass
+
+    def _report_line(r):
+        return (f"{r.get('report_number') or '—'} · {r.get('reported_entity_name') or '(no entity)'} "
+                f"· {r.get('report_date') or ''} · {(r.get('approval_status') or '').replace('_',' ')}")
+
+    def update_cic_intel(e=None):
+        """#5: a duplicate CIC is INFORMATION, never a blocker — show the subject's
+        prior filings so the analyst sees the fuller picture."""
+        finalize_cic(e)
+        if not intelligence_service or not cic_ref.current:
+            return
+        cic = (cic_ref.current.value or "").strip()
+        empty = {"count": 0, "reports": [], "summary": {}}
+        h = intelligence_service.cic_history(cic, exclude_report_id=_edit_report_id) if cic else empty
+        if h["count"] == 0:
+            _fill_intel_banner(cic_intel_ref, None, colors["info"], "", [])
+            return
+        s = h.get("summary", {}) or {}
+        lines = []
+        if s.get("entities"):
+            lines.append("Entities: " + ", ".join(s["entities"][:4])
+                         + (" …" if len(s["entities"]) > 4 else ""))
+        if s.get("amount_sum") is not None:
+            lines.append(f"Total transactions: {s['amount_sum']:,.2f} "
+                         f"(min {s['amount_min']:,.2f} – max {s['amount_max']:,.2f})")
+        if s.get("days_since_last") is not None:
+            lines.append(f"Days since last report: {s['days_since_last']}")
+        if s.get("pending"):
+            lines.append(f"{s['pending']} still pending approval")
+        if s.get("classifications"):
+            lines.append("Classifications: " + ", ".join(s["classifications"][:4]))
+        # then the most recent reports themselves
+        for r in h["reports"][:3]:
+            lines.append(_report_line(r))
+        if h["count"] > 3:
+            lines.append(f"…and {h['count'] - 3} more report(s)")
+        _fill_intel_banner(
+            cic_intel_ref, ft.Icons.INFO_OUTLINE, colors["info"],
+            f"This CIC already appears on {h['count']} report(s):", lines)
+
+    def update_account_intel(e=None):
+        """#14: multiple reports on one account within 0–2 days is a structuring
+        signal — flag it (non-blocking)."""
+        if not intelligence_service or not account_ref.current:
+            return
+        account = (account_ref.current.value or "").strip()
+        rdate = report_date_ref.current.value if report_date_ref.current else ""
+        r = intelligence_service.account_rapid_repeat(
+            account, rdate, within_days=2, exclude_report_id=_edit_report_id) if account else {"count": 0, "reports": []}
+        if r["count"] == 0:
+            _fill_intel_banner(account_intel_ref, None, colors["warning"], "", [])
+            return
+        shown = r["reports"][:5]
+        lines = [_report_line(x) for x in shown]
+        if r["count"] > len(shown):
+            lines.append(f"…and {r['count'] - len(shown)} more")
+        _fill_intel_banner(
+            account_intel_ref, ft.Icons.WARNING_AMBER, colors["warning"],
+            f"Possible structuring: {r['count']} other report(s) on this account within 2 days:",
+            lines)
 
     # Live validation functions
     def validate_sn_live(e):
@@ -659,6 +742,9 @@ def show_report_dialog(
             fiu_letter_number_ref.current.value = report_data.get('fiu_letter_number', '')
 
         page.update()
+        # surface intelligence for the already-populated CIC / account on open
+        update_cic_intel()
+        update_account_intel()
 
     def reserve_numbers():
         """Show (read-only) the reserved number this new report will consume."""
@@ -826,7 +912,10 @@ def show_report_dialog(
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_account_live,
+                                on_blur=update_account_intel,
                             ),
+                            ft.Container(ref=account_intel_ref, visible=False,
+                                         border_radius=4, padding=8),
                         ],
                         spacing=4,
                     ),
@@ -871,8 +960,10 @@ def show_report_dialog(
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_cic_live,
-                                on_blur=finalize_cic,
+                                on_blur=update_cic_intel,
                             ),
+                            ft.Container(ref=cic_intel_ref, visible=False,
+                                         border_radius=4, padding=8),
                         ],
                         spacing=4,
                     ),
