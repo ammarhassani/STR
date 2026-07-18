@@ -63,7 +63,7 @@ def test_replica_sync():
     rep = os.path.join(bus, "replica", "fiu_ro.db")
     ver = os.path.join(bus, "replica", "version.txt")
     with open(rep, "wb") as f: f.write(b"DBv1")
-    with open(ver, "w") as f: f.write("1")
+    with open(ver, "w", encoding="utf-8") as f: f.write("1")
     local = os.path.join(d, "client_replica.db")
     check("bootstrap copies replica", bootstrap_replica(bus, local, timeout=2.0) and os.path.exists(local))
     check("bootstrap content v1", open(local, "rb").read() == b"DBv1")
@@ -75,7 +75,7 @@ def test_replica_sync():
     r = ReplicaRefresher(bus, local, poll=0.1, on_update=lambda: hits.__setitem__("n", hits["n"] + 1))
     r.start()
     with open(rep, "wb") as f: f.write(b"DBv2")
-    with open(ver, "w") as f: f.write("2")
+    with open(ver, "w", encoding="utf-8") as f: f.write("2")
     for _ in range(50):
         if open(local, "rb").read() == b"DBv2": break
         time.sleep(0.1)
@@ -111,8 +111,11 @@ def test_client_replica_readonly():
     host.publish_replica()  # writes bus/replica/fiu_ro.db (DELETE mode) + version.txt
 
     # Confirm the published replica is NOT WAL-tagged (the actual C1 root cause).
-    pubjm = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db")).execute(
-        "PRAGMA journal_mode").fetchone()[0]
+    # close the handle: on Windows a leaked reader locks the file and the host's
+    # next publish_replica() can never swap it.
+    _pub = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db"))
+    pubjm = _pub.execute("PRAGMA journal_mode").fetchone()[0]
+    _pub.close()
     check("g1ro published replica is non-WAL", pubjm.lower() != "wal", pubjm)
 
     local = os.path.join(d, "client_replica.db")

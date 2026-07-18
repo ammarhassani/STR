@@ -12,7 +12,7 @@ import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
-REPO = '/Users/engammar/Scripts/STR'
+REPO = os.path.dirname(os.path.abspath(__file__))
 SCRATCH = os.path.dirname(os.path.abspath(__file__))
 SANDBOX = os.path.join(SCRATCH, 'sandbox')
 DB_PATH = os.path.join(SANDBOX, 'fiu_sandbox.db')

@@ -39,6 +39,20 @@ def test_t_and_fallback():
           t('onboard.user_id', username='bob'))
 
 
+def test_help_prose_is_localized():
+    """The help tabs render catalog prose, not hardcoded English."""
+    from i18n import t, set_language
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'flet_app', 'dialogs', 'help_dialog.py'), encoding='utf-8').read()
+    check("help dialog pulls its prose from the catalog",
+          't("help.body.getting_started")' in src and 'Welcome to FIU' not in src)
+    set_language('en'); en = t('help.body.faq')
+    set_language('ar'); ar = t('help.body.faq')
+    set_language('en')
+    check("FAQ prose differs per language", en != ar and 'Frequently Asked' in en)
+    check("Arabic FAQ is actually Arabic", any('؀' <= c <= 'ۿ' for c in ar))
+
+
 def test_language_persists_and_logs_in():
     from database.init_db import initialize_database
     from database.migrations import migrate_database
@@ -82,6 +96,7 @@ def test_set_language_is_a_write_command():
 if __name__ == "__main__":
     test_catalog_parity()
     test_t_and_fallback()
+    test_help_prose_is_localized()
     test_language_persists_and_logs_in()
     test_set_language_is_a_write_command()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")

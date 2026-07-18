@@ -137,7 +137,8 @@ class LoggingService:
         file_handler = logging.handlers.RotatingFileHandler(
             self.log_dir / 'app.log',
             maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
+            backupCount=5,
+            encoding='utf-8'  # Windows defaults to cp1252 -> Arabic log lines are lost
         )
         file_handler.setLevel(logging.INFO)
         file_formatter = logging.Formatter(

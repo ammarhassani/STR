@@ -2,6 +2,7 @@
 Run: python3.14 tests_gender_normalization.py"""
 import os, sys, tempfile, sqlite3
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from utils import utf8_console  # noqa: F401 - this suite prints Arabic values
 
 _fail = 0
 def check(label, cond, detail=""):

@@ -128,7 +128,7 @@ def test_launchers_windowless_and_self_updating():
     for name in ['start_host.vbs', 'start_client.vbs']:
         p = os.path.join(root, 'deploy', name)
         check(f"{name} exists", os.path.exists(p))
-        src = open(p).read()
+        src = open(p, encoding="utf-8").read()
         check(f"{name} runs hidden (window style 0)", ".Run " in src and ", 0, " in src)
         check(f"{name} uses pythonw (no console)", "pythonw" in src)
         check(f"{name} self-updates first (#19)", "updater.py" in src)

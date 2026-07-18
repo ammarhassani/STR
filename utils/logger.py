@@ -27,7 +27,8 @@ def setup_logging(log_level=logging.INFO) -> logging.Logger:
     handler = RotatingFileHandler(
         log_file,
         maxBytes=10*1024*1024,  # 10MB
-        backupCount=5
+        backupCount=5,
+        encoding='utf-8'  # Windows defaults to cp1252 -> Arabic log lines are lost
     )
     
     # Create formatter

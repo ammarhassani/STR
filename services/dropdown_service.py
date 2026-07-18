@@ -356,6 +356,10 @@ class DropdownService:
             allowed, why = self._require_admin("reorder")
             if not allowed:
                 return False, why
+            # A bare string is iterable: without this it would silently run one
+            # UPDATE per character.
+            if not isinstance(ordered_ids, (list, tuple)):
+                return False, "Invalid id list."
             # Update display order for each item
             for order, config_id in enumerate(ordered_ids, start=1):
                 update_query = """
@@ -436,6 +440,10 @@ class DropdownService:
             allowed, why = self._require_admin("bulk_import")
             if not allowed:
                 return False, why
+            # A bare string is iterable: without this it would import one
+            # dropdown value per character.
+            if not isinstance(values, (list, tuple)):
+                return False, "Invalid value list."
             if replace_existing:
                 # Deactivate all existing values in this category
                 deactivate_query = """

@@ -7,7 +7,7 @@ import os, sys, shutil, sqlite3, itertools, traceback, threading
 from datetime import datetime
 from pathlib import Path
 
-REPO = '/Users/engammar/Scripts/STR'
+REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 import database.db_manager as _dbm
 _dbm.time.sleep = lambda *a, **k: None  # kill retry backoff for fast fuzzing
@@ -88,10 +88,23 @@ def q1(sql, p=()):
 # ---- hostile value pool
 HOSTILE = [None, -1, 10**18, 'x'*50000, "'; DROP TABLE reports;--", [], {}, float('inf')]
 
-import signal
+import signal, time
 class _Timeout(Exception): pass
 def _alarm(sig, frm): raise _Timeout("call exceeded 2s")
-signal.signal(signal.SIGALRM, _alarm)
+
+# SIGALRM/setitimer are POSIX-only; the target workstation is Windows. There we
+# can't pre-empt a call, so fall back to measuring elapsed time after it returns
+# -- a true infinite hang blocks the suite instead of being reported.
+# ponytail: good enough for a fuzz harness; use a worker thread if a hang ever bites.
+_CAN_INTERRUPT = hasattr(signal, 'SIGALRM')
+if _CAN_INTERRUPT:
+    signal.signal(signal.SIGALRM, _alarm)
+
+def _arm():
+    if _CAN_INTERRUPT: signal.setitimer(signal.ITIMER_REAL, 2.0)
+
+def _disarm():
+    if _CAN_INTERRUPT: signal.setitimer(signal.ITIMER_REAL, 0)
 
 def fuzz_method(label, fn, arg_templates):
     """Call fn with each hostile value in each arg position; 2s per-call cap."""
@@ -99,15 +112,17 @@ def fuzz_method(label, fn, arg_templates):
         for i in range(len(base)):
             for h in HOSTILE:
                 args = list(base); args[i] = h
-                signal.setitimer(signal.ITIMER_REAL, 2.0)
+                _arm(); t0 = time.monotonic()
                 try:
                     fn(*args)
+                    if time.monotonic() - t0 > 2.0:
+                        CRASHES.append((label, tuple(repr(a)[:30] for a in args), "HANG: >2s"))
                 except _Timeout:
                     CRASHES.append((label, tuple(repr(a)[:30] for a in args), "HANG: >2s"))
                 except Exception as e:
                     CRASHES.append((label, tuple(repr(a)[:30] for a in args), f"{type(e).__name__}: {e}"))
                 finally:
-                    signal.setitimer(signal.ITIMER_REAL, 0)
+                    _disarm()
 
 def part1_fuzz():
     print('PART 1: crash-fuzzing service methods...')
@@ -394,7 +409,7 @@ def part3_features():
          not admin.dropdowns.is_category_admin_manageable('second_reason_for_suspicion'))
 
     # ---- R82 permanent-delete type-DELETE confirm (UI gate present)
-    src = open(os.path.join(REPO, 'flet_app/dialogs/delete_confirmation_dialog.py')).read()
+    src = open(os.path.join(REPO, 'flet_app/dialogs/delete_confirmation_dialog.py'), encoding="utf-8").read()
     conf('R82', 'permanent delete requires typing DELETE',
          'Type \'DELETE\'' in src and 'upper() == "DELETE"' in src)
 

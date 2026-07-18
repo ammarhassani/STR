@@ -3,6 +3,7 @@ Report Dialog for FIU Report Management System.
 Comprehensive 35-field tabbed form for creating and editing reports.
 """
 import flet as ft
+from i18n import t
 from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
 from datetime import datetime
@@ -74,7 +75,10 @@ def show_report_dialog(
     # Load dropdown values
     # #3: options are (english_value, localized_label) — store the English
     # canonical, show the label in the user's language.
-    from i18n import get_language, t
+    # NOTE: `t` is imported at module level. Re-importing it here would make it a
+    # function-local name and every earlier t(...) call (the login/permission
+    # guards above) would raise UnboundLocalError.
+    from i18n import get_language
     from i18n.fields import field_label
     _lang = get_language()
     _db = app_state.db_manager

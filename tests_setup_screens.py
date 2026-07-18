@@ -61,7 +61,7 @@ DARK_BG = "#0d1117"   # Colors.DARK bg_primary — must never appear in a light-
 def test_wizard_no_dark_and_scrolls():
     from theme.colors import Colors
     # 1) source-level: the wizard must not reach for the dark palette at all
-    src = open(os.path.join("flet_app", "views", "setup_wizard_view.py")).read()
+    src = open(os.path.join("flet_app", "views", "setup_wizard_view.py"), encoding="utf-8").read()
     check("wizard source does not use Colors.DARK", "Colors.DARK" not in src)
 
     from views.setup_wizard_view import build_setup_wizard

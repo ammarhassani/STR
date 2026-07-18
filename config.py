@@ -8,6 +8,8 @@ import socket
 from pathlib import Path
 from uuid import uuid4
 
+from utils import utf8_console  # noqa: F401 - side effect: UTF-8 console on Windows
+
 
 class Config:
     """Global configuration manager"""

@@ -1,6 +1,6 @@
 """Single-host / multi-client integration + idempotency harness. Run: python3.14 tests_host_cluster.py"""
 import os, sys, shutil, tempfile, json, uuid
-sys.path.insert(0, '/Users/engammar/Scripts/STR')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 FAILS = []
 def check(name, ok, detail=''):

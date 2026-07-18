@@ -15,6 +15,13 @@ from typing import Tuple, Optional, Dict, List
 from datetime import datetime, timedelta
 
 
+def _is_username(value) -> bool:
+    """A username must be a non-empty string. Anything else (list/dict/None/int)
+    would reach sqlite as an unsupported bind type and raise ProgrammingError
+    out of the service, so it is rejected at the boundary instead."""
+    return isinstance(value, str) and value.strip() != ""
+
+
 class ReportNumberService:
     """
     Thread-safe service for managing report numbers and serial numbers.
@@ -147,9 +154,11 @@ class ReportNumberService:
     def reserve_block(self, username, count):
         """Allocate the next `count` sequential numbers to `username` as
         'available', in one transaction. count clamped to [1, 100]."""
+        if not _is_username(username):
+            return False, [], "Invalid user"
         try:
             count = int(count)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):  # OverflowError: float('inf')
             return False, [], "Invalid count"
         if count < 1 or count > 100:
             return False, [], "Count must be between 1 and 100"
@@ -176,6 +185,8 @@ class ReportNumberService:
 
     def get_available_numbers(self, username):
         """This user's 'available' numbers, ascending."""
+        if not _is_username(username):
+            return []
         rows = self.db_manager.execute_with_retry(
             "SELECT id, report_number, serial_number, reserved_at, transferred_from "
             "FROM reserved_numbers WHERE owned_by = ? AND status = 'available' "
@@ -184,6 +195,8 @@ class ReportNumberService:
                  'reserved_at': r[3], 'transferred_from': r[4]} for r in (rows or [])]
 
     def get_available_count(self, username):
+        if not _is_username(username):
+            return 0
         r = self.db_manager.execute_with_retry(
             "SELECT COUNT(*) FROM reserved_numbers WHERE owned_by = ? AND status = 'available'", (username,))
         return r[0][0] if r else 0
@@ -208,7 +221,9 @@ class ReportNumberService:
     def transfer_numbers(self, from_user, to_user, report_numbers):
         """Reassign owned_by for the given 'available' numbers (must currently
         be owned by from_user). to_user must be an active user."""
-        if not report_numbers:
+        if not _is_username(from_user) or not _is_username(to_user):
+            return False, "Invalid user"
+        if not report_numbers or not isinstance(report_numbers, (list, tuple, set)):
             return False, "No numbers selected"
         tgt = self.db_manager.execute_with_retry(
             "SELECT is_active FROM users WHERE username = ?", (to_user,))
@@ -216,6 +231,8 @@ class ReportNumberService:
             return False, "Recipient must be an active user"
         moved = 0
         for rn in report_numbers:
+            if not isinstance(rn, str):
+                continue  # unbindable type; a real report number is always a string
             n = self.db_manager.execute_write(
                 "UPDATE reserved_numbers SET owned_by=?, transferred_from=? "
                 "WHERE report_number=? AND owned_by=? AND status='available'",

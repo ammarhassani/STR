@@ -146,7 +146,7 @@ def test_become_host():
     dst.execute("PRAGMA journal_mode=DELETE"); dst.close(); src.close()
 
     # a stale in-flight command sitting in processing/
-    with open(os.path.join(bus, "queue", "processing", "0000000000001_abc.json"), "w") as f:
+    with open(os.path.join(bus, "queue", "processing", "0000000000001_abc.json"), "w", encoding="utf-8") as f:
         json.dump({"id": "abc", "command": "noop"}, f)
 
     local = os.path.join(d, "backup_pc.db")
@@ -158,7 +158,7 @@ def test_become_host():
 
         # host goes stale -> promote
         stale = read_heartbeat(bus); stale["epoch_ms"] -= 120000
-        with open(os.path.join(bus, "host", "heartbeat.json"), "w") as f: json.dump(stale, f)
+        with open(os.path.join(bus, "host", "heartbeat.json"), "w", encoding="utf-8") as f: json.dump(stale, f)
         ok2, msg2, term2 = become_host(bus, local, "BACKUP-PC", stale_seconds=60, force=False)
         check("promotes on stale heartbeat", ok2 and term2 == 5, (ok2, msg2, term2))
         check("adopted replica exists locally", os.path.exists(local))
@@ -321,7 +321,7 @@ def test_failover_hardening():
     host = HostService({"auth_service": _A()}, dbm, QueueTransport(bus), bus, host_id="OLD")
     host.term = 1
     write_heartbeat(bus, "NEW", 2, 0, 1, "PC2")
-    with open(os.path.join(bus, "queue", "pending", "0000000000001_x.json"), "w") as f:
+    with open(os.path.join(bus, "queue", "pending", "0000000000001_x.json"), "w", encoding="utf-8") as f:
         json.dump({"id": "x", "command": "noop"}, f)
     host.serve_forever()  # must return immediately (step-down before startup) — no hang
     check("rival term: serve_forever refuses, no command served",

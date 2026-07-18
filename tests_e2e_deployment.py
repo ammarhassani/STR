@@ -210,14 +210,14 @@ def run():
     check("host publishes a code snapshot to the share", pub_ok and os.path.isdir(os.path.join(share, "app", ver)), pmsg)
     client_app = os.path.join(root, "clientA_app"); os.makedirs(client_app)
     # a stale client app + its own local config that must survive
-    open(os.path.join(client_app, "main.py"), "w").write("print('OLD')\n")
+    open(os.path.join(client_app, "main.py"), "w", encoding="utf-8").write("print('OLD')\n")
     os.makedirs(os.path.join(client_app, "config"))
-    open(os.path.join(client_app, "config", "config.json"), "w").write('{"mode":"client"}')
+    open(os.path.join(client_app, "config", "config.json"), "w", encoding="utf-8").write('{"mode":"client"}')
     up_ok, umsg = update_from_share(client_app, share)
     check("client copies the new version from the share", up_ok, umsg)
-    check("client code updated", "def " in open(os.path.join(client_app, "updater.py")).read() if os.path.exists(os.path.join(client_app, "updater.py")) else False)
+    check("client code updated", "def " in open(os.path.join(client_app, "updater.py"), encoding="utf-8").read() if os.path.exists(os.path.join(client_app, "updater.py")) else False)
     check("client's own config.json NOT clobbered by the update",
-          '"mode":"client"' in open(os.path.join(client_app, "config", "config.json")).read())
+          '"mode":"client"' in open(os.path.join(client_app, "config", "config.json"), encoding="utf-8").read())
 
     # ---- P9 hard reset (go-live: wipe test data, keep config, one fresh admin)
     phase("P9 Hard reset — test -> production")

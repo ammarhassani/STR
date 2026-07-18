@@ -8,7 +8,7 @@ import os, sys, shutil, sqlite3, threading, time, traceback
 from datetime import datetime
 from pathlib import Path
 
-REPO = '/Users/engammar/Scripts/STR'
+REPO = os.path.dirname(os.path.abspath(__file__))
 SCRATCH = os.path.dirname(os.path.abspath(__file__))
 BOX = os.path.join(SCRATCH, 'pbox')
 DB = os.path.join(BOX, 'p.db')

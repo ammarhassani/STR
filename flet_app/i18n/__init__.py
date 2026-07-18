@@ -10,6 +10,8 @@ English is the source of truth for keys; Arabic is drafted and owner-reviewed.
 """
 import logging
 
+from utils import utf8_console  # noqa: F401 - side effect: UTF-8 console on Windows
+
 _logger = logging.getLogger(__name__)
 
 _current = "en"

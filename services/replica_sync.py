@@ -7,6 +7,8 @@ import uuid
 import shutil
 import threading
 
+from utils.atomic_replace import replace_with_retry
+
 
 def _paths(bus_dir):
     rep = os.path.join(bus_dir, "replica", "fiu_ro.db")
@@ -18,7 +20,9 @@ def _atomic_copy(src, dst):
     """Copy src -> dst atomically (temp in dst's dir, then os.replace)."""
     tmp = dst + ".tmp-" + uuid.uuid4().hex
     shutil.copyfile(src, tmp)
-    os.replace(tmp, dst)
+    # On Windows the swap fails while any read-only query holds the local
+    # replica open, and the refresher swallows the error -> silently stale data.
+    replace_with_retry(tmp, dst)
     # Best-effort: a read-only client never creates WAL sidecars itself, but
     # clean up any stale ones left behind so a swapped-in file is never
     # shadowed by an old -wal/-shm from a previous (writable) open.
@@ -46,7 +50,7 @@ def bootstrap_replica(bus_dir, local_path, timeout=30.0):
 
 def _read_version(ver):
     try:
-        with open(ver) as f:
+        with open(ver, encoding="utf-8") as f:
             return f.read().strip()
     except Exception:
         return None

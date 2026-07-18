@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import flet as ft
 
-REPO = '/Users/engammar/Scripts/STR'
+REPO = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.join(REPO, 'flet_app'))
 SCRATCH = os.path.dirname(os.path.abspath(__file__))
@@ -170,7 +170,7 @@ def run():
     # ============================================== ADMIN PANEL delete path
     C = 'UI Admin panel'
     # the view must NOT contain a raw hard DELETE of users
-    src = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py')).read()
+    src = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py'), encoding="utf-8").read()
     finding(C, 'admin panel view still contains raw "DELETE FROM users"',
             'DELETE FROM users' in src, 'raw hard-delete present')
     # and the service path it now uses must SOFT-delete (row remains, is_active=0)
@@ -203,21 +203,21 @@ def run():
 
     # ---- new-feature UI wiring present
     E = 'UI Feature wiring'
-    ap_src = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
+    ap_src = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py'), encoding="utf-8").read()
     finding(E, 'approval panel missing reassign dropdown wiring',
             'reassign_ref' not in ap_src or 'get_active_agents' not in ap_src)
     finding(E, 'reject_report not passed reassign_to from UI',
             'reassign_to=reassign_to' not in ap_src)
-    set_src = open(os.path.join(REPO, 'flet_app/views/settings_view.py')).read()
+    set_src = open(os.path.join(REPO, 'flet_app/views/settings_view.py'), encoding="utf-8").read()
     # #15: numbering is calendar-driven now — the manual Close-Month control is
     # GONE; settings shows the current numbering month instead.
     finding(E, 'settings still has the removed Close-Month control',
             'handle_close_month' in set_src or 'close_month(' in set_src)
     finding(E, 'settings lost the numbering-month display',
             'get_active_numbering_month' not in set_src)
-    rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py')).read()
-    rv_src = open(os.path.join(REPO, 'flet_app/views/reports_view.py')).read()
-    main_src2 = open(os.path.join(REPO, 'flet_app/main.py')).read()
+    rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py'), encoding="utf-8").read()
+    rv_src = open(os.path.join(REPO, 'flet_app/views/reports_view.py'), encoding="utf-8").read()
+    main_src2 = open(os.path.join(REPO, 'flet_app/main.py'), encoding="utf-8").read()
     # #7: every Add-Report affordance must be gated on the add_report permission,
     # so a reporter never sees / can't trigger a create it can't do.
     finding(E, 'report dialog does not gate create on add_report permission',
@@ -233,10 +233,10 @@ def run():
             or _sub.index('update_report') > _sub.index('request_approval'))
     finding(E, 'report dialog missing edit-lock acquire/release',
             'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)
-    hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py')).read()
+    hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py'), encoding="utf-8").read()
     finding(E, 'header still has a theme toggle (dark mode removed)',
             'toggle_theme' in hdr_src or 'theme_button' in hdr_src)
-    rsv = open(os.path.join(REPO, 'flet_app/dialogs/reservation_dialog.py')).read()
+    rsv = open(os.path.join(REPO, 'flet_app/dialogs/reservation_dialog.py'), encoding="utf-8").read()
     finding(E, 'reservation dialog still runs raw SQL (must use service methods)',
             'execute_with_retry' in rsv or 'DELETE FROM' in rsv)
     finding(E, 'reservation dialog missing reserve_block wiring',
@@ -249,7 +249,7 @@ def run():
 
     # #2 + #11: My Work must be wired end-to-end (nav item, route, title) and the
     # edit dialog must surface the reviewer's rework message.
-    sb_src = open(os.path.join(REPO, 'flet_app/components/sidebar.py')).read()
+    sb_src = open(os.path.join(REPO, 'flet_app/components/sidebar.py'), encoding="utf-8").read()
     finding(E, "My Work nav item missing (gated on add_report)",
             '/my-work' not in sb_src or "has_permission('add_report')" not in sb_src)
     finding(E, "main.py missing /my-work route wiring",
@@ -260,10 +260,10 @@ def run():
     # #5 + #14: non-blocking intelligence banners for CIC history + account repeat
     finding(E, "CIC info banner (#5) not wired",
             'update_cic_intel' not in rd_src or 'cic_history' not in open(
-                os.path.join(REPO, 'services/intelligence_service.py')).read())
+                os.path.join(REPO, 'services/intelligence_service.py'), encoding="utf-8").read())
     finding(E, "account rapid-repeat banner (#14) not wired",
             'update_account_intel' not in rd_src or 'account_rapid_repeat' not in open(
-                os.path.join(REPO, 'services/intelligence_service.py')).read())
+                os.path.join(REPO, 'services/intelligence_service.py'), encoding="utf-8").read())
     # non-blocking by design: the submit/validate path must NOT consult the
     # intelligence layer — it lives only in the on-blur banner updaters.
     finding(E, "intelligence must be info-only (validate_form must not call it)",
@@ -285,21 +285,21 @@ def run():
             'get_active_options' not in rd_src or 'for _v, _l in genders' not in rd_src)
 
     # #18: help/documentation tabs must scroll (content exceeds the dialog height)
-    help_src = open(os.path.join(REPO, 'flet_app/dialogs/help_dialog.py')).read()
+    help_src = open(os.path.join(REPO, 'flet_app/dialogs/help_dialog.py'), encoding="utf-8").read()
     finding(E, "help dialog tabs are not scrollable",
             'ScrollMode.AUTO' not in help_src or 'scroll_pane' not in help_src)
 
     # #1: two-way handshake onboarding must be wired
-    lv_src = open(os.path.join(REPO, 'flet_app/views/login_view.py')).read()
+    lv_src = open(os.path.join(REPO, 'flet_app/views/login_view.py'), encoding="utf-8").read()
     finding(E, "login does not route pending users to self-registration",
             'get_onboarding_status' not in lv_src or '_show_registration_dialog' not in lv_src
             or 'complete_onboarding' not in lv_src)
-    ud_src = open(os.path.join(REPO, 'flet_app/dialogs/user_dialog.py')).read()
+    ud_src = open(os.path.join(REPO, 'flet_app/dialogs/user_dialog.py'), encoding="utf-8").read()
     finding(E, "admin user creation still sets password/full_name instead of the handshake",
             'create_pending_user' not in ud_src)
     finding(E, "admin user dialog still collects a password (breaks handshake)",
             'password_ref' in ud_src)
-    ap_users = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py')).read()
+    ap_users = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py'), encoding="utf-8").read()
     finding(E, "admin panel does not surface pending-registration users",
             'onboarding_pending' not in ap_users)
     # the onboarding UI must live in the LIVE LoginView class, not a dead function
@@ -311,35 +311,35 @@ def run():
     # #3 Phase 0: i18n machinery wired
     finding(E, "login screen not using the i18n catalog",
             'from i18n import' not in lv_src or 't(' not in lv_src)
-    hdr_i18n = open(os.path.join(REPO, 'flet_app/components/header.py')).read()
+    hdr_i18n = open(os.path.join(REPO, 'flet_app/components/header.py'), encoding="utf-8").read()
     finding(E, "no per-user language toggle in the header",
             'set_user_language' not in hdr_i18n or 'language_menu' not in hdr_i18n)
-    as_src = open(os.path.join(REPO, 'flet_app/app_state.py')).read()
+    as_src = open(os.path.join(REPO, 'flet_app/app_state.py'), encoding="utf-8").read()
     finding(E, "user language not applied on login",
             'set_language' not in as_src)
 
     # #6: log export must actually write a file, not stub a toast
-    log_src = open(os.path.join(REPO, 'flet_app/views/log_management_view.py')).read()
+    log_src = open(os.path.join(REPO, 'flet_app/views/log_management_view.py'), encoding="utf-8").read()
     finding(E, "log export is still a TODO stub",
             'ready for export' in log_src or 'TODO: Implement file export' in log_src)
     finding(E, "log export does not call export_logs",
             'export_logs' not in log_src)
 
     # #16: exports must be xlsx, not csv
-    exp_src = open(os.path.join(REPO, 'utils/export.py')).read()
+    exp_src = open(os.path.join(REPO, 'utils/export.py'), encoding="utf-8").read()
     finding(E, "report export is not xlsx",
             'write_xlsx' not in exp_src or '.xlsx' not in exp_src)
-    ev_src = open(os.path.join(REPO, 'flet_app/views/export_view.py')).read()
+    ev_src = open(os.path.join(REPO, 'flet_app/views/export_view.py'), encoding="utf-8").read()
     finding(E, "export view UI still says CSV",
             'CSV' in ev_src or 'to CSV' in ev_src or '.csv' in ev_src)
 
     # #17/#4: config-driven dashboard must render widgets (not hardcoded charts)
-    dv_src = open(os.path.join(REPO, 'flet_app/views/dashboard_view.py')).read()
+    dv_src = open(os.path.join(REPO, 'flet_app/views/dashboard_view.py'), encoding="utf-8").read()
     finding(E, "dashboard is not config-driven (no widget grid)",
             'render_widget_grid' not in dv_src or 'get_dashboard_widgets' not in dv_src)
     finding(E, "dashboard still uses the old hardcoded charts",
             'kpi_row' in dv_src or 'charts_row' in dv_src)
-    ds_src = open(os.path.join(REPO, 'services/dashboard_service.py')).read()
+    ds_src = open(os.path.join(REPO, 'services/dashboard_service.py'), encoding="utf-8").read()
     finding(E, "widget queries not executed read-only",
             'mode=ro' not in ds_src or 'validate_widget_query' not in ds_src)
     finding(E, "no admin widget management view",
@@ -347,7 +347,7 @@ def run():
             or '/dashboard-widgets' not in main_src2)
 
     # #10: the review dialog must be roomy, not the cramped 650x520 / 280px form
-    ap_src2 = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
+    ap_src2 = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py'), encoding="utf-8").read()
     finding(E, "review dialog is still the cramped 650x520",
             'width=650' in ap_src2 and 'height=520' in ap_src2)
     finding(E, "review form viewport is still the cramped 280px",

@@ -1,7 +1,7 @@
 """Flat-enterprise theme unit checks. Run: python3.14 tests_theme.py"""
-import sys
-sys.path.insert(0, '/Users/engammar/Scripts/STR')
-sys.path.insert(0, '/Users/engammar/Scripts/STR/flet_app')
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
 
 FAILS = []
 def check(name, ok, detail=''):

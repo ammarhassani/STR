@@ -1,6 +1,9 @@
 """Phase 3b operator + client-UX tests. Run: python3.14 tests_panel.py"""
 import os, sys, json, time, tempfile, shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# UI components import their siblings as top-level modules (`from i18n import t`),
+# the same layout main.py sets up.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
 
 _fail = 0
 def check(label, cond, detail=""):
@@ -43,7 +46,7 @@ def test_panel_controller():
         st2 = pc.status()
         check("status: host online + term from heartbeat", st2["host_online"] and st2["term"] == 7, st2)
         # queue depth
-        open(os.path.join(bus, "queue", "pending", "0000000000001_a.json"), "w").write("{}")
+        open(os.path.join(bus, "queue", "pending", "0000000000001_a.json"), "w", encoding="utf-8").write("{}")
         check("status: counts pending", pc.status()["queue_pending"] == 1)
         # manual backup + list + restore
         ok, msg = pc.manual_backup()
@@ -63,9 +66,9 @@ def test_panel_controller():
         oks, msgs = pc.start_host(spawn=fake_spawn)
         check("start_host launches --host detached", oks and "--host" in " ".join(calls["cmd"]), (msgs, calls))
         # become_host on a stale heartbeat
-        stale = __import__("json").load(open(os.path.join(bus, "host", "heartbeat.json")))
+        stale = __import__("json").load(open(os.path.join(bus, "host", "heartbeat.json"), encoding="utf-8"))
         stale["epoch_ms"] -= 120000
-        open(os.path.join(bus, "host", "heartbeat.json"), "w").write(__import__("json").dumps(stale))
+        open(os.path.join(bus, "host", "heartbeat.json"), "w", encoding="utf-8").write(__import__("json").dumps(stale))
         # need a replica to adopt
         import sqlite3
         src = sqlite3.connect(db); dst = sqlite3.connect(os.path.join(bus, "replica", "fiu_ro.db"))
@@ -137,7 +140,7 @@ def test_deploy_artifacts_exist():
     root = os.path.dirname(os.path.abspath(__file__))
     for rel in ("deploy/start_host.bat", "deploy/start_panel.bat", "docs/HOST_RUNBOOK.md"):
         check(f"{rel} exists", os.path.exists(os.path.join(root, rel)), rel)
-    runbook = open(os.path.join(root, "docs/HOST_RUNBOOK.md")).read().lower()
+    runbook = open(os.path.join(root, "docs/HOST_RUNBOOK.md"), encoding="utf-8").read().lower()
     for term in ("become host", "restore", "startup folder", "integrity", "session"):
         check(f"runbook covers '{term}'", term in runbook)
 

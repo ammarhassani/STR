@@ -9,6 +9,7 @@ import sqlite3
 import socket
 from host.lease import read_lease
 from host import heartbeat as hb
+from utils.atomic_replace import replace_with_retry
 
 SESSION_TIMEOUT_SECONDS = 1800
 BACKUP_EVERY_SECONDS = 300
@@ -126,12 +127,12 @@ class HostService:
             dst.execute("PRAGMA journal_mode=DELETE")
         finally:
             dst.close(); src.close()
-        os.replace(tmp, dest)
+        replace_with_retry(tmp, dest)
         version = int(time.time() * 1000)
         vtmp = os.path.join(self.bus, ".tmp", uuid.uuid4().hex + ".ver")
-        with open(vtmp, "w") as f:
+        with open(vtmp, "w", encoding="utf-8") as f:
             f.write(str(version))
-        os.replace(vtmp, os.path.join(self.bus, "replica", "version.txt"))
+        replace_with_retry(vtmp, os.path.join(self.bus, "replica", "version.txt"))
         self._db_version = version
 
     def _beat(self):

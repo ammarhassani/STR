@@ -29,7 +29,7 @@ class PanelController:
         ver_path = os.path.join(self.bus, "replica", "version.txt")
         version = None
         try:
-            with open(ver_path) as f:
+            with open(ver_path, encoding="utf-8") as f:
                 version = f.read().strip()
         except OSError:
             pass
