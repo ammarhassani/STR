@@ -49,6 +49,12 @@ Thumbs.db
 *.db-wal
 *.log
 
+# Per-machine config + updater state — MUST stay local, never distributed
+# (each PC configures its own mode/paths via the setup wizard).
+config/config.json
+.str_version
+logs/
+
 # Temporary files
 *.tmp
 temp/

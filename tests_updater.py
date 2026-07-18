@@ -94,6 +94,26 @@ def test_client_updates_across_two_publishes():
     check("previous version retained on the share for rollback", (Path(share) / "app" / v1).is_dir())
 
 
+def test_never_clobbers_per_machine_config():
+    # even if a snapshot wrongly contains config/ or .str_version, the client's
+    # own per-machine files must survive (config bleed guard).
+    from updater import update_from_share
+    from pathlib import Path
+    import os
+    share = tempfile.mkdtemp(); client = tempfile.mkdtemp()
+    app = Path(share) / "app" / "v1"; (app / "config").mkdir(parents=True)
+    (app / "main.py").write_text("print('new')\n")
+    (app / "config" / "config.json").write_text('{"mode":"HOST"}')   # bad: snapshot has config
+    (Path(share) / "app" / "latest.txt").write_text("v1\n")
+    os.makedirs(os.path.join(client, "config"))
+    Path(client, "config", "config.json").write_text('{"mode":"client","share":"Z:"}')
+
+    up, msg = update_from_share(client, share)
+    check("code still updates", up and Path(client, "main.py").read_text().strip() == "print('new')", msg)
+    check("client's own config.json is NOT clobbered by the snapshot",
+          '"mode":"client"' in Path(client, "config", "config.json").read_text())
+
+
 def test_safe_when_share_empty_or_missing():
     from updater import update_from_share
     client = tempfile.mkdtemp(); share = tempfile.mkdtemp()

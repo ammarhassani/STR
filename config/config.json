@@ -1,6 +1,0 @@
-{
-  "database_path": "/Users/engammar/Scripts/STR/DB/fiu_reports.db",
-  "backup_path": "/Users/engammar/Scripts/STR/DB/Backup",
-  "session_timeout": 30,
-  "max_login_attempts": 5
-}

@@ -161,12 +161,17 @@ def update_from_share(app_dir, share_dir) -> Tuple[bool, str]:
         if not snapshot.is_dir():
             return False, f"Published version {want} missing on the share — using current code."
 
-        # overlay every file from the snapshot onto the app folder
+        # overlay every file from the snapshot onto the app folder, but NEVER
+        # touch per-machine state — config and the version file belong to this PC
+        # (defense-in-depth; they are gitignored so shouldn't be in a snapshot).
         copied = 0
         for src in snapshot.rglob("*"):
             if src.is_dir():
                 continue
             rel = src.relative_to(snapshot)
+            rel_posix = rel.as_posix()
+            if rel_posix == _VERSION_FILE or rel_posix.startswith("config/") or rel_posix.startswith("logs/"):
+                continue
             target = Path(app_dir) / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, target)
