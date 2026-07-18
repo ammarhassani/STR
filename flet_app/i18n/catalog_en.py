@@ -9,6 +9,16 @@ STRINGS = {
     "common.delete": "Delete",
     "common.edit": "Edit",
     "common.add": "Add",
+    "common.no_entity": "(no entity)",
+    "common.reviewer": "Reviewer",
+    "common.loading": "Loading...",
+
+    # My Work
+    "mywork.lane.rework": "Returned for Rework",
+    "mywork.lane.draft": "Drafts",
+    "mywork.lane.pending": "Pending Approval",
+    "mywork.lane.approved": "Approved",
+    "mywork.nothing": "Nothing here.",
 
     # login
     "login.title": "Login",

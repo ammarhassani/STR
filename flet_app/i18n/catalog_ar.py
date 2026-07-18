@@ -10,6 +10,16 @@ STRINGS = {
     "common.delete": "حذف",
     "common.edit": "تعديل",
     "common.add": "إضافة",
+    "common.no_entity": "(بدون جهة)",
+    "common.reviewer": "المُراجع",
+    "common.loading": "جارٍ التحميل...",
+
+    # My Work
+    "mywork.lane.rework": "أُعيدت لإعادة العمل",
+    "mywork.lane.draft": "المسودّات",
+    "mywork.lane.pending": "قيد الاعتماد",
+    "mywork.lane.approved": "معتمدة",
+    "mywork.nothing": "لا يوجد شيء هنا.",
 
     # login
     "login.title": "تسجيل الدخول",

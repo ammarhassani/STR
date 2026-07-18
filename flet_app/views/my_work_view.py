@@ -7,16 +7,17 @@ from typing import Any
 
 from theme.theme_manager import theme_manager
 from dialogs.report_dialog import show_report_dialog
+from i18n import t
 
 
 # lane order matters: Rework first (the thing an agent must act on), then Drafts,
 # then in-flight, then done.
 def _lanes(colors):
     return [
-        ('rework', 'Returned for Rework', ft.Icons.REPLAY, colors['danger']),
-        ('draft', 'Drafts', ft.Icons.EDIT_NOTE, colors['text_secondary']),
-        ('pending_approval', 'Pending Approval', ft.Icons.HOURGLASS_TOP, colors['warning']),
-        ('approved', 'Approved', ft.Icons.CHECK_CIRCLE, colors['success']),
+        ('rework', t("mywork.lane.rework"), ft.Icons.REPLAY, colors['danger']),
+        ('draft', t("mywork.lane.draft"), ft.Icons.EDIT_NOTE, colors['text_secondary']),
+        ('pending_approval', t("mywork.lane.pending"), ft.Icons.HOURGLASS_TOP, colors['warning']),
+        ('approved', t("mywork.lane.approved"), ft.Icons.CHECK_CIRCLE, colors['success']),
     ]
 
 
@@ -42,7 +43,7 @@ def build_my_work_view(page: ft.Page, app_state: Any) -> ft.Control:
             content=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.CHAT_BUBBLE_OUTLINE, size=14, color=color),
-                    ft.Text(f"{rc.get('reviewer') or 'Reviewer'}: {rc.get('comment')}",
+                    ft.Text(f"{rc.get('reviewer') or t('common.reviewer')}: {rc.get('comment')}",
                             size=12, color=color, italic=True, expand=True, selectable=True),
                 ],
                 spacing=6,
@@ -58,7 +59,7 @@ def build_my_work_view(page: ft.Page, app_state: Any) -> ft.Control:
                 controls=[
                     ft.Text(rep.get('report_number') or '—', size=13, weight=ft.FontWeight.W_600,
                             color=colors['text_primary']),
-                    ft.Text(rep.get('reported_entity_name') or '(no entity)', size=13,
+                    ft.Text(rep.get('reported_entity_name') or t('common.no_entity'), size=13,
                             color=colors['text_secondary'], expand=True),
                     ft.Text(rep.get('report_date') or '', size=11, color=colors['text_muted']),
                 ],
@@ -95,7 +96,7 @@ def build_my_work_view(page: ft.Page, app_state: Any) -> ft.Control:
             )
             cards = [report_card(r, status, color) for r in reports]
             if not cards:
-                cards = [ft.Text("Nothing here.", size=12, italic=True, color=colors['text_muted'])]
+                cards = [ft.Text(t('mywork.nothing'), size=12, italic=True, color=colors['text_muted'])]
             body.controls.append(
                 ft.Container(
                     content=ft.Column([header, ft.Container(height=6)] + cards, spacing=8, tight=True),
