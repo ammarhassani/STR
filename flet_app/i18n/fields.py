@@ -15,17 +15,22 @@ def _load(db_manager, lang):
     return m
 
 
-def field_label(db_manager, column_name, lang='en', default=None):
+def field_label(db_manager, column_name, lang='en', default=None, strict=False):
     """Label for a report column in `lang`. Unknown columns fall back to
-    `default` (or a humanized column name)."""
-    if db_manager is None:
-        return default or column_name.replace('_', ' ').title()
-    if lang not in _cache:
-        try:
-            _cache[lang] = _load(db_manager, lang)
-        except Exception:
-            _cache[lang] = {}
-    return _cache[lang].get(column_name) or default or column_name.replace('_', ' ').title()
+    `default` (or a humanized column name) — unless `strict`, which returns None
+    so the caller can try another source (e.g. the static catalog)."""
+    if db_manager is not None:
+        if lang not in _cache:
+            try:
+                _cache[lang] = _load(db_manager, lang)
+            except Exception:
+                _cache[lang] = {}
+        hit = _cache[lang].get(column_name)
+        if hit:
+            return hit
+    if strict:
+        return None
+    return default or column_name.replace('_', ' ').title()
 
 
 def clear_cache():

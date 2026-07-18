@@ -74,8 +74,18 @@ def show_report_dialog(
     # Load dropdown values
     # #3: options are (english_value, localized_label) — store the English
     # canonical, show the label in the user's language.
-    from i18n import get_language
+    from i18n import get_language, t
+    from i18n.fields import field_label
     _lang = get_language()
+    _db = app_state.db_manager
+    def _flabel(col, required=False):
+        # admin-managed column_settings wins; fall back to the static catalog,
+        # then a humanized name. Append the required marker.
+        lbl = field_label(_db, col, _lang, strict=True)
+        if lbl is None:
+            c = t(f"field.{col}")
+            lbl = c if c != f"field.{col}" else col.replace('_', ' ').title()
+        return lbl + (" *" if required else "")
     def _opts(cat):
         return dropdown_service.get_active_options(cat, _lang) if dropdown_service else []
     genders = _opts('gender')
@@ -593,7 +603,7 @@ def show_report_dialog(
 
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Submit for Approval"),
+            title=ft.Text(t("form.submit")),
             content=ft.Text(
                 "Are you sure you want to submit this report for admin approval?\n\n"
                 "Once submitted, you won't be able to edit it until an admin reviews it."
@@ -774,7 +784,7 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
-                            ft.Text("Serial Number *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("sn", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=sn_ref,
                                 hint_text="Enter serial number (e.g., 1)",
@@ -787,7 +797,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Report Number *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("report_number", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=report_number_ref,
                                 hint_text="Format: YYYY/MM/NNN (e.g., 2025/11/001)",
@@ -800,7 +810,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Case ID", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("case_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=case_id_ref,
                                 hint_text="Enter Case ID (optional)",
@@ -812,7 +822,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Report Date *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("report_date", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=report_date_ref,
                                 hint_text="DD/MM/YYYY",
@@ -837,7 +847,7 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
-                            ft.Text("Reported Entity Name *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("reported_entity_name", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=entity_name_ref,
                                 hint_text="Enter entity name",
@@ -855,7 +865,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Gender", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("gender"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=gender_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in genders],
@@ -867,7 +877,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Nationality", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("nationality"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=nationality_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in nationalities],
@@ -879,7 +889,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("ID/CR", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("id_cr"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=id_cr_ref,
                                 hint_text="Enter ID or Commercial Registration number",
@@ -898,7 +908,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("ID/CR Type", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("id_type"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=id_type_display_ref,
                                 value="ID",
@@ -911,7 +921,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Account/Membership", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("account_membership"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=account_ref,
                                 hint_text="Enter account or membership number",
@@ -933,7 +943,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Relationship", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("relationship"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=relationship_ref,
                                 value="Current Account",
@@ -946,7 +956,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Branch ID", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("branch_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=branch_ref,
                                 hint_text="Enter branch ID",
@@ -958,7 +968,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("CIC", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("cic"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=cic_ref,
                                 hint_text="Enter CIC number (will auto-pad to 16 digits)",
@@ -987,7 +997,7 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
-                            ft.Text("First Reason for Suspicion", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("first_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=first_reason_ref,
                                 hint_text="Describe the first reason for suspicion",
@@ -1002,7 +1012,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Second Reason for Suspicion", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("second_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             # #13: a reason for suspicion is a narrative (schema TYPE=TEXT,
                             # column TEXT) — free text like the first reason, not a
                             # constrained dropdown the analyst can't type into.
@@ -1020,7 +1030,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Type of Suspected Transaction", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("type_of_suspected_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=transaction_type_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in transaction_types],
@@ -1032,7 +1042,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("ARB Staff", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("arb_staff"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=arb_staff_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=a, text=a) for a in arb_staff_values],
@@ -1044,7 +1054,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Total Transaction", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("total_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=total_transaction_ref,
                                 hint_text="Enter amount with SAR (e.g., 605040 SAR)",
@@ -1068,7 +1078,7 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
-                            ft.Text("Report Classification", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("report_classification"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=classification_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in classifications],
@@ -1080,7 +1090,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Report Source", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("report_source"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=report_source_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in report_sources],
@@ -1092,7 +1102,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Reporting Entity", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("reporting_entity"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=reporting_entity_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in reporting_entities],
@@ -1104,7 +1114,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Reporter Initials", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("reporter_initials"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=reporter_initials_ref,
                                 hint_text="Enter 2 uppercase letters (e.g., ZM)",
@@ -1118,7 +1128,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("Sending Date", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("sending_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=sending_date_ref,
                                 hint_text="DD/MM/YYYY (optional)",
@@ -1142,7 +1152,7 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
-                            ft.Text("FIU Number", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("fiu_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_number_ref,
                                 hint_text="Enter FIU number",
@@ -1154,7 +1164,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("FIU Letter Receive Date", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("fiu_letter_receive_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_receive_date_ref,
                                 hint_text="DD/MM/YYYY (optional)",
@@ -1166,7 +1176,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("FIU Feedback", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("fiu_feedback"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=fiu_feedback_ref,
                                 options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in fiu_feedbacks],
@@ -1178,7 +1188,7 @@ def show_report_dialog(
                     ),
                     ft.Column(
                         controls=[
-                            ft.Text("FIU Letter Number", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.Text(_flabel("fiu_letter_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_letter_number_ref,
                                 hint_text="Enter FIU letter number",
@@ -1254,11 +1264,11 @@ def show_report_dialog(
         selected_index=0,
         animation_duration=300,
         tabs=[
-            ft.Tab(text="Basic Information", content=build_basic_info_tab()),
-            ft.Tab(text="Entity Details", content=build_entity_details_tab()),
-            ft.Tab(text="Suspicion Details", content=build_suspicion_details_tab()),
-            ft.Tab(text="Classification & Source", content=build_classification_tab()),
-            ft.Tab(text="FIU Details", content=build_fiu_details_tab()),
+            ft.Tab(text=t("form.tab.basic"), content=build_basic_info_tab()),
+            ft.Tab(text=t("form.tab.entity"), content=build_entity_details_tab()),
+            ft.Tab(text=t("form.tab.suspicion"), content=build_suspicion_details_tab()),
+            ft.Tab(text=t("form.tab.classification"), content=build_classification_tab()),
+            ft.Tab(text=t("form.tab.fiu"), content=build_fiu_details_tab()),
         ],
         expand=True,
     )
@@ -1268,12 +1278,12 @@ def show_report_dialog(
     left_buttons = []
     if is_edit_mode and report_data:
         left_buttons.append(
-            ft.TextButton("View History", icon=ft.Icons.HISTORY, on_click=view_history)
+            ft.TextButton(t("form.view_history"), icon=ft.Icons.HISTORY, on_click=view_history)
         )
 
     right_buttons = [
         ft.TextButton("Cancel", icon=ft.Icons.CLOSE, on_click=close_dialog),
-        app_button("Save Report", icon=ft.Icons.SAVE, on_click=save_report, variant="ghost"),
+        app_button(t("form.save"), icon=ft.Icons.SAVE, on_click=save_report, variant="ghost"),
     ]
     # Submit for approval (non-admin, editable states only)
     if is_edit_mode and report_data:
@@ -1281,7 +1291,7 @@ def show_report_dialog(
         is_admin = current_user and current_user.get('role') == 'admin'
         if not is_admin and approval_status not in ['pending_approval', 'approved']:
             right_buttons.append(
-                app_button("Submit for Approval", icon=ft.Icons.CHECK_CIRCLE,
+                app_button(t("form.submit"), icon=ft.Icons.CHECK_CIRCLE,
                            on_click=submit_for_approval, variant="ghost")
             )
 

@@ -21,6 +21,23 @@ STRINGS = {
     "mywork.lane.approved": "معتمدة",
     "mywork.nothing": "لا يوجد شيء هنا.",
 
+    # report field labels not in column_settings (derived/special)
+    "field.case_id": "رقم الحالة",
+    "field.id_type": "نوع الهوية/السجل",
+    "field.relationship": "العلاقة",
+
+    # report form: tabs + buttons
+    "form.tab.basic": "المعلومات الأساسية",
+    "form.tab.entity": "تفاصيل الجهة",
+    "form.tab.suspicion": "تفاصيل الاشتباه",
+    "form.tab.classification": "التصنيف والمصدر",
+    "form.tab.fiu": "تفاصيل وحدة التحريات",
+    "form.save": "حفظ التقرير",
+    "form.submit": "إرسال للاعتماد",
+    "form.view_history": "عرض السجل",
+    "form.new_title": "تقرير جديد",
+    "form.edit_title": "تعديل التقرير",
+
     # login
     "login.title": "تسجيل الدخول",
     "login.user_id": "معرّف المستخدم",

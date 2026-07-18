@@ -20,6 +20,23 @@ STRINGS = {
     "mywork.lane.approved": "Approved",
     "mywork.nothing": "Nothing here.",
 
+    # report field labels not in column_settings (derived/special)
+    "field.case_id": "Case ID",
+    "field.id_type": "ID/CR Type",
+    "field.relationship": "Relationship",
+
+    # report form: tabs + buttons
+    "form.tab.basic": "Basic Information",
+    "form.tab.entity": "Entity Details",
+    "form.tab.suspicion": "Suspicion Details",
+    "form.tab.classification": "Classification & Source",
+    "form.tab.fiu": "FIU Details",
+    "form.save": "Save Report",
+    "form.submit": "Submit for Approval",
+    "form.view_history": "View History",
+    "form.new_title": "New Report",
+    "form.edit_title": "Edit Report",
+
     # login
     "login.title": "Login",
     "login.user_id": "User ID",
