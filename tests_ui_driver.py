@@ -267,6 +267,13 @@ def run():
     finding(E, "help dialog tabs are not scrollable",
             'ScrollMode.AUTO' not in help_src or 'scroll_pane' not in help_src)
 
+    # #6: log export must actually write a file, not stub a toast
+    log_src = open(os.path.join(REPO, 'flet_app/views/log_management_view.py')).read()
+    finding(E, "log export is still a TODO stub",
+            'ready for export' in log_src or 'TODO: Implement file export' in log_src)
+    finding(E, "log export does not call export_logs",
+            'export_logs' not in log_src)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]

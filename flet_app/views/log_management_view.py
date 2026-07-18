@@ -197,13 +197,60 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         page.run_task(load_logs)
 
     def handle_export(e):
-        """Export logs to file."""
+        """Export the currently loaded logs to a CSV file (#6)."""
         if not logs_data:
             show_error(page, "No logs to export")
             return
 
-        # TODO: Implement file export with FilePicker
-        show_success(page, f"Export functionality - {len(logs_data)} logs ready for export")
+        from pathlib import Path
+        from utils.export import export_logs
+
+        # Save to Downloads if it exists, else the home folder — same convention
+        # as the reports export, no per-machine path config needed.
+        downloads = Path.home() / "Downloads"
+        output_dir = str(downloads if downloads.exists() else Path.home())
+
+        try:
+            file_path = export_logs(logs_data, output_dir=output_dir)
+        except Exception as ex:
+            show_error(page, f"Export failed: {str(ex)}")
+            if app_state.logging_service:
+                app_state.logging_service.error(f"Log export failed: {str(ex)}")
+            return
+
+        if app_state.logging_service:
+            app_state.logging_service.log_user_action(
+                "LOG_EXPORT_COMPLETED", {"file_path": str(file_path), "count": len(logs_data)})
+
+        show_success(page, f"Exported {len(logs_data)} logs to {file_path}")
+
+        def open_folder(ev):
+            import os, subprocess
+            folder_path = str(Path(file_path).parent)
+            dialog.open = False
+            page.update()
+            if os.name == 'nt':
+                os.startfile(folder_path)
+            elif os.name == 'posix':
+                subprocess.Popen(['xdg-open', folder_path])
+
+        def close_dialog(ev):
+            dialog.open = False
+            page.update()
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Export Successful"),
+            content=ft.Text(f"File saved to:\n{file_path}\n\nWould you like to open the folder?"),
+            actions=[
+                ft.TextButton("No", on_click=close_dialog),
+                ft.ElevatedButton("Open Folder", bgcolor=colors["primary"],
+                                  color=ft.Colors.WHITE, on_click=open_folder),
+            ],
+        )
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
 
     def handle_clear_logs(e):
         """Clear all logs."""

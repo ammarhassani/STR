@@ -95,3 +95,37 @@ def export_reports(
     
     # Export
     return export_to_csv(data, headers, str(filepath))
+
+
+def export_logs(
+    logs: List[Dict[str, Any]],
+    output_dir: Optional[str] = None
+) -> Path:
+    """
+    Export already-fetched log records to a timestamped CSV.
+
+    Args:
+        logs: List of log dicts (as returned by LoggingService.get_logs)
+        output_dir: Output directory (default: current directory)
+
+    Returns:
+        Path to created CSV file
+    """
+    if not logs:
+        raise ValueError("No logs to export")
+
+    # Columns = the union of keys across records (first row order, then any extras),
+    # so every field is exported even if some rows omit a key.
+    headers = list(logs[0].keys())
+    for row in logs:
+        for k in row.keys():
+            if k not in headers:
+                headers.append(k)
+
+    data = [[row.get(h, '') for h in headers] for row in logs]
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"fiu_logs_{timestamp}.csv"
+    filepath = Path(output_dir) / filename if output_dir else Path(filename)
+
+    return export_to_csv(data, headers, str(filepath))

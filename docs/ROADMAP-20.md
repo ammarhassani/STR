@@ -49,7 +49,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    last** · any still **pending** · **classifications** seen. (Signal set
    confirmed.)
 
-6. **Log export is broken ("logs ready for export", nothing happens)** — ☐
+6. **Log export is broken ("logs ready for export", nothing happens)** — ☑ (was a TODO stub; now writes a timestamped UTF-8-BOM CSV via new utils.export.export_logs — all columns, Arabic-safe, union of keys — to Downloads/home, then offers to open the folder like the reports export; tests_log_export.py + ui_driver guards)
    *Ask:* fix it.
    *Do:* diagnose + fix the log-export handler so it actually writes the file.
 
