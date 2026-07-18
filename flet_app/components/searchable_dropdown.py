@@ -41,6 +41,13 @@ class _Evt:
         self.page = getattr(control, "page", None)
 
 
+# Only one dropdown menu open at a time — opening one collapses the rest.
+_OPEN_MENUS = []
+
+_ROW_H = 38
+_MAX_ROWS = 6
+
+
 class SearchableDropdown(ft.Column):
     def __init__(self, options=None, value=None, on_change=None, label=None,
                  hint_text=None, width=None, disabled=False, ref=None,
@@ -70,11 +77,13 @@ class SearchableDropdown(ft.Column):
             on_focus=self._open_menu,
             on_blur=self._on_blur,
         )
+        self._over_menu = False   # pointer is over the option list
         self._list = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO, tight=True)
         self._menu = ft.Container(
             content=self._list, visible=False, width=width,
             border=ft.border.all(1, "#e2e5e9"), border_radius=6,
-            bgcolor="#ffffff", padding=4, height=220,
+            bgcolor="#ffffff", padding=4,   # height set dynamically to fit content
+            on_hover=self._track_hover,
         )
         self.controls = [self._field, self._menu]
         self.disabled = disabled
@@ -138,16 +147,28 @@ class SearchableDropdown(ft.Column):
             rows = [ft.Container(content=ft.Text("No matches", size=12, italic=True),
                                  padding=ft.padding.symmetric(8, 10))]
         self._list.controls = rows
+        # fit the box to its content (cap at _MAX_ROWS, then scroll) — no more
+        # tall empty box for a 2-option list
+        self._menu.height = min(len(rows), _MAX_ROWS) * _ROW_H + 8
         self._safe_update(self._list)
+        self._safe_update(self._menu)
 
     def _open_menu(self, e=None):
         if self.disabled:
             return
+        # collapse any other open dropdown first (one open at a time)
+        for other in list(_OPEN_MENUS):
+            if other is not self:
+                other._close_menu()
+        if self not in _OPEN_MENUS:
+            _OPEN_MENUS.append(self)
         self._rebuild_list(self._field.value or "")
         self._menu.visible = True
         self._safe_update(self._menu)
 
     def _close_menu(self):
+        if self in _OPEN_MENUS:
+            _OPEN_MENUS.remove(self)
         self._menu.visible = False
         self._safe_update(self._menu)
 
@@ -160,13 +181,22 @@ class SearchableDropdown(ft.Column):
     def _on_type(self, e):
         # typing filters only; it never sets the value
         self._rebuild_list(self._field.value or "")
+        if self not in _OPEN_MENUS:
+            _OPEN_MENUS.append(self)
         self._menu.visible = True
         self._safe_update(self._menu)
 
+    def _track_hover(self, e):
+        self._over_menu = (getattr(e, "data", "") == "true")
+
     def _on_blur(self, e):
-        # snap the text back to the current selection so free-typed text can't
-        # linger and be mistaken for a value
+        # collapse when the user clicks AWAY (into another field / empty space).
+        # If the pointer is over the option list, they're picking an option — let
+        # that click land first; the pick handler closes the menu itself.
+        if self._over_menu:
+            return
         self._render_selection()
+        self._close_menu()
 
     def _safe_update(self, ctrl):
         try:
