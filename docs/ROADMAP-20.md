@@ -20,7 +20,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
 
 ---
 
-1. **Select-all in reservation management** — ☐
+1. **Select-all in reservation management** — ☑ (header "Select all" checkbox toggles every listed number for transfer; two-way sync — checking all individually turns the header on, and it reflects partial selection; ui_driver guards)
    *Ask:* bulk-select numbers in the reservation dialog.
    *Do:* add "Select all / Clear all" to the number list used for transfer.
    Small UI on top of the existing owned-block reservation.

@@ -241,6 +241,11 @@ def run():
             'execute_with_retry' in rsv or 'DELETE FROM' in rsv)
     finding(E, 'reservation dialog missing reserve_block wiring',
             'reserve_block' not in rsv)
+    # #1: select-all for transfers
+    finding(E, 'reservation dialog missing a select-all control',
+            'select_all_cb' not in rsv or 'on_select_all' not in rsv)
+    finding(E, 'select-all does not select from the available set',
+            'set(available_rns)' not in rsv)
 
     # #2 + #11: My Work must be wired end-to-end (nav item, route, title) and the
     # edit dialog must surface the reviewer's rework message.

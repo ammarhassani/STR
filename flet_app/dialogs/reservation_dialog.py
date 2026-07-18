@@ -34,6 +34,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
 
     # State
     selected_numbers = set()  # report_numbers checked for transfer
+    available_rns = set()     # report_numbers currently listed (for select-all sync)
 
     # Controls
     reserve_count_input = ft.TextField(
@@ -47,17 +48,26 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
 
     numbers_list = ft.Column(spacing=4, scroll=ft.ScrollMode.AUTO)
 
+    # #1: select-all — checking each of many numbers for a transfer is tedious.
+    select_all_cb = ft.Checkbox(label="Select all", value=False, visible=False)
+
     target_dropdown = searchable_dropdown(
         label="Transfer To",
         width=260,
         options=[],
     )
 
+    def sync_select_all():
+        """Header checkbox is on only when every listed number is selected."""
+        select_all_cb.visible = bool(available_rns)
+        select_all_cb.value = bool(available_rns) and available_rns <= selected_numbers
+
     def refresh_numbers():
         """Reload this user's available numbers from the service and rebuild the list."""
-        nonlocal selected_numbers
+        nonlocal selected_numbers, available_rns
         numbers_data = report_number_service.get_available_numbers(username)
-        selected_numbers &= {n['report_number'] for n in numbers_data}
+        available_rns = {n['report_number'] for n in numbers_data}
+        selected_numbers &= available_rns
         count_text.value = f"You have {len(numbers_data)} available number(s)."
 
         numbers_list.controls.clear()
@@ -73,6 +83,8 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                     selected_numbers.add(rn)
                 else:
                     selected_numbers.discard(rn)
+                sync_select_all()
+                select_all_cb.update()
 
             label = f"{rn}   (SN {n['serial_number']})"
             if n.get('transferred_from'):
@@ -87,6 +99,15 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                     spacing=4,
                 )
             )
+        sync_select_all()
+
+    def on_select_all(e):
+        nonlocal selected_numbers
+        selected_numbers = set(available_rns) if e.control.value else set()
+        refresh_numbers()
+        page.update()
+
+    select_all_cb.on_change = on_select_all
 
     def load_agents():
         """Populate the transfer-target dropdown from active agents (excluding self)."""
@@ -158,7 +179,10 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                         spacing=12,
                     ),
                     ft.Divider(height=1, color=colors["border"]),
-                    count_text,
+                    ft.Row(
+                        controls=[count_text, ft.Container(expand=True), select_all_cb],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
                     ft.Container(
                         content=numbers_list,
                         height=200,
