@@ -31,7 +31,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    Rework, Pending Approval, Approved — with counts. Rework lane is front and
    center. (Depends on #8 roles + #11 messages.)
 
-3. **Submit-for-approval auto-saves (no extra friction)** — ☐
+3. **Submit-for-approval auto-saves (no extra friction)** — ☑ (Submit validates+saves+snapshots then submits, one click; edit persists through rework->resubmit; tested)
    *Ask:* submitting shouldn't need a separate Save.
    *Do:* the Submit action saves the current form first, then submits, as one
    step.

@@ -226,6 +226,11 @@ def run():
             "has_permission('add_report')" not in rv_src)
     finding(E, "Ctrl+N still gated on the bogus 'creator' role instead of add_report",
             "'creator'" in main_src2)
+    # #3: submit-for-approval must auto-save (update_report) BEFORE request_approval
+    _sub = rd_src.split('def submit_for_approval')[-1][:1600]
+    finding(E, 'submit-for-approval does not auto-save before submitting',
+            'update_report' not in _sub or 'request_approval' not in _sub
+            or _sub.index('update_report') > _sub.index('request_approval'))
     finding(E, 'report dialog missing edit-lock acquire/release',
             'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)
     hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py')).read()

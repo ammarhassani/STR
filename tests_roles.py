@@ -161,9 +161,38 @@ def test_migration_rebuilds_old_check():
     check("after migration a supervisor can be inserted", ok and n == 1, n)
 
 
+def test_submit_autosaves():
+    # #3: submitting for approval auto-saves the current edits first (one action).
+    # Proven at the service level (the dialog handler chains exactly this:
+    # validate -> update_report -> snapshot -> request_approval).
+    dbm, auth, numbers, reports, approvals = _services()
+    auth.authenticate('admin', 'Admin@1234')
+    auth.create_user('ag9', 'Pass@123', 'Ag9', 'agent')
+    auth.create_user('sup9', 'Pass@123', 'Sup9', 'supervisor')
+    ok, rid, apid, _ = _make_and_submit(dbm, auth, numbers, reports, 'ag9')
+    check("setup: agent report is pending", ok and apid)
+    auth.authenticate('sup9', 'Pass@123')
+    okr, msgr = approvals.reject_report(apid, 'fix the entity name', request_rework=True)
+    check("supervisor returns it for rework", okr, msgr)
+    # agent corrects + re-submits (save-then-submit)
+    auth.authenticate('ag9', 'Pass@123')
+    oke, msge = reports.update_report(rid, {'reported_entity_name': 'CORRECTED ENTITY'})
+    check("agent's correction saves", oke, msge)
+    oks, apid2, msgs = approvals.request_approval(rid, 'resubmitted')
+    check("agent re-submits", oks, msgs)
+    rep = reports.get_report(rid)
+    check("the correction is persisted with the submission",
+          rep and rep['reported_entity_name'] == 'CORRECTED ENTITY',
+          rep.get('reported_entity_name') if rep else None)
+    auth.authenticate('sup9', 'Pass@123')
+    pend = [p['approval_id'] for p in approvals.get_pending_approvals()]
+    check("resubmitted report is pending for the supervisor again", apid2 in pend, pend)
+
+
 if __name__ == "__main__":
     test_permissions_map()
     test_role_creation_and_routing()
     test_migration_rebuilds_old_check()
+    test_submit_autosaves()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

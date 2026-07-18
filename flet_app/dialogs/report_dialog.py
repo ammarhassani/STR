@@ -464,6 +464,20 @@ def show_report_dialog(
             page.update()
 
             try:
+                # #3: auto-save the current form FIRST so Submit is one frictionless
+                # action — no separate Save click, and the reviewer sees the edits.
+                is_valid, errors = validate_form()
+                if not is_valid:
+                    show_error_dialog("\n".join(f"• {err}" for err in errors))
+                    return
+                ok_save, save_msg = report_service.update_report(report_id, get_form_data())
+                if not ok_save:
+                    show_error_dialog(f"Couldn't save before submitting: {save_msg}")
+                    return
+                if version_service:
+                    version_service.create_version_snapshot(
+                        report_id, f"Submitted by {current_user['username']}")
+
                 if not approval_service:
                     show_error_dialog("Approval service not available")
                     return
