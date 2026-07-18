@@ -235,18 +235,16 @@ def show_report_dialog(
         fill_choice(gender_ref, "gender", "gender")
         fill_choice(nationality_ref, "nationality", "nationality")
         fill_text(id_cr_ref, "id_cr", "ID/CR")
-        fill_text(account_ref, "account_membership", "account/membership")
         fill_text(branch_ref, "branch_id", "branch")
         fill_check(legal_owner_ref, "legal_entity_owner_checkbox", "legal owner")
-        fill_check(acc_membership_ref, "acc_membership_checkbox", "account type")
         fill_check(id_type_checkbox_ref, "id_type", "ID type")
 
-        # keep the two derived display fields in step with their checkboxes
+        # keep the ID-type display in step with its checkbox. The
+        # account/membership fields are intentionally left alone: the customer
+        # may hold several accounts, or an account and a membership, so only the
+        # analyst knows which one this report is about.
         if id_type_display_ref.current and id_type_checkbox_ref.current:
             id_type_display_ref.current.value = "CR" if id_type_checkbox_ref.current.value else "ID"
-        if relationship_ref.current and acc_membership_ref.current:
-            relationship_ref.current.value = (
-                "Membership" if acc_membership_ref.current.value else "Current Account")
 
         if filled:
             try:

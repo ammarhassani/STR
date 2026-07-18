@@ -272,11 +272,13 @@ after the fact.
 
 ### What the code does today, and how it lines up
 
-- A report is frozen for its author only while `pending_approval` (someone is
-  reviewing it right now, and they must decide on the text they were shown) or
-  `rejected` (terminal).
-- An **approved** report stays editable by its author. That is the state a
-  report is in when the FIU number comes back, so step 4 works.
+- `pending_approval` is the ONLY frozen state: someone is reviewing the report
+  right now and must decide on exactly the text they were shown.
+- Every other state -- draft, approved, rework, rejected -- stays editable by
+  its author. An FIU report keeps growing after its first approval, so a
+  permanent freeze would break the job. (Owner's rule, 2026-07-18.)
+- Rejected is final only in the sense that it cannot be RESUBMITTED for
+  approval; the author can still complete the record.
 - Every edit is versioned inside `update_report`, so the FIU refill shows up as
   its own version rather than silently overwriting version 1.
 
@@ -287,9 +289,19 @@ real feature, not a tweak — it needs a status beyond the current five, a way t
 tell "waiting for the FIU" apart from "finished", and a decision about who
 confirms step 5.
 
-### Open question for the owner
+### Answered
 
-If the FIU number can arrive while the report is still `pending_approval`
-(rather than after approval), the current freeze blocks the refill. Say so and
-the FIU fields become editable in that state too, while the rest of the report
-stays frozen.
+The FIU number arrives after internal approval, so the single `pending_approval`
+freeze does not obstruct step 4. Confirmed by the owner, 2026-07-18.
+
+### Related: what the CIC lookup does and does not carry over
+
+Typing a CIC brings back who the customer IS -- name, gender, nationality,
+ID/CR and its type, branch, legal-owner flag -- from the most recent live report
+for that CIC, filling only fields the analyst left empty.
+
+It deliberately does NOT carry over the **account or membership number**. One
+customer can hold several accounts, or an account AND a membership, so the
+number on their last report says nothing about which one the new report
+concerns. Prefilling it would quietly attach the wrong account to a suspicion.
+(Owner's rule, 2026-07-18.)

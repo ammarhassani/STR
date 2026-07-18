@@ -102,10 +102,13 @@ class ReportService:
     # internally.
     WORKFLOW_OWNED_FIELDS = {'approval_status', 'current_version'}
 
-    # Statuses in which a report is frozen: it is either under review by someone
-    # else (editing it would mean the approver decides on text they never saw)
-    # or terminally rejected. BRD 04§4 / 06§14.
-    LOCKED_STATUSES = {'pending_approval', 'rejected'}
+    # The ONLY frozen state: someone is reviewing the report right now, and the
+    # approver must decide on exactly the text they were shown. Everything else
+    # stays editable by its author -- an FIU report keeps growing after it is
+    # first approved (the FIU number, letter and date only exist once the report
+    # has been submitted on the FIU portal and answered). See the FIU round-trip
+    # note in docs/DECISIONS.md.
+    LOCKED_STATUSES = {'pending_approval'}
 
     # Coarse per-field length backstop (characters). Real format rules live in
     # column_settings; this just stops storage/DoS abuse of unbounded TEXT.
@@ -414,14 +417,12 @@ class ReportService:
                                                     resource_owner=old_report.get('created_by')):
                 return False, "You do not have permission to edit this report"
 
-            # A report under approval must not change underneath its approver,
-            # and a rejected one is final (BRD 04§4, 06§14). Admins keep the
-            # override: the approval panel's review-edit runs as an admin.
+            # A report under approval must not change underneath its approver.
+            # Admins keep the override: the approval panel's review-edit mode
+            # runs as an admin.
             status = (old_report.get('approval_status') or '').lower()
             if status in self.LOCKED_STATUSES and current_user.get('role') != 'admin':
-                return False, ("This report is pending approval and cannot be edited"
-                               if status == 'pending_approval'
-                               else "This report was rejected and cannot be edited")
+                return False, "This report is pending approval and cannot be edited"
 
             # Reject absurdly long field values (storage/DoS guard)
             for k, v in report_data.items():

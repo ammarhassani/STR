@@ -100,13 +100,17 @@ class IntelligenceService:
         rows = self._rows(where, params)
         return {"count": len(rows), "reports": rows, "summary": self._summarize(rows)}
 
-    # Entity/customer fields that describe WHO the customer is. These are
-    # properties of the CIC, not of any one report, so the most recent report
-    # carrying that CIC is the best local record of them.
+    # Fields that describe WHO the customer is. These belong to the CIC, not to
+    # any one report, so the most recent report carrying that CIC is the best
+    # local record of them.
+    #
+    # The account/membership is deliberately NOT here: one customer can hold
+    # several accounts, or an account AND a membership, so the number on their
+    # last report says nothing about which one this report concerns. Carrying it
+    # over would quietly attach the wrong account to a suspicion.
     PROFILE_FIELDS = (
         "reported_entity_name", "gender", "nationality", "id_cr", "id_type",
-        "account_membership", "branch_id", "legal_entity_owner",
-        "legal_entity_owner_checkbox", "acc_membership_checkbox", "relationship",
+        "branch_id", "legal_entity_owner", "legal_entity_owner_checkbox",
     )
 
     def customer_profile(self, cic: str, exclude_report_id: Optional[int] = None) -> Optional[Dict[str, Any]]:

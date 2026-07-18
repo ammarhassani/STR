@@ -364,12 +364,13 @@ def child_main():
             if outcome == "ok":
                 defect("WORKFLOW", "a rejected report was resubmitted for approval",
                        rep["report_id"])
+            # A rejected report stays EDITABLE (owner's rule): only the
+            # resubmission is barred. The author still has to be able to
+            # complete the record -- FIU details arrive after the fact.
             out2, v2 = attempt("edit a REJECTED report", R.update_report,
                                rep["report_id"], {"reported_entity_name": "EDIT AFTER REJECT"})
-            refresh()
-            now = R.get_report(rep["report_id"]) or {}
-            if now.get("reported_entity_name") == "EDIT AFTER REJECT":
-                defect("WORKFLOW", "a rejected report was edited", rep["report_id"])
+            if out2 in ("refused", "error"):
+                defect("WORKFLOW", "a rejected report could not be edited by its author", v2)
 
     def probe_cic_uniqueness():
         """BRD 01§2: one live report per CIC -- duplicates would split a

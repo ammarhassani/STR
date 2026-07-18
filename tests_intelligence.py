@@ -126,6 +126,8 @@ def test_customer_profile_lookup():
           (prof or {}).get('nationality') == 'Saudi Arabian'
           and (prof or {}).get('branch_id') == '045'
           and (prof or {}).get('id_cr') == '7012345678', prof)
+    check("the account is NOT carried over (a customer may hold several, or an "
+          "account and a membership)", 'account_membership' not in (prof or {}), prof)
     check("unknown CIC returns nothing", intel.customer_profile('9999999999999999') is None)
     check("blank CIC returns nothing", intel.customer_profile('') is None)
 
