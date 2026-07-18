@@ -89,6 +89,12 @@ class FletApp:
     def _configure_page(self):
         """Configure the Flet page."""
         self.page.title = "FIU Report Management System"
+        # App/taskbar icon (bank mark). Windows prefers .ico; assets_dir is set
+        # on ft.app so Flet resolves these relative names.
+        try:
+            self.page.window.icon = "logo.ico"
+        except Exception:
+            pass
         # Open windowed-fullscreen (maximized), not a small off-centre window
         self.page.window.width = 1400
         self.page.window.height = 900
@@ -586,7 +592,9 @@ if __name__ == "__main__":
             print(f"[VIEW] desktop client unavailable ({e}); falling back to web")
             use_web = True
 
+    _assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
     if use_web:
-        ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("STR_PORT", "8550")))
+        ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("STR_PORT", "8550")),
+               assets_dir=_assets)
     else:
-        ft.app(target=main)  # native desktop window
+        ft.app(target=main, assets_dir=_assets)  # native desktop window
