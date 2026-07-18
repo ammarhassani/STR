@@ -8,6 +8,7 @@ import asyncio
 from typing import Any, Dict, List
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.toast import show_success, show_error
 
 
@@ -135,7 +136,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 content=ft.Column(
                     controls=[
                         ft.Icon(ft.Icons.LIST, size=48, color=colors["text_muted"]),
-                        ft.Text("No values found", color=colors["text_muted"]),
+                        ft.Text(t("ddm.none"), color=colors["text_muted"]),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -161,7 +162,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                     ft.IconButton(
                         icon=ft.Icons.EDIT,
                         icon_color=colors["primary"],
-                        tooltip="Edit",
+                        tooltip=t("common.edit"),
                         on_click=lambda e, v=val: handle_edit(v),
                     )
                 )
@@ -170,7 +171,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.IconButton(
                             icon=ft.Icons.DELETE,
                             icon_color=colors["danger"],
-                            tooltip="Delete",
+                            tooltip=t("common.delete"),
                             on_click=lambda e, v=val: handle_delete(v),
                         )
                     )
@@ -179,7 +180,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.IconButton(
                             icon=ft.Icons.RESTORE,
                             icon_color=colors["success"],
-                            tooltip="Restore",
+                            tooltip=t("ddm.restore"),
                             on_click=lambda e, v=val: handle_restore(v),
                         )
                     )
@@ -208,11 +209,11 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             )
 
         columns = [
-            ft.DataColumn(ft.Text("Value", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Order", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Updated By", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("ddm.col.value"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("ddm.col.order"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("ddm.col.status"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("ddm.col.updated_by"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("common.actions"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
         ]
 
         return ft.DataTable(
@@ -239,7 +240,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             current_category = None
             dropdown_values.clear()
             if table_ref.current:
-                table_ref.current.content = ft.Text("Select a category to view values", color=colors["text_muted"])
+                table_ref.current.content = ft.Text(t("ddm.select_prompt"), color=colors["text_muted"])
             if status_ref.current:
                 status_ref.current.value = ""
             if add_btn_ref.current:
@@ -258,12 +259,12 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             next_order = 0
 
         value_input = ft.TextField(
-            label="Value",
+            label=t("ddm.value"),
             value=value_data.get('value', '') if value_data else '',
             autofocus=True,
         )
         order_input = ft.TextField(
-            label="Display Order",
+            label=t("ddm.display_order"),
             value=str(value_data.get('display_order', next_order)) if value_data else str(next_order),
             keyboard_type=ft.KeyboardType.NUMBER,
             width=100,
@@ -272,7 +273,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         def save_value(e):
             value = value_input.value.strip()
             if not value:
-                show_error(page, "Value cannot be empty")
+                show_error(page, t("ddm.err_empty"))
                 return
 
             try:
@@ -320,20 +321,20 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             title=ft.Text(f"{'Edit' if is_edit else 'Add'} Value - {current_category}"),
             content=ft.Column(
                 controls=[
-                    ft.Text(f"Category: {current_category}", weight=ft.FontWeight.BOLD),
+                    ft.Text(t("ddm.category_label", cat=current_category), weight=ft.FontWeight.BOLD),
                     ft.Container(height=8),
                     value_input,
                     ft.Container(height=8),
                     order_input,
-                    ft.Text("Lower numbers appear first", size=11, color=colors["text_muted"]),
+                    ft.Text(t("ddm.order_hint"), size=11, color=colors["text_muted"]),
                 ],
                 spacing=4,
                 tight=True,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=close_dialog),
+                ft.TextButton(t("common.cancel"), on_click=close_dialog),
                 ft.ElevatedButton(
-                    "Save",
+                    t("common.save"),
                     bgcolor=colors["primary"],
                     color=ft.Colors.WHITE,
                     on_click=save_value,
@@ -385,7 +386,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Confirm Delete"),
+            title=ft.Text(t("ddm.confirm_delete")),
             content=ft.Text(
                 f"Are you sure you want to delete '{value_data.get('value')}'?\n\n"
                 "This will be a soft delete - the value will be hidden but existing data is preserved."
@@ -433,7 +434,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
     header_row = ft.Row(
         controls=[
             ft.Text(
-                "Dropdown Management",
+                t("ddm.title"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
                 color=colors["text_primary"],
@@ -450,7 +451,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Info text
     info_text = ft.Text(
-        "Manage dropdown values for various fields. [Editable] categories can be freely modified.",
+        t("ddm.info"),
         size=13,
         color=colors["text_secondary"],
     )
@@ -459,7 +460,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
     category_row = ft.Container(
         content=ft.Row(
             controls=[
-                ft.Text("Category:", color=colors["text_secondary"]),
+                ft.Text(t("ddm.category"), color=colors["text_secondary"]),
                 searchable_dropdown(
                     ref=category_ref,
                     value="",
@@ -515,7 +516,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
     # Table container
     table_container = ft.Container(
         ref=table_ref,
-        content=ft.Text("Select a category to view values", color=colors["text_muted"]),
+        content=ft.Text(t("ddm.select_prompt"), color=colors["text_muted"]),
         expand=True,
     )
 

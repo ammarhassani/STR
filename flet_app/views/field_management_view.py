@@ -8,6 +8,7 @@ import asyncio
 from typing import Any, Dict, List
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.toast import show_success, show_error
 
 
@@ -98,7 +99,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         # Generic field rules
         if rules.get('required'):
-            parts.append("Required")
+            parts.append(t("fld.required"))
         if 'pattern' in rules:
             parts.append(f"Pattern: {rules.get('example', rules['pattern'][:20])}")
         if 'maxLength' in rules:
@@ -125,7 +126,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 content=ft.Column(
                     controls=[
                         ft.Icon(ft.Icons.TUNE, size=48, color=colors["text_muted"]),
-                        ft.Text("No field settings found", color=colors["text_muted"]),
+                        ft.Text(t("fld.none"), color=colors["text_muted"]),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -174,11 +175,11 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             )
 
         columns = [
-            ft.DataColumn(ft.Text("Field Name", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Required", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Validation Rules", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Updated By", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("fld.col.name"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("fld.col.required"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("fld.col.validation"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("fld.col.updated_by"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("common.actions"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
         ]
 
         return ft.DataTable(
@@ -202,7 +203,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         # Required checkbox
         required_checkbox = ft.Checkbox(
-            label="Mark this field as required",
+            label=t("fld.mark_required"),
             value=is_required,
         )
 
@@ -211,26 +212,26 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         if field_name == 'id_cr':
             length_input = ft.TextField(
-                label="Length (digits)",
+                label=t("fld.length"),
                 value=str(rules.get('length', 10)),
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=120,
             )
             saudi_input = ft.TextField(
-                label="Saudi ID starts with",
+                label=t("fld.id_starts"),
                 value=str(rules.get('saudi_starts_with', '1')),
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=120,
             )
             cr_input = ft.TextField(
-                label="CR starts with",
+                label=t("fld.cr_starts"),
                 value=str(rules.get('cr_starts_with', '7')),
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=120,
             )
 
             rules_controls = [
-                ft.Text("ID/CR Validation Rules", weight=ft.FontWeight.BOLD, size=13),
+                ft.Text(t("fld.idcr_rules"), weight=ft.FontWeight.BOLD, size=13),
                 ft.Container(height=8),
                 ft.Row(controls=[length_input, saudi_input, cr_input], spacing=12, wrap=True),
                 ft.Container(height=4),
@@ -253,20 +254,20 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         elif field_name == 'account_membership':
             account_input = ft.TextField(
-                label="Account number length",
+                label=t("fld.account_length"),
                 value=str(rules.get('account_length', 21)),
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=150,
             )
             membership_input = ft.TextField(
-                label="Membership number length",
+                label=t("fld.membership_length"),
                 value=str(rules.get('membership_length', 8)),
                 keyboard_type=ft.KeyboardType.NUMBER,
                 width=150,
             )
 
             rules_controls = [
-                ft.Text("Account/Membership Validation Rules", weight=ft.FontWeight.BOLD, size=13),
+                ft.Text(t("fld.acc_rules"), weight=ft.FontWeight.BOLD, size=13),
                 ft.Container(height=8),
                 ft.Row(controls=[account_input, membership_input], spacing=12),
                 ft.Container(height=4),
@@ -405,9 +406,9 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 width=450,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=close_dialog),
+                ft.TextButton(t("common.cancel"), on_click=close_dialog),
                 ft.ElevatedButton(
-                    "Save",
+                    t("common.save"),
                     bgcolor=colors["primary"],
                     color=ft.Colors.WHITE,
                     on_click=save_changes,
@@ -443,8 +444,7 @@ def build_field_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Info text
     info_text = ft.Text(
-        "Configure validation rules and required status for all report fields. "
-        "These rules will be applied when creating or editing reports.",
+        t("fld.info") + t("fld.info2"),
         size=13,
         color=colors["text_secondary"],
     )
