@@ -32,6 +32,8 @@ WRITE_COMMANDS = {
     "validation_service.update_validation_rules": ("validation_service", "update_validation_rules"),
     "validation_service.update_required_status": ("validation_service", "update_required_status"),
     "auth_service.create_user": ("auth_service", "create_user"),
+    "auth_service.create_pending_user": ("auth_service", "create_pending_user"),
+    "auth_service.reset_onboarding": ("auth_service", "reset_onboarding"),
     "auth_service.update_user": ("auth_service", "update_user"),
     "auth_service.delete_user": ("auth_service", "delete_user"),
     "auth_service.reset_password": ("auth_service", "reset_password"),

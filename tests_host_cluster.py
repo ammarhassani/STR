@@ -405,6 +405,41 @@ def test_registry_reservation_commands():
     check('P2T4 transfer_numbers is a write command', cr.is_write_command('report_number_service.transfer_numbers'))
     check('P2T4 old reserve_next_numbers removed', not cr.is_write_command('report_number_service.reserve_next_numbers'))
 
+def test_onboarding_through_host():
+    """#1 two-way handshake across the host boundary: admin creates the ID
+    (write command), the user self-registers (pre-auth complete_onboarding),
+    then logs in — all via the host."""
+    box = tempfile.mkdtemp()
+    try:
+        host, t, dbm = _build_host(box)
+        ok, token, _, _ = host.login('admin', 'Admin@1234')
+        check('OB admin logged in', ok and token)
+        # admin creates a pending user via write command
+        r = host.handle_command({'id': 'ob1', 'command': 'auth_service.create_pending_user',
+                                 'args': ['newrep', 'reporter'], 'kwargs': {}, 'token': token})
+        check('OB pending user created via host', r['ok'] and r['result'][0], r.get('error'))
+        # a pending user cannot log in yet
+        pok, *_ = host.login('newrep', 'anything')
+        check('OB pending user cannot log in before registering', not pok)
+        # user self-registers (pre-auth, NO token)
+        r2 = host.handle_command({'id': 'ob2', 'command': 'complete_onboarding',
+                                  'args': ['newrep', 'New Rep', 'StrongPass123'], 'kwargs': {}})
+        check('OB complete_onboarding via host (pre-auth)', r2['ok'] and r2['result'][0], r2.get('result'))
+        # now the user logs in with the password only they set
+        lok, ltok, lmsg, lu = host.login('newrep', 'StrongPass123')
+        check('OB onboarded user logs in via host', lok and lu['role'] == 'reporter', lmsg)
+        # complete_onboarding is registered as a pre-auth special (not a write cmd)
+        from services import command_registry as cr
+        check('OB create_pending_user is a write command',
+              cr.is_write_command('auth_service.create_pending_user'))
+        check('OB reset_onboarding is a write command',
+              cr.is_write_command('auth_service.reset_onboarding'))
+        check('OB complete_onboarding is NOT a token-gated write command',
+              not cr.is_write_command('auth_service.complete_onboarding'))
+    finally:
+        shutil.rmtree(box, ignore_errors=True)
+
+
 if __name__ == '__main__':
     test_transport_roundtrip()
     test_applied_commands_table()
@@ -419,5 +454,6 @@ if __name__ == '__main__':
     test_create_report_gate()
     test_self_heal_stranded_number()
     test_registry_reservation_commands()
+    test_onboarding_through_host()
     print(f"\nCLUSTER FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

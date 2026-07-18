@@ -41,7 +41,8 @@ class AuthService:
             query = """
                 SELECT user_id, username, password, full_name, role, is_active,
                        failed_login_attempts,
-                       COALESCE(must_change_password, 0)
+                       COALESCE(must_change_password, 0),
+                       COALESCE(onboarding_pending, 0)
                 FROM users
                 WHERE username = ? COLLATE NOCASE
             """
@@ -52,7 +53,14 @@ class AuthService:
                 return False, None, "Invalid username or password"
 
             user = result[0]
-            user_id, db_username, db_password, full_name, role, is_active, failed_attempts, must_change_password = user
+            (user_id, db_username, db_password, full_name, role, is_active,
+             failed_attempts, must_change_password, onboarding_pending) = user
+
+            # Onboarding handshake (#1): a pending user has no password yet — never
+            # let them "log in" (an empty stored password would otherwise match an
+            # empty entry via the legacy path). Route them to self-registration.
+            if onboarding_pending:
+                return False, None, "ONBOARDING_REQUIRED"
 
             # Check if user is active
             if not is_active:
@@ -268,6 +276,110 @@ class AuthService:
         except Exception as e:
             self.logger.error(f"Error creating user: {str(e)}", exc_info=True)
             return False, f"Error creating user: {str(e)}"
+
+    # ---------------------------------------------------- two-way handshake (#1)
+    def create_pending_user(self, username: str, role: str) -> Tuple[bool, str]:
+        """Admin creates a user ID + role only. The user self-registers their
+        own full name + password at first login (onboarding handshake), so the
+        admin never knows an FIU reporter's password."""
+        try:
+            allowed, why = self._require_admin("create_pending_user")
+            if not allowed:
+                return False, why
+            username = (username or "").strip()
+            if not username:
+                return False, "User ID is required"
+            if role not in ['admin', 'supervisor', 'agent', 'reporter']:
+                return False, "Invalid role"
+            exists = self.db_manager.execute_with_retry(
+                "SELECT COUNT(*) FROM users WHERE username = ? COLLATE NOCASE", (username,))
+            if exists and exists[0][0] > 0:
+                return False, "User ID already exists"
+            # password/full_name stay empty until the user completes onboarding
+            self.db_manager.execute_with_retry(
+                "INSERT INTO users (username, password, full_name, role, is_active, "
+                "onboarding_pending, created_by) VALUES (?, '', '', ?, 1, 1, ?)",
+                (username, role, self.current_user['username'] if self.current_user else 'SYSTEM'))
+            self.logger.log_user_action(
+                "USER_PENDING_CREATED",
+                {'username': username, 'role': role,
+                 'created_by': self.current_user['username'] if self.current_user else 'SYSTEM'})
+            return True, f"User ID '{username}' created — the user completes registration at first login."
+        except Exception as e:
+            self.logger.error(f"Error creating pending user: {str(e)}", exc_info=True)
+            return False, f"Error creating user: {str(e)}"
+
+    def get_onboarding_status(self, username: str) -> str:
+        """'pending' (needs self-registration), 'active' (normal login), or
+        'unknown' (no such user / inactive). Used by the login screen to route."""
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT COALESCE(onboarding_pending, 0), is_active FROM users "
+                "WHERE username = ? COLLATE NOCASE", ((username or "").strip(),))
+            if not rows:
+                return "unknown"
+            pending, is_active = rows[0]
+            if not is_active:
+                return "unknown"
+            return "pending" if pending else "active"
+        except Exception as e:
+            self.logger.error(f"Error checking onboarding status: {str(e)}")
+            return "unknown"
+
+    def complete_onboarding(self, username: str, full_name: str, password: str) -> Tuple[bool, str]:
+        """The USER (not the admin) sets their own name + password. Only works
+        for a user still in the pending state. Not admin-gated — runs pre-login."""
+        try:
+            username = (username or "").strip()
+            full_name = (full_name or "").strip()
+            rows = self.db_manager.execute_with_retry(
+                "SELECT user_id, COALESCE(onboarding_pending, 0), is_active FROM users "
+                "WHERE username = ? COLLATE NOCASE", (username,))
+            if not rows:
+                return False, "Unknown user ID."
+            user_id, pending, is_active = rows[0]
+            if not is_active:
+                return False, "This account is inactive. Contact your administrator."
+            if not pending:
+                return False, "This user is already registered. Please log in."
+            if not full_name:
+                return False, "Full name is required."
+            score, feedback = SecurityService.check_password_strength(password)
+            if not password or len(password) < 8:
+                return False, feedback or "Password must be at least 8 characters."
+            self.db_manager.execute_with_retry(
+                "UPDATE users SET password = ?, full_name = ?, onboarding_pending = 0, "
+                "must_change_password = 0, failed_login_attempts = 0, "
+                "updated_at = datetime('now'), updated_by = ? WHERE user_id = ?",
+                (SecurityService.hash_password(password), full_name, username, user_id))
+            self.logger.log_user_action("USER_ONBOARDED", {'username': username})
+            return True, "Registration complete — you can now use the application."
+        except Exception as e:
+            self.logger.error(f"Error completing onboarding: {str(e)}", exc_info=True)
+            return False, f"Error completing registration: {str(e)}"
+
+    def reset_onboarding(self, username: str) -> Tuple[bool, str]:
+        """Admin re-arms the handshake for a user (e.g. forgotten password):
+        clears their password + name so they self-register again."""
+        try:
+            allowed, why = self._require_admin("reset_onboarding")
+            if not allowed:
+                return False, why
+            username = (username or "").strip()
+            rows = self.db_manager.execute_with_retry(
+                "SELECT user_id, role FROM users WHERE username = ? COLLATE NOCASE", (username,))
+            if not rows:
+                return False, "Unknown user ID."
+            self.db_manager.execute_with_retry(
+                "UPDATE users SET password = '', onboarding_pending = 1, "
+                "failed_login_attempts = 0, updated_at = datetime('now'), updated_by = ? "
+                "WHERE username = ? COLLATE NOCASE",
+                (self.current_user['username'] if self.current_user else 'SYSTEM', username))
+            self.logger.log_user_action("USER_ONBOARDING_RESET", {'username': username})
+            return True, f"'{username}' must re-register (name + password) at next login."
+        except Exception as e:
+            self.logger.error(f"Error resetting onboarding: {str(e)}", exc_info=True)
+            return False, f"Error: {str(e)}"
 
     def update_user(self, user_id: int, **kwargs) -> Tuple[bool, str]:
         """

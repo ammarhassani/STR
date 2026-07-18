@@ -72,6 +72,12 @@ class HostService:
                                    "user": {"user_id": user["user_id"], "username": user["username"],
                                             "full_name": user.get("full_name"), "role": user["role"]}}} if ok \
                     else {"id": cid, "ok": False, "error": msg}
+            elif name == "complete_onboarding":
+                # pre-auth write (two-way handshake #1): the user self-registers
+                # their name + password. No token; the method itself only allows
+                # a still-pending user, so it can't hijack a registered account.
+                ok, msg = self.auth.complete_onboarding(*cmd.get("args", []))
+                resp = {"id": cid, "ok": True, "result": [ok, msg]}
             else:
                 user = self._resolve(cmd.get("token"))
                 if not user:
@@ -92,7 +98,7 @@ class HostService:
         # retryable — recording it would poison the stable id and make a later
         # resubmit (after re-login / session-timeout / failover) replay the
         # failure instead of applying the write. Login excluded (tokens one-shot).
-        if name != "login" and resp.get("ok"):
+        if name not in ("login", "complete_onboarding") and resp.get("ok"):
             try:
                 self.db.execute_with_retry(
                     "INSERT OR IGNORE INTO applied_commands (command_id, response_json) VALUES (?, ?)",

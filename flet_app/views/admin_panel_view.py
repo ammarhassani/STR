@@ -58,7 +58,8 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
             def fetch_users():
                 # Build query
-                query = "SELECT user_id, username, full_name, role, is_active, last_login FROM users WHERE 1=1"
+                query = ("SELECT user_id, username, full_name, role, is_active, last_login, "
+                         "COALESCE(onboarding_pending, 0) FROM users WHERE 1=1")
                 params = []
 
                 # Role filter
@@ -84,7 +85,8 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         'full_name': row[2],
                         'role': row[3],
                         'is_active': row[4],
-                        'last_login': row[5]
+                        'last_login': row[5],
+                        'onboarding_pending': row[6],
                     })
                 return users
 
@@ -134,9 +136,17 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         # Build data rows
         rows = []
         for user in users_data:
-            # Status color
-            status_color = colors["success"] if user['is_active'] else colors["danger"]
-            status_text = "Active" if user['is_active'] else "Inactive"
+            # Status color — a pending user (created but not yet self-registered)
+            # is called out so the admin knows they're awaiting first-login setup.
+            if user.get('onboarding_pending'):
+                status_color = colors["warning"]
+                status_text = "Pending registration"
+            elif user['is_active']:
+                status_color = colors["success"]
+                status_text = "Active"
+            else:
+                status_color = colors["danger"]
+                status_text = "Inactive"
 
             # Last login
             last_login = user.get('last_login', '')
@@ -171,7 +181,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                     cells=[
                         ft.DataCell(ft.Text(str(user['user_id']), size=12, color=colors["text_primary"])),
                         ft.DataCell(ft.Text(user['username'], size=12, color=colors["text_primary"])),
-                        ft.DataCell(ft.Text(user['full_name'], size=12, color=colors["text_primary"])),
+                        ft.DataCell(ft.Text(user['full_name'] or "—", size=12, color=colors["text_primary"])),
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(

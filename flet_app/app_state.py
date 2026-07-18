@@ -249,6 +249,17 @@ class AppState:
             return self.login_remote(username, password)
         return self.auth_service.authenticate(username, password)
 
+    def get_onboarding_status(self, username: str) -> str:
+        """'pending' | 'active' | 'unknown' — read (local replica in client mode)."""
+        return self.auth_service.get_onboarding_status(username)
+
+    def complete_onboarding(self, username: str, full_name: str, password: str):
+        """Two-way handshake (#1): the user self-registers name + password.
+        Pre-auth write — routed to the host in client mode."""
+        if self._gateway:
+            return self._gateway.complete_onboarding(username, full_name, password)
+        return self.auth_service.complete_onboarding(username, full_name, password)
+
     def pending_writes(self) -> int:
         """Outbox depth: writes queued while the host was unreachable."""
         gw = self._gateway

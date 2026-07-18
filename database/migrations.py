@@ -1332,6 +1332,17 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"must_change_password column skipped: {str(e)}")
 
+        # onboarding_pending: two-way-handshake user creation — admin sets the
+        # user ID; the user self-registers their name + password at first login.
+        try:
+            cursor.execute("PRAGMA table_info(users)")
+            if 'onboarding_pending' not in [r[1] for r in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE users ADD COLUMN onboarding_pending INTEGER DEFAULT 0")
+                conn.commit()
+                messages.append("Added onboarding_pending column to users")
+        except Exception as e:
+            messages.append(f"onboarding_pending column skipped: {str(e)}")
+
         # Gender values: reconcile the one anomaly in an otherwise-English seed.
         # Migration 12 historically seeded gender in Arabic (ذكر/أنثى) while every
         # other category + the app (English-only per BRD) used English. Normalize

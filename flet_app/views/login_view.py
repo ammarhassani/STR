@@ -81,6 +81,84 @@ def build_login_view(
 
         page.update()
 
+    def _show_registration_dialog(username: str):
+        """Two-way handshake (#1): a user whose ID the admin created sets their
+        OWN full name + password here. The admin never learns the password."""
+        danger = colors.get("danger", "#d32f2f")
+        fullname_ref = ft.Ref[ft.TextField]()
+        pw_ref = ft.Ref[ft.TextField]()
+        confirm_ref = ft.Ref[ft.TextField]()
+        err_ref = ft.Ref[ft.Text]()
+
+        def _err(msg):
+            if err_ref.current:
+                err_ref.current.value = msg
+                err_ref.current.visible = True
+            page.update()
+
+        async def do_register():
+            full_name = (fullname_ref.current.value or "").strip() if fullname_ref.current else ""
+            pw = pw_ref.current.value or "" if pw_ref.current else ""
+            confirm = confirm_ref.current.value or "" if confirm_ref.current else ""
+            if not full_name:
+                _err("Please enter your full name."); return
+            if len(pw) < 8:
+                _err("Password must be at least 8 characters."); return
+            if pw != confirm:
+                _err("Passwords do not match."); return
+            loop = asyncio.get_event_loop()
+            ok, msg = await loop.run_in_executor(None, app_state.complete_onboarding,
+                                                 username, full_name, pw)
+            if not ok:
+                _err(msg or "Could not complete registration."); return
+            dlg.open = False
+            page.update()
+            # auto-login with the password the user just set
+            success, user, m = await loop.run_in_executor(None, app_state.authenticate, username, pw)
+            if success:
+                app_state.login(user)
+                on_login_success(user)
+            else:
+                show_login_error(m or "Registration complete — please log in.")
+
+        def submit(e):
+            page.run_task(do_register)
+
+        def cancel(e):
+            dlg.open = False
+            page.update()
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(f"Welcome — complete your registration"),
+            content=ft.Container(
+                width=380,
+                content=ft.Column(
+                    controls=[
+                        ft.Text(f"User ID: {username}", size=12, weight=ft.FontWeight.W_600,
+                                color=colors.get("text_primary")),
+                        ft.Text("Set your name and a password only you know.", size=12,
+                                color=colors.get("text_secondary")),
+                        ft.TextField(ref=fullname_ref, label="Full name", text_size=13),
+                        ft.TextField(ref=pw_ref, label="New password", password=True,
+                                     can_reveal_password=True, text_size=13),
+                        ft.TextField(ref=confirm_ref, label="Confirm password", password=True,
+                                     can_reveal_password=True, text_size=13, on_submit=submit),
+                        ft.Text(ref=err_ref, value="", color=danger, size=12, visible=False),
+                    ],
+                    tight=True, spacing=10,
+                ),
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=cancel),
+                ft.ElevatedButton("Complete Registration", on_click=submit,
+                                  bgcolor=colors.get("primary"), color=ft.Colors.WHITE),
+            ],
+        )
+        page.overlay.append(dlg)
+        dlg.open = True
+        page.update()
+
     async def do_login():
         """Perform login asynchronously."""
         username = username_ref.current.value.strip() if username_ref.current else ""
@@ -88,20 +166,31 @@ def build_login_view(
 
         # Validation
         if not username:
-            show_login_error("Please enter your username")
+            show_login_error("Please enter your user ID")
             if username_ref.current:
                 username_ref.current.focus()
             return
 
+        # Two-way handshake (#1): a user whose ID an admin created but who hasn't
+        # registered yet is routed to self-registration, NOT asked for a password.
+        set_loading(True)
+        hide_login_error()
+        try:
+            loop = asyncio.get_event_loop()
+            status = await loop.run_in_executor(None, app_state.get_onboarding_status, username)
+        except Exception:
+            status = "active"
+        if status == "pending":
+            set_loading(False)
+            _show_registration_dialog(username)
+            return
+
         if not password:
+            set_loading(False)
             show_login_error("Please enter your password")
             if password_ref.current:
                 password_ref.current.focus()
             return
-
-        # Set loading state
-        set_loading(True)
-        hide_login_error()
 
         try:
             # Run authentication in executor to not block UI

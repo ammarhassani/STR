@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL CHECK(role IN ('admin', 'supervisor', 'agent', 'reporter')),
     is_active INTEGER DEFAULT 1,
     must_change_password INTEGER DEFAULT 0, -- 1 = force a password change at next login
+    onboarding_pending INTEGER DEFAULT 0, -- 1 = admin created the ID; user self-registers name+password (two-way handshake)
     failed_login_attempts INTEGER DEFAULT 0,
     last_login TEXT,
     theme_preference TEXT DEFAULT 'light' CHECK(theme_preference IN ('light', 'dark')),

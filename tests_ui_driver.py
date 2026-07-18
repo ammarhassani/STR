@@ -285,6 +285,20 @@ def run():
     finding(E, "help dialog tabs are not scrollable",
             'ScrollMode.AUTO' not in help_src or 'scroll_pane' not in help_src)
 
+    # #1: two-way handshake onboarding must be wired
+    lv_src = open(os.path.join(REPO, 'flet_app/views/login_view.py')).read()
+    finding(E, "login does not route pending users to self-registration",
+            'get_onboarding_status' not in lv_src or '_show_registration_dialog' not in lv_src
+            or 'complete_onboarding' not in lv_src)
+    ud_src = open(os.path.join(REPO, 'flet_app/dialogs/user_dialog.py')).read()
+    finding(E, "admin user creation still sets password/full_name instead of the handshake",
+            'create_pending_user' not in ud_src)
+    finding(E, "admin user dialog still collects a password (breaks handshake)",
+            'password_ref' in ud_src)
+    ap_users = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py')).read()
+    finding(E, "admin panel does not surface pending-registration users",
+            'onboarding_pending' not in ap_users)
+
     # #6: log export must actually write a file, not stub a toast
     log_src = open(os.path.join(REPO, 'flet_app/views/log_management_view.py')).read()
     finding(E, "log export is still a TODO stub",

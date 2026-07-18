@@ -29,6 +29,21 @@ class RemoteGateway:
             return True, resp["result"].get("user"), "ok"
         return False, None, resp.get("error", "login failed")
 
+    def complete_onboarding(self, username, full_name, password):
+        """Pre-auth write (like login): the user self-registers name + password
+        against the host. No session token yet."""
+        cid = uuid.uuid4().hex
+        self.t.submit({"id": cid, "command": "complete_onboarding",
+                       "args": [username, full_name, password], "kwargs": {}})
+        try:
+            resp = self.t.await_response(cid, timeout=self.timeout)
+        except TimeoutError:
+            return False, "Host offline — cannot complete registration right now."
+        if resp.get("ok"):
+            r = resp.get("result") or [False, "unknown error"]
+            return bool(r[0]), (r[1] if len(r) > 1 else "")
+        return False, resp.get("error", "registration failed")
+
     def call(self, command_name, args, kwargs):
         cid = uuid.uuid4().hex
         command = {"id": cid, "command": command_name,
