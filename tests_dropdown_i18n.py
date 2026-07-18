@@ -80,6 +80,46 @@ def test_backward_compat_english_values():
     check("legacy getter still English", 'Male' in vals and 'ذكر' not in vals, vals)
 
 
+def test_admin_adds_bilingual_value():
+    # admin can specify BOTH English and Arabic when adding/editing a value
+    import sqlite3
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    from services.dropdown_service import DropdownService
+    from services.security_service import SecurityService
+    d = tempfile.mkdtemp(); db = os.path.join(d, "r.db")
+    initialize_database(db); migrate_database(db)
+    conn = sqlite3.connect(db)
+    conn.execute("UPDATE users SET password=?, must_change_password=0 WHERE username='admin'",
+                 (SecurityService.hash_password('Admin@1234'),))
+    conn.commit(); conn.close()
+    dbm = DatabaseManager(db); log = LoggingService(dbm, None, db_logging=False)
+    auth = AuthService(dbm, log); auth.authenticate('admin', 'Admin@1234')
+    dd = DropdownService(dbm, log, auth)
+
+    ok, _ = dd.add_dropdown_value('nationality', 'Turkish', 'admin', value_ar='تركي')
+    check("add value with en+ar succeeds", ok)
+    en = dict(dd.get_active_options('nationality', 'en'))
+    ar = dict(dd.get_active_options('nationality', 'ar'))
+    check("English mode shows the English value", en.get('Turkish') == 'Turkish', en.get('Turkish'))
+    check("Arabic mode shows the Arabic value", ar.get('Turkish') == 'تركي', ar.get('Turkish'))
+
+    row = [v for v in dd.get_all_dropdown_values('nationality') if v['value'] == 'Turkish'][0]
+    check("get_all_dropdown_values returns value_ar (for edit prefill)", row.get('value_ar') == 'تركي', row)
+    ok, _ = dd.update_dropdown_value(row['config_id'], 'Turkish', 'admin', value_ar='تركية')
+    check("edit updates the Arabic value", ok)
+    ar2 = dict(dd.get_active_options('nationality', 'ar'))
+    check("edited Arabic value applied", ar2.get('Turkish') == 'تركية', ar2.get('Turkish'))
+
+    # blank Arabic -> Arabic mode falls back to the English value
+    dd.add_dropdown_value('nationality', 'Greek', 'admin', value_ar='')
+    arg = dict(dd.get_active_options('nationality', 'ar'))
+    check("blank Arabic falls back to English", arg.get('Greek') == 'Greek', arg.get('Greek'))
+
+
 def test_arb_staff_cleaned_and_paired():
     dbm, svc = _svc()
     en = dict(svc.get_active_options('arb_staff', 'en'))
@@ -131,6 +171,7 @@ def test_second_reason_arabic_only_always():
 
 if __name__ == "__main__":
     test_arabic_labels_populated()
+    test_admin_adds_bilingual_value()
     test_arb_staff_cleaned_and_paired()
     test_maybe_junk_removed_on_prod_db()
     test_second_reason_arabic_only_always()

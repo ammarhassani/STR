@@ -193,6 +193,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.DataRow(
                     cells=[
                         ft.DataCell(ft.Text(val.get('value', ''), size=12, color=colors["text_primary"])),
+                        ft.DataCell(ft.Text(val.get('value_ar', '') or '—', size=12, color=colors["text_secondary"])),
                         ft.DataCell(ft.Text(str(val.get('display_order', 0)), size=12, color=colors["text_secondary"])),
                         ft.DataCell(
                             ft.Container(
@@ -210,6 +211,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         columns = [
             ft.DataColumn(ft.Text(t("ddm.col.value"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("ddm.col.value_ar"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
             ft.DataColumn(ft.Text(t("ddm.col.order"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
             ft.DataColumn(ft.Text(t("ddm.col.status"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
             ft.DataColumn(ft.Text(t("ddm.col.updated_by"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
@@ -259,9 +261,14 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             next_order = 0
 
         value_input = ft.TextField(
-            label=t("ddm.value"),
+            label=t("ddm.value_en"),
             value=value_data.get('value', '') if value_data else '',
             autofocus=True,
+        )
+        value_ar_input = ft.TextField(
+            label=t("ddm.value_ar"),
+            value=value_data.get('value_ar', '') if value_data else '',
+            rtl=True,
         )
         order_input = ft.TextField(
             label=t("ddm.display_order"),
@@ -272,6 +279,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def save_value(e):
             value = value_input.value.strip()
+            value_ar = (value_ar_input.value or "").strip()
             if not value:
                 show_error(page, t("ddm.err_empty"))
                 return
@@ -291,14 +299,16 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                         value_data['config_id'],
                         value,
                         username,
-                        order
+                        order,
+                        value_ar=value_ar,
                     )
                 else:
                     success, message = app_state.dropdown_service.add_dropdown_value(
                         current_category,
                         value,
                         username,
-                        order
+                        order,
+                        value_ar=value_ar,
                     )
 
                 if success:
@@ -318,12 +328,14 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text(f"{'Edit' if is_edit else 'Add'} Value - {current_category}"),
+            title=ft.Text((t("ddm.edit_value") if is_edit else t("ddm.add_value")) + f" — {current_category}"),
             content=ft.Column(
                 controls=[
                     ft.Text(t("ddm.category_label", cat=current_category), weight=ft.FontWeight.BOLD),
                     ft.Container(height=8),
                     value_input,
+                    value_ar_input,
+                    ft.Text(t("ddm.value_ar_hint"), size=11, color=colors["text_muted"]),
                     ft.Container(height=8),
                     order_input,
                     ft.Text(t("ddm.order_hint"), size=11, color=colors["text_muted"]),

@@ -203,7 +203,7 @@ class DropdownService:
             self.logger.error(f"Error getting all categories: {str(e)}")
             return {}
 
-    def add_dropdown_value(self, category: str, value: str, username: str, display_order: Optional[int] = None) -> Tuple[bool, str]:
+    def add_dropdown_value(self, category: str, value: str, username: str, display_order: Optional[int] = None, value_ar: Optional[str] = None) -> Tuple[bool, str]:
         """
         Add a new dropdown value to a category.
 
@@ -246,15 +246,15 @@ class DropdownService:
             # Generate config key
             config_key = f"{category}_{value.lower().replace(' ', '_').replace('-', '_').replace('/', '_')}"
 
-            # Insert new dropdown value
+            # Insert new dropdown value (config_value = English, config_value_ar = Arabic)
             insert_query = """
                 INSERT INTO system_config
-                (config_key, config_value, config_type, config_category, display_order, is_active, updated_at, updated_by)
-                VALUES (?, ?, 'dropdown', ?, ?, 1, ?, ?)
+                (config_key, config_value, config_value_ar, config_type, config_category, display_order, is_active, updated_at, updated_by)
+                VALUES (?, ?, ?, 'dropdown', ?, ?, 1, ?, ?)
             """
             self.db_manager.execute_with_retry(
                 insert_query,
-                (config_key, value, category, display_order, datetime.now().isoformat(), username)
+                (config_key, value, (value_ar or None), category, display_order, datetime.now().isoformat(), username)
             )
 
             self.logger.info(f"User {username} added dropdown value '{value}' to category '{category}'")
@@ -264,7 +264,7 @@ class DropdownService:
             self.logger.error(f"Error adding dropdown value: {str(e)}")
             return False, f"Error adding dropdown value: {str(e)}"
 
-    def update_dropdown_value(self, config_id: int, new_value: str, username: str, display_order: Optional[int] = None) -> Tuple[bool, str]:
+    def update_dropdown_value(self, config_id: int, new_value: str, username: str, display_order: Optional[int] = None, value_ar: Optional[str] = None) -> Tuple[bool, str]:
         """
         Update an existing dropdown value.
 
@@ -281,21 +281,21 @@ class DropdownService:
             allowed, why = self._require_admin("update")
             if not allowed:
                 return False, why
-            # Build update query
+            # Build update query (always set the Arabic label too)
             if display_order is not None:
                 update_query = """
                     UPDATE system_config
-                    SET config_value = ?, display_order = ?, updated_at = ?, updated_by = ?
+                    SET config_value = ?, config_value_ar = ?, display_order = ?, updated_at = ?, updated_by = ?
                     WHERE config_id = ? AND config_type = 'dropdown'
                 """
-                params = (new_value, display_order, datetime.now().isoformat(), username, config_id)
+                params = (new_value, (value_ar or None), display_order, datetime.now().isoformat(), username, config_id)
             else:
                 update_query = """
                     UPDATE system_config
-                    SET config_value = ?, updated_at = ?, updated_by = ?
+                    SET config_value = ?, config_value_ar = ?, updated_at = ?, updated_by = ?
                     WHERE config_id = ? AND config_type = 'dropdown'
                 """
-                params = (new_value, datetime.now().isoformat(), username, config_id)
+                params = (new_value, (value_ar or None), datetime.now().isoformat(), username, config_id)
 
             self.db_manager.execute_with_retry(update_query, params)
 
@@ -475,7 +475,7 @@ class DropdownService:
         """
         try:
             query = """
-                SELECT config_id, config_value, display_order, is_active, updated_by
+                SELECT config_id, config_value, display_order, is_active, updated_by, COALESCE(config_value_ar,'')
                 FROM system_config
                 WHERE config_type = 'dropdown' AND config_category = ?
                 ORDER BY display_order, config_value
@@ -489,7 +489,8 @@ class DropdownService:
                     'value': row[1],
                     'display_order': row[2],
                     'is_active': row[3],
-                    'updated_by': row[4]
+                    'updated_by': row[4],
+                    'value_ar': row[5],
                 })
 
             return values
