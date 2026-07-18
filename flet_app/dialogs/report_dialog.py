@@ -1202,12 +1202,42 @@ def show_report_dialog(
         visible=False,
     )
 
+    # #11: when a supervisor returns a report for rework, the agent must SEE why,
+    # front-and-center, the moment they open it — not buried in an approvals log.
+    rework_banner = None
+    if is_edit_mode and report_data and report_data.get('approval_status') == 'rework':
+        rc = app_state.approval_service.get_review_comment(
+            report_data.get('report_id') or report_data.get('id'))
+        if rc and rc.get('comment'):
+            rework_banner = ft.Container(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.ASSIGNMENT_RETURN, color=colors["danger"], size=20),
+                        ft.Column(
+                            controls=[
+                                ft.Text(f"Returned for rework by {rc.get('reviewer') or 'reviewer'}",
+                                        weight=ft.FontWeight.BOLD, size=13, color=colors["danger"]),
+                                ft.Text(rc["comment"], size=13, color=colors["text_primary"],
+                                        selectable=True),
+                            ],
+                            spacing=2, expand=True,
+                        ),
+                    ],
+                    spacing=10, vertical_alignment=ft.CrossAxisAlignment.START,
+                ),
+                bgcolor=ft.Colors.with_opacity(0.10, colors["danger"]),
+                border=ft.border.all(1, colors["danger"]),
+                border_radius=6,
+                padding=ft.padding.symmetric(10, 14),
+            )
+
     # The form fills the whole surface; the bottom padding reserves a thin strip
     # so the last field never hides under the floating buttons.
     form_area = ft.Container(
         content=ft.Column(
             controls=[
                 ft.Row(controls=header_controls, spacing=8),
+                *([rework_banner] if rework_banner else []),
                 tabs,
                 error_banner,
             ],

@@ -688,6 +688,25 @@ class ApprovalService:
 
     # ==================== Helper Methods ====================
 
+    def get_review_comment(self, report_id: int) -> Optional[Dict]:
+        """The most recent reviewer message on a report (a rework/rejection
+        comment) — what the agent needs to read. Returns {comment, status,
+        reviewed_at, reviewer} or None."""
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT ra.approval_comment, ra.approval_status, ra.reviewed_at, u.username "
+                "FROM report_approvals ra LEFT JOIN users u ON u.user_id = ra.approver_id "
+                "WHERE ra.report_id = ? AND ra.approval_status IN ('rework', 'rejected') "
+                "AND ra.approval_comment IS NOT NULL AND TRIM(ra.approval_comment) != '' "
+                "ORDER BY ra.approval_id DESC LIMIT 1", (report_id,))
+            if not rows:
+                return None
+            r = rows[0]
+            return {'comment': r[0], 'status': r[1], 'reviewed_at': r[2], 'reviewer': r[3]}
+        except Exception as e:
+            self.logger.error(f"Error getting review comment: {str(e)}")
+            return None
+
     def get_approver_users(self) -> List[Dict]:
         """Users who can approve reports (supervisors + admins). These are who a
         submit-for-approval notifies."""

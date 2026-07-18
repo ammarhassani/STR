@@ -242,6 +242,16 @@ def run():
     finding(E, 'reservation dialog missing reserve_block wiring',
             'reserve_block' not in rsv)
 
+    # #2 + #11: My Work must be wired end-to-end (nav item, route, title) and the
+    # edit dialog must surface the reviewer's rework message.
+    sb_src = open(os.path.join(REPO, 'flet_app/components/sidebar.py')).read()
+    finding(E, "My Work nav item missing (gated on add_report)",
+            '/my-work' not in sb_src or "has_permission('add_report')" not in sb_src)
+    finding(E, "main.py missing /my-work route wiring",
+            '/my-work' not in main_src2 or 'build_my_work_view' not in main_src2)
+    finding(E, "report dialog does not surface the rework/review comment (#11)",
+            'get_review_comment' not in rd_src)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]

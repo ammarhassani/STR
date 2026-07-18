@@ -39,6 +39,11 @@ def create_sidebar(
             {"icon": ft.Icons.DOWNLOAD, "label": "Export", "route": "/export"},
         ]
 
+        # My Work: a personal queue for anyone who creates reports (agent /
+        # supervisor / admin) — drafts, returned-for-rework, pending, approved.
+        if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
+            items.insert(2, {"icon": ft.Icons.INBOX, "label": "My Work", "route": "/my-work"})
+
         auth = app_state.auth_service
         can_approve = bool(auth and auth.has_permission('approve_reports'))
 

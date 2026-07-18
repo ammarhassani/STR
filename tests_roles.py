@@ -189,10 +189,50 @@ def test_submit_autosaves():
     check("resubmitted report is pending for the supervisor again", apid2 in pend, pend)
 
 
+def test_my_work_lanes_and_review_comment():
+    # #2 + #11: My Work groups a user's OWN reports by status, and a returned
+    # report carries the supervisor's message (get_review_comment).
+    dbm, auth, numbers, reports, approvals = _services()
+    auth.authenticate('admin', 'Admin@1234')
+    auth.create_user('ma', 'Pass@123', 'MA', 'agent')
+    auth.create_user('mb', 'Pass@123', 'MB', 'agent')
+    auth.create_user('msup', 'Pass@123', 'MSup', 'supervisor')
+
+    # ma submits two reports; msup returns ONE for rework
+    ok1, rid1, apid1, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma')
+    ok2, rid2, apid2, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma')
+    check("setup: two ma reports pending", ok1 and ok2 and apid1 and apid2)
+    # a different agent's report must NOT leak into ma's lanes
+    okb, ridb, apidb, _ = _make_and_submit(dbm, auth, numbers, reports, 'mb')
+    auth.authenticate('msup', 'Pass@123')
+    okr, _ = approvals.reject_report(apid1, 'Fix the nationality field please', request_rework=True)
+    check("supervisor returns rid1 for rework", okr)
+    oka, _ = approvals.approve_report(apid2, 'ok')
+    check("supervisor approves rid2", oka)
+
+    # lane filtering: ma sees exactly her own report in each lane
+    auth.authenticate('ma', 'Pass@123')
+    rework, n_rework = reports.get_reports(status='rework', created_by='ma', limit=None)
+    approved, n_appr = reports.get_reports(status='approved', created_by='ma', limit=None)
+    check("ma rework lane has exactly rid1", n_rework == 1 and rework[0]['report_id'] == rid1, (n_rework, rework))
+    check("ma approved lane has exactly rid2", n_appr == 1 and approved[0]['report_id'] == rid2, (n_appr, approved))
+    # cross-user isolation: mb's report never appears for ma
+    all_ma = sum(reports.get_reports(status=s, created_by='ma', limit=None)[1]
+                 for s in ('draft', 'pending_approval', 'approved', 'rejected', 'rework'))
+    check("ma sees only her own reports (no leak from mb)", all_ma == 2, all_ma)
+
+    # #11: the returned report carries the reviewer's message
+    rc = approvals.get_review_comment(rid1)
+    check("rework report exposes reviewer comment", rc and rc['comment'] == 'Fix the nationality field please', rc)
+    check("review comment names the reviewer (msup)", rc and rc['reviewer'] == 'msup', rc)
+    check("an approved report has no rework/reject comment", approvals.get_review_comment(rid2) is None)
+
+
 if __name__ == "__main__":
     test_permissions_map()
     test_role_creation_and_routing()
     test_migration_rebuilds_old_check()
     test_submit_autosaves()
+    test_my_work_lanes_and_review_comment()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

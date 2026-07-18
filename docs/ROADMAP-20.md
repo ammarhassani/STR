@@ -25,7 +25,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    *Do:* add "Select all / Clear all" to the number list used for transfer.
    Small UI on top of the existing owned-block reservation.
 
-2. **Agent work queues (find my reworked/returned reports)** — ☐
+2. **Agent work queues (find my reworked/returned reports)** — ☑ (My Work view: Returned-for-Rework / Draft / Pending / Approved lanes, own reports only, counts, click-to-edit; nav gated on add_report; route+title wired; lane grouping + cross-user isolation tested)
    *Ask:* reworked reports are unfindable.
    *Do:* build an agent **"My Work"** view with clear lanes — Draft, Returned/
    Rework, Pending Approval, Approved — with counts. Rework lane is front and
@@ -74,7 +74,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Ask:* more content visible.
     *Do:* enlarge the review/report dialog (width/height + layout).
 
-11. **Agent sees the supervisor's message on a reworked report** — ☐
+11. **Agent sees the supervisor's message on a reworked report** — ☑ (get_review_comment surfaces the latest rework/reject comment + reviewer; shown as a red banner atop the edit dialog AND on each My Work rework card; tested)
     *Ask:* read the reviewer's note.
     *Do:* surface the rework comment on the report inside the agent's queue (#2)
     and on the report view.
