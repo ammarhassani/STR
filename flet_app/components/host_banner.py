@@ -21,8 +21,8 @@ def build_host_banner(app_state):
             container.visible = False
         else:
             n = app_state.pending_writes()
-            text.value = (f"Host offline — read-only. New entries are queued and will "
-                          f"sync when the host returns ({n} pending).")
+            from i18n import t
+            text.value = t("hostbanner.offline", n=n)
             container.visible = True
 
     container.refresh = refresh

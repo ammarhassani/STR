@@ -3,6 +3,7 @@ Setup Wizard View for FIU Report Management System.
 Multi-step wizard for first-time setup.
 """
 import flet as ft
+from i18n import t
 import asyncio
 import os
 import threading
@@ -41,24 +42,24 @@ def build_setup_wizard(
 
     # Controls
     db_path_input = ft.TextField(
-        label="Database File Path",
+        label=t("wiz.db_path"),
         value=default_db_path,
         hint_text="Select location for database file",
     )
 
     backup_path_input = ft.TextField(
-        label="Backup Directory",
+        label=t("wiz.backup_dir"),
         value=default_backup_path,
         hint_text="Select directory for backups",
     )
 
     mode_group = ft.RadioGroup(value="local", content=ft.Column([
-        ft.Radio(value="local", label="Single PC (local database)"),
-        ft.Radio(value="host",  label="Host PC (this PC serves the shared team)"),
-        ft.Radio(value="client", label="Client PC (connect to a host over the shared folder)"),
+        ft.Radio(value="local", label=t("wiz.mode.local")),
+        ft.Radio(value="host",  label=t("wiz.mode.host")),
+        ft.Radio(value="client", label=t("wiz.mode.client")),
     ]))
     share_path_input = ft.TextField(
-        label="Shared folder path (host/client)",
+        label=t("wiz.share_path"),
         value="",
         hint_text="Path to the shared network folder",
     )
@@ -77,12 +78,12 @@ def build_setup_wizard(
 
     # Navigation buttons
     back_btn = ft.ElevatedButton(
-        "← Back",
+        t("wiz.back"),
         visible=False,
     )
 
     next_btn = ft.ElevatedButton(
-        "Next →",
+        t("wiz.next"),
         bgcolor=colors["primary"],
         color=ft.Colors.WHITE,
     )
@@ -90,7 +91,7 @@ def build_setup_wizard(
     def update_step_indicator():
         """Update step indicator UI."""
         step_indicator.controls.clear()
-        steps = ["Welcome", "Configure Paths", "Create Database", "Complete"]
+        steps = [t("wiz.step.welcome"), t("wiz.step.paths"), t("wiz.step.database"), t("wiz.step.complete")]
 
         for i, step_name in enumerate(steps):
             is_current = i == current_step
@@ -143,7 +144,7 @@ def build_setup_wizard(
                     ft.Icon(ft.Icons.ANALYTICS, size=64, color=colors["primary"]),
                     ft.Container(height=16),
                     ft.Text(
-                        "Welcome to FIU Report Management System",
+                        t("wiz.welcome_title"),
                         size=24,
                         weight=ft.FontWeight.BOLD,
                         color=colors["text_primary"],
@@ -161,11 +162,11 @@ def build_setup_wizard(
                     ft.Container(
                         content=ft.Column(
                             controls=[
-                                ft.Text("You will configure:", size=13, color=colors["text_primary"]),
+                                ft.Text(t("wiz.will_configure"), size=13, color=colors["text_primary"]),
                                 ft.Container(height=8),
-                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text("Database location", size=13)], spacing=8),
-                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text("Backup directory", size=13)], spacing=8),
-                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text("Initial system settings", size=13)], spacing=8),
+                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text(t("wiz.cfg.db"), size=13)], spacing=8),
+                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text(t("wiz.cfg.backup"), size=13)], spacing=8),
+                                ft.Row([ft.Icon(ft.Icons.CHECK_CIRCLE, size=16, color=colors["success"]), ft.Text(t("wiz.cfg.settings"), size=13)], spacing=8),
                             ],
                             spacing=4,
                         ),
@@ -226,7 +227,7 @@ def build_setup_wizard(
         db_section = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Database File Location", weight=ft.FontWeight.W_600, size=13),
+                    ft.Text(t("wiz.db_location"), weight=ft.FontWeight.W_600, size=13),
                     ft.Text(
                         "Choose where to store the main database file",
                         size=11,
@@ -236,7 +237,7 @@ def build_setup_wizard(
                     ft.Row(
                         controls=[
                             ft.Container(content=db_path_input, expand=True),
-                            ft.ElevatedButton("Browse...", on_click=browse_db),
+                            ft.ElevatedButton(t("wiz.browse"), on_click=browse_db),
                         ],
                         spacing=8,
                     ),
@@ -253,7 +254,7 @@ def build_setup_wizard(
         share_section = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Shared Folder Path", weight=ft.FontWeight.W_600, size=13),
+                    ft.Text(t("wiz.share_folder"), weight=ft.FontWeight.W_600, size=13),
                     ft.Text(
                         "Network folder used to exchange data with the host",
                         size=11,
@@ -298,7 +299,7 @@ def build_setup_wizard(
                     ft.Container(
                         content=ft.Column(
                             controls=[
-                                ft.Text("Deployment Mode", weight=ft.FontWeight.W_600, size=13),
+                                ft.Text(t("wiz.deploy_mode"), weight=ft.FontWeight.W_600, size=13),
                                 mode_group,
                             ],
                             spacing=4,
@@ -320,7 +321,7 @@ def build_setup_wizard(
                     ft.Container(
                         content=ft.Column(
                             controls=[
-                                ft.Text("Backup Directory", weight=ft.FontWeight.W_600, size=13),
+                                ft.Text(t("wiz.backup_dir"), weight=ft.FontWeight.W_600, size=13),
                                 ft.Text(
                                     "Choose where to store automatic backups",
                                     size=11,
@@ -330,7 +331,7 @@ def build_setup_wizard(
                                 ft.Row(
                                     controls=[
                                         ft.Container(content=backup_path_input, expand=True),
-                                        ft.ElevatedButton("Browse...", on_click=browse_backup),
+                                        ft.ElevatedButton(t("wiz.browse"), on_click=browse_backup),
                                     ],
                                     spacing=8,
                                 ),
@@ -400,7 +401,7 @@ def build_setup_wizard(
                     ft.Icon(ft.Icons.CHECK_CIRCLE, size=80, color=colors["success"]),
                     ft.Container(height=16),
                     ft.Text(
-                        "Setup Completed Successfully!",
+                        t("wiz.complete_title"),
                         size=24,
                         weight=ft.FontWeight.BOLD,
                         color=colors["text_primary"],
@@ -468,11 +469,11 @@ def build_setup_wizard(
         if current_step == 0:
             content_container.content = build_welcome_step()
             back_btn.visible = False
-            next_btn.text = "Next →"
+            next_btn.text = t("wiz.next")
         elif current_step == 1:
             content_container.content = build_paths_step()
             back_btn.visible = True
-            next_btn.text = "Next →"
+            next_btn.text = t("wiz.next")
         elif current_step == 2:
             content_container.content = build_creation_step()
             back_btn.visible = False
@@ -483,7 +484,7 @@ def build_setup_wizard(
             content_container.content = build_complete_step()
             back_btn.visible = False
             next_btn.visible = True
-            next_btn.text = "Finish"
+            next_btn.text = t("wiz.finish")
 
         update_step_indicator()
         page.update()
@@ -499,7 +500,7 @@ def build_setup_wizard(
             if not share_path:
                 return False, "Please specify the shared folder path."
             if not os.path.isdir(share_path):
-                return False, "Shared folder path does not exist or is not accessible."
+                return False, t("wiz.err_share")
             return True, "client"
 
         db_path = db_path_input.value.strip() if db_path_input.value else ""
@@ -647,7 +648,7 @@ def build_setup_wizard(
 
                 confirm_dialog = ft.AlertDialog(
                     modal=True,
-                    title=ft.Text("Database Exists"),
+                    title=ft.Text(t("wiz.db_exists")),
                     content=ft.Text(
                         f"A database already exists at:\n{db_path_input.value}\n\n"
                         "Do you want to use the existing database or create a new one?"
