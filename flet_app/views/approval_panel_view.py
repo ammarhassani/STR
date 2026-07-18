@@ -69,6 +69,10 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         Approval panel column
     """
     colors = theme_manager.get_colors()
+    from i18n import t, get_language
+    from i18n.fields import field_label
+    _lang = get_language()
+    _db = app_state.db_manager
 
     # State
     pending_approvals = []
@@ -119,9 +123,9 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         # Update stats
         if stats_ref.current:
             if pending_approvals:
-                stats_ref.current.value = f"Showing {len(pending_approvals)} pending approval request(s)"
+                stats_ref.current.value = t("appr.showing", n=len(pending_approvals))
             else:
-                stats_ref.current.value = "No pending approval requests at this time."
+                stats_ref.current.value = t("appr.none")
 
         # Show empty state or table
         if not pending_approvals:
@@ -168,7 +172,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(
-                                    "Pending",
+                                    t("appr.pending"),
                                     size=11,
                                     color=ft.Colors.WHITE,
                                 ),
@@ -187,7 +191,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ),
                         ft.DataCell(
                             ft.ElevatedButton(
-                                "Review",
+                                t("appr.review"),
                                 icon=ft.Icons.RATE_REVIEW,
                                 bgcolor=colors["primary"],
                                 color=ft.Colors.WHITE,
@@ -199,12 +203,12 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             )
 
         columns = [
-            ft.DataColumn(ft.Text("Report #", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Entity Name", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Requested By", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Requested At", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Comment", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.report"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.entity"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.requested_by"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.requested_at"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.status"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("appr.col.comment"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
             ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
         ]
 
@@ -261,7 +265,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             row_fields = []
             for field in REPORT_FIELDS:
                 key = field['key']
-                label = field['label']
+                label = field_label(_db, field['key'], _lang, default=field['label'])
                 always_readonly = field.get('readonly', False)  # SN and Report Number
                 field_type = field.get('type', 'text')
                 value = str(report_data.get(key, '') or '')
@@ -432,7 +436,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             # Handle Edit action - just enable edit mode, don't close dialog
             if decision == "edit":
                 toggle_edit_mode(True)
-                show_success(page, "Edit mode enabled. You can now modify the form fields.")
+                show_success(page, t("appr.edit_enabled"))
                 return
 
             # Validate comment for reject/rework
@@ -533,7 +537,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                 # Save button (hidden by default, shown in edit mode)
                                 ft.ElevatedButton(
                                     ref=save_btn_ref,
-                                    text="Save Changes",
+                                    text=t("appr.save_changes"),
                                     icon=ft.Icons.SAVE,
                                     bgcolor=colors["primary"],
                                     color=ft.Colors.WHITE,
@@ -543,7 +547,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                                 # Approve button (hidden by default, shown in edit mode)
                                 ft.ElevatedButton(
                                     ref=approve_btn_ref,
-                                    text="Approve Report",
+                                    text=t("appr.approve_report"),
                                     icon=ft.Icons.CHECK_CIRCLE,
                                     bgcolor=colors["success"],
                                     color=ft.Colors.WHITE,
@@ -560,7 +564,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                             content=ft.Row(
                                 controls=[
                                     ft.ProgressRing(width=20, height=20),
-                                    ft.Text("Loading report data...", size=12),
+                                    ft.Text(t("appr.loading"), size=12),
                                 ],
                                 spacing=8,
                             ),
@@ -580,16 +584,16 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.Divider(height=1, color=colors["border"]),
 
                         # Decision section
-                        ft.Text("Your Decision", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+                        ft.Text(t("appr.your_decision"), size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
                         ft.RadioGroup(
                             value="approve",
                             on_change=on_decision_change,
                             content=ft.Column(
                                 controls=[
-                                    ft.Radio(value="approve", label="Approve - Report is accurate and complete"),
-                                    ft.Radio(value="rework", label="Request Rework - Send back for corrections"),
-                                    ft.Radio(value="reject", label="Reject - Report is invalid"),
-                                    ft.Radio(value="edit", label="Edit - Modify report fields yourself"),
+                                    ft.Radio(value="approve", label=t("appr.opt.approve")),
+                                    ft.Radio(value="rework", label=t("appr.opt.rework")),
+                                    ft.Radio(value="reject", label=t("appr.opt.reject")),
+                                    ft.Radio(value="edit", label=t("appr.opt.edit")),
                                 ],
                                 spacing=4,
                             ),
@@ -597,8 +601,8 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
                         ft.TextField(
                             ref=comment_ref,
-                            label="Decision Comment (required for Rework/Reject)",
-                            hint_text="Enter feedback or reasons for this decision...",
+                            label=t("appr.comment"),
+                            hint_text=t("appr.comment_hint"),
                             multiline=True,
                             min_lines=2,
                             max_lines=3,
@@ -609,9 +613,9 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         # different active agent. Only relevant for Rework.
                         searchable_dropdown(
                             ref=reassign_ref,
-                            label="Reassign rework to (optional)",
-                            hint_text="Keep current agent",
-                            options=[ft.dropdown.Option(key="", text="-- Keep current agent --")] + [
+                            label=t("appr.reassign"),
+                            hint_text=t("appr.keep_agent"),
+                            options=[ft.dropdown.Option(key="", text=t("appr.keep_agent_opt"))] + [
                                 ft.dropdown.Option(key=a['username'], text=a['full_name'] or a['username'])
                                 for a in (app_state.approval_service.get_active_agents()
                                           if app_state.approval_service else [])
