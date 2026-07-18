@@ -270,17 +270,14 @@ def run():
             'cic_history' in rd_src.split('def validate_form')[-1][:1500]
             or 'account_rapid_repeat' in rd_src.split('def validate_form')[-1][:1500])
 
-    # #13: second reason for suspicion is a narrative (schema TEXT) — must be a
-    # free-text field like the first reason, NOT a constrained dropdown.
-    # anchor on the field's ref inside its TextField (stable across localization)
+    # second reason for suspicion is a PICK from the FIU's standard list — a
+    # searchable dropdown (NOT free text). First reason stays free text.
     _si = rd_src.find('ref=second_reason_ref')
-    _sr = rd_src[_si:_si + 300] if _si >= 0 else ''
-    finding(E, "second reason for suspicion is still a dropdown (not editable free text)",
-            'searchable_dropdown' in _sr or 'dropdown.Option' in _sr)
-    finding(E, "second reason for suspicion is not a multiline text field",
-            'second_reason_ref' not in _sr or 'multiline=True' not in _sr)
-    finding(E, "second reason still saved via get_dropdown_value",
-            "'second_reason_for_suspicion': get_dropdown_value" in rd_src)
+    _sr = rd_src[max(0, _si - 120):_si + 200] if _si >= 0 else ''
+    finding(E, "second reason for suspicion is not a dropdown",
+            'searchable_dropdown' not in _sr)
+    finding(E, "second reason saved via get_value instead of get_dropdown_value",
+            "'second_reason_for_suspicion': get_value" in rd_src)
 
     # #3 Phase 1b: report form binds localized options (English-canonical value +
     # localized label) so the DB stays single-language while the user sees theirs.

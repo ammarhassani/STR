@@ -74,7 +74,8 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     dropdowns enforce a real choice; edit-mode defaults to the current value
     ("keep current"). Baked into the custom searchable dropdown (#SD).
 
-13. **Second reason of suspicion not editable** — ☑ (root cause: rendered as a constrained dropdown while the schema declares it TEXT and the column is TEXT — a narrative like the first reason; now a free-text multiline field identical to the first reason, saved via get_value; dead second_reasons fetch removed; ui_driver structural guards)
+13. **Second reason of suspicion — dropdown must WORK** — ☑ (CORRECTED: owner wanted the dropdown to function, not to become free text. My first pass wrongly made it free-text; reverted. Now a SEARCHABLE dropdown picking from the FIU's standard second-reason list (get_active_options, localized-ready), saved via get_dropdown_value. First reason stays free-text narrative. ui_driver guards flipped to assert it IS a dropdown.)
+    *Note:* the 157 second-reason values are mixed en/ar + unpaired — bilingual pairing (config_value_ar) is a follow-up content task; the dropdown shows/stores them as-is for now.
 
 14. **Rapid-repeat account banner (multiple entries on one account, 0–2 days)** — ☑ (IntelligenceService.account_rapid_repeat windows same-account reports on report_date ±2 days; on-blur non-blocking warning banner listing the repeats; ≥1 other report in window = structuring signal; shares the #5 layer; tests_intelligence.py)
 

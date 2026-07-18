@@ -90,6 +90,7 @@ def show_report_dialog(
         return dropdown_service.get_active_options(cat, _lang) if dropdown_service else []
     genders = _opts('gender')
     nationalities = _opts('nationality')
+    second_reasons = _opts('second_reason_for_suspicion')
     transaction_types = _opts('type_of_suspected_transaction')
     arb_staff_values = dropdown_service.get_active_dropdown_values('arb_staff') if dropdown_service else []
     classifications = _opts('report_classification')
@@ -114,7 +115,7 @@ def show_report_dialog(
     branch_ref = ft.Ref[ft.TextField]()
     cic_ref = ft.Ref[ft.TextField]()
     first_reason_ref = ft.Ref[ft.TextField]()
-    second_reason_ref = ft.Ref[ft.TextField]()
+    second_reason_ref = ft.Ref[ft.Dropdown]()
     transaction_type_ref = ft.Ref[ft.Dropdown]()
     arb_staff_ref = ft.Ref[ft.Dropdown]()
     total_transaction_ref = ft.Ref[ft.TextField]()
@@ -479,7 +480,7 @@ def show_report_dialog(
             'branch_id': get_value(branch_ref) or None,
             'cic': get_value(cic_ref) or None,
             'first_reason_for_suspicion': get_value(first_reason_ref) or None,
-            'second_reason_for_suspicion': get_value(second_reason_ref) or None,
+            'second_reason_for_suspicion': get_dropdown_value(second_reason_ref),
             'type_of_suspected_transaction': get_dropdown_value(transaction_type_ref),
             'arb_staff': get_dropdown_value(arb_staff_ref),
             'total_transaction': get_value(total_transaction_ref) or None,
@@ -1013,15 +1014,11 @@ def show_report_dialog(
                     ft.Column(
                         controls=[
                             ft.Text(_flabel("second_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            # #13: a reason for suspicion is a narrative (schema TYPE=TEXT,
-                            # column TEXT) — free text like the first reason, not a
-                            # constrained dropdown the analyst can't type into.
-                            ft.TextField(
+                            # Second reason is a PICK from the FIU's standard suspicion-
+                            # reason list (searchable). First reason stays free-text.
+                            searchable_dropdown(
                                 ref=second_reason_ref,
-                                hint_text=t("form.hint.second_reason"),
-                                multiline=True,
-                                min_lines=3,
-                                max_lines=5,
+                                options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in second_reasons],
                                 text_size=13,
                                 border_radius=4,
                             ),
