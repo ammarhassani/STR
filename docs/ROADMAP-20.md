@@ -65,10 +65,8 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    supervisors, keep agents reserving their own numbers. Foundational for
    #2/#3/#7/#11.
 
-9. **Review screen: gender greyed out, value not printed** — ☐
-   *Ask:* it must show the stored value.
-   *Do:* fix the review renderer so gender (and any similarly-disabled field)
-   displays its saved value.
+9. **Review screen: gender greyed out, value not printed** — ☑ (locked review shows gender as a readable read-only field like every other field; edit mode swaps to a constrained dropdown sourced from live gender values UNIONED with the stored value, so a review never blanks recorded data even across language/config changes; `review_field_options` pure helper + tests_review_screen.py)
+   *Note:* uncovered a systemic gender-values inconsistency (schema CHECK + dropdown_config seed Arabic ذكر/أنثى, seed_dropdowns.py seeds English Male/Female, form sources from dropdown_service) — the review fix is robust to it, but the three-way source mismatch is a separate landmine to reconcile (own item, TBD).
 
 10. **Bigger review screen** — ☐
     *Ask:* more content visible.

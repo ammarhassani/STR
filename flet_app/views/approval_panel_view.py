@@ -47,6 +47,16 @@ REPORT_FIELDS = [
 ]
 
 
+def review_field_options(live_values, stored_value):
+    """Option set for a constrained field on the review screen: the currently
+    active values, plus the stored value if it isn't among them — so a review
+    can NEVER drop or blank recorded data, even when the option set changed (or
+    was seeded in a different language) after the report was written. Order
+    preserved, duplicates and empties removed."""
+    return list(dict.fromkeys(
+        [v for v in (live_values or []) if v] + ([stored_value] if stored_value else [])))
+
+
 def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
     """
     Build the approval panel view.
@@ -258,15 +268,30 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
                 # All fields start as readonly (locked)
                 if field_type == 'dropdown':
-                    options = field.get('options', [])
-                    control = searchable_dropdown(
-                        label=label,
-                        value=value if value in options else '',
-                        options=[ft.dropdown.Option(o) for o in options],
-                        disabled=True,  # Start disabled
-                        text_size=12,
-                        width=280,
+                    # #9: a locked review must READ like every other field — a plain,
+                    # readable value, never greyed-out or blank. So locked = a
+                    # read-only text field showing the stored value; edit mode swaps
+                    # to a constrained dropdown. Options come from the SAME source the
+                    # form uses (not a hardcoded English list that silently blanks any
+                    # value stored in another language/config), unioned with the stored
+                    # value so a review can never drop recorded data.
+                    live = (app_state.dropdown_service.get_active_dropdown_values(key)
+                            if app_state.dropdown_service else [])
+                    opts = review_field_options(live, value)
+                    display = ft.TextField(
+                        label=label, value=value, read_only=True, text_size=12,
+                        width=280, bgcolor=colors["bg_tertiary"],
                     )
+                    editor = searchable_dropdown(
+                        label=label,
+                        value=value if value in opts else '',
+                        options=[ft.dropdown.Option(o) for o in opts],
+                        text_size=12, width=280,
+                    )
+                    editor.visible = False   # locked by default; shown in edit mode
+                    control = ft.Column(controls=[display, editor], spacing=0, tight=True, width=280)
+                    field_refs[key] = {'control': control, 'display': display, 'editor': editor,
+                                       'always_readonly': always_readonly, 'type': 'dropdown'}
                 else:
                     control = ft.TextField(
                         label=label,
@@ -276,8 +301,8 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         width=280,
                         bgcolor=colors["bg_tertiary"],
                     )
+                    field_refs[key] = {'control': control, 'always_readonly': always_readonly, 'type': field_type}
 
-                field_refs[key] = {'control': control, 'always_readonly': always_readonly, 'type': field_type}
                 row_fields.append(control)
 
                 # Create row every 2 fields
@@ -323,7 +348,9 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                     continue
 
                 if field_type == 'dropdown':
-                    control.disabled = not enable
+                    # swap readable display <-> constrained editor
+                    field_info['display'].visible = not enable
+                    field_info['editor'].visible = enable
                 else:
                     control.read_only = not enable
                     control.bgcolor = None if enable else colors["bg_tertiary"]
@@ -342,11 +369,11 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             """Get current form data."""
             data = {}
             for key, field_info in field_refs.items():
-                control = field_info['control']
-                if isinstance(control, ft.Dropdown):
-                    data[key] = control.value or ''
+                if field_info['type'] == 'dropdown':
+                    # the editor holds the (constrained) value; the display is read-only
+                    data[key] = field_info['editor'].value or ''
                 else:
-                    data[key] = control.value or ''
+                    data[key] = field_info['control'].value or ''
             return data
 
         def save_changes(e):
