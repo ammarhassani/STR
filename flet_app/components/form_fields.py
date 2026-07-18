@@ -146,6 +146,7 @@ def create_date_picker(
     ref: Optional[ft.Ref] = None,
     page: Optional[ft.Page] = None,
     hint_text: str = "DD/MM/YYYY",
+    on_blur: Optional[Callable] = None,
 ) -> ft.Column:
     """A labelled date field: type it, or pick it off a calendar.
 
@@ -169,6 +170,7 @@ def create_date_picker(
         content_padding=ft.padding.symmetric(horizontal=12, vertical=10),
         border_radius=4,
         on_change=on_change,
+        on_blur=on_blur,
         expand=True,
     )
 
@@ -180,11 +182,13 @@ def create_date_picker(
             picked_value = getattr(ev.control, "value", None)
             if picked_value:
                 date_field.value = picked_value.strftime("%d/%m/%Y")
-                if on_change:
-                    try:
-                        on_change(ev)
-                    except Exception:
-                        pass
+                # a picked date goes through the same validation as a typed one
+                for hook in (on_change, on_blur):
+                    if hook:
+                        try:
+                            hook(ev)
+                        except Exception:
+                            pass
                 try:
                     date_field.update()
                 except Exception:

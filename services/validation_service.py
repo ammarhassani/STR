@@ -829,6 +829,21 @@ class ValidationService:
                     error_msg = rules.get('error_message', f"Invalid format for {display_name}")
                     return False, error_msg
 
+            # Apply date-format validation. Several columns carry
+            # {"format": "DD/MM/YYYY"} in column_settings, but nothing acted on
+            # it: '31/31/2026' and 'yesterday' passed every UI check and were
+            # only caught at save time deep in the report service. A date field
+            # must reject a value that is not a real calendar date.
+            fmt = rules.get('format')
+            if fmt:
+                py_fmt = (str(fmt).upper()
+                          .replace('DD', '%d').replace('MM', '%m')
+                          .replace('YYYY', '%Y').replace('YY', '%y'))
+                try:
+                    datetime.strptime(value, py_fmt)
+                except ValueError:
+                    return False, rules.get('error_message', f"Must be a real date ({fmt})")
+
             # Apply length validation
             if 'maxLength' in rules and len(value) > rules['maxLength']:
                 return False, f"Must be at most {rules['maxLength']} characters"

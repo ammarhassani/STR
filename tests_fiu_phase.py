@@ -259,6 +259,113 @@ def test_dialog_exposes_every_required_fiu_field():
     check("date fields offer a calendar to pick from", len(pickers) >= 3, len(pickers))
 
 
+def test_live_validation_and_hidden_echo_fields():
+    """Errors must appear as the analyst types, not only when they hit Save,
+    and a field that only echoes a checkbox must not take up screen space."""
+    import flet as ft
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
+
+    class FakePage:
+        def __init__(self):
+            self.overlay = []
+            self.snack_bar = None
+        def update(self): pass
+        def run_task(self, fn, *a): pass
+
+    def walk(control):
+        seen, stack = set(), [control]
+        while stack:
+            c = stack.pop()
+            if c is None or id(c) in seen:
+                continue
+            seen.add(id(c)); yield c
+            for attr in ('controls', 'content', 'actions', 'title', 'tabs'):
+                v = getattr(c, attr, None)
+                if isinstance(v, (list, tuple)):
+                    stack.extend(v)
+                elif v is not None and 'flet' in str(type(v)):
+                    stack.append(v)
+
+    auth, reports, nums, appr, dbm = _setup()
+    from services.validation_service import ValidationService
+    from services.logging_service import LoggingService
+    auth.authenticate('agent1', 'Pass@123')
+    nums.reserve_block('agent1', 2)
+
+    class _State: pass
+    st = _State()
+    st.report_service = reports; st.approval_service = appr
+    st.report_number_service = nums; st.auth_service = auth
+    st.db_manager = dbm; st.current_user = auth.get_current_user()
+    st.dropdown_service = None
+    st.validation_service = ValidationService(dbm, None, auth)
+    st.logging_service = None; st.version_service = None
+    st.intelligence_service = None
+
+    from dialogs.report_dialog import show_report_dialog
+    page = FakePage()
+    show_report_dialog(page, st, report_data=None)
+    if not page.overlay:
+        check("dialog opens for the live-validation check", False)
+        return
+    tree = page.overlay[-1]
+
+    fields = [c for c in walk(tree) if isinstance(c, ft.TextField)]
+
+    # a field that echoes a checkbox must not be on screen
+    echoes = [c for c in fields if getattr(c, 'read_only', False)
+              and str(getattr(c, 'value', '')) in ('ID', 'CR', 'Current Account', 'Membership')]
+    for c in echoes:
+        check(f"the read-only echo field '{c.value}' is hidden",
+              not _is_visible(c, tree), c.value)
+
+    # typing an impossible date must flag the field immediately, with no Save
+    date_fields = [c for c in fields
+                   if 'dd/mm/yyyy' in (getattr(c, 'hint_text', '') or '').lower()]
+    check("date fields are present to validate", bool(date_fields))
+    flagged = False
+    for c in date_fields:
+        if not c.on_change:
+            continue
+        c.value = "31/31/2026"
+        c.on_change(None)
+        if c.error_text:
+            flagged = True
+            break
+    check("typing an impossible date flags the field live (no Save needed)", flagged)
+
+    # and correcting it clears the error again
+    if flagged:
+        c.value = "01/07/2026"
+        c.on_change(None)
+        check("correcting the date clears the live error", not c.error_text, c.error_text)
+
+
+def _is_visible(control, tree):
+    """A control is visible only if it and every ancestor are visible."""
+    import flet as ft
+    parents = {}
+    stack = [tree]
+    seen = set()
+    while stack:
+        c = stack.pop()
+        if c is None or id(c) in seen:
+            continue
+        seen.add(id(c))
+        for attr in ('controls', 'content', 'actions', 'title', 'tabs'):
+            v = getattr(c, attr, None)
+            kids = v if isinstance(v, (list, tuple)) else ([v] if v is not None and 'flet' in str(type(v)) else [])
+            for k in kids:
+                parents[id(k)] = c
+                stack.append(k)
+    node = control
+    while node is not None:
+        if getattr(node, 'visible', True) is False:
+            return False
+        node = parents.get(id(node))
+    return True
+
+
 if __name__ == "__main__":
     test_saving_does_not_submit()
     test_cannot_submit_without_fiu_details()
@@ -269,5 +376,6 @@ if __name__ == "__main__":
     test_waiting_report_stays_editable()
     test_admin_reports_skip_the_basket()
     test_dialog_exposes_every_required_fiu_field()
+    test_live_validation_and_hidden_echo_fields()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail) + ' FAILED'}")
     sys.exit(1 if _fail else 0)

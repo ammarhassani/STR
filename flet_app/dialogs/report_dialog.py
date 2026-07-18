@@ -337,6 +337,49 @@ def show_report_dialog(
                 report_number_ref.current.error_text = None
             page.update()
 
+    def live_check(column, ref, context=None):
+        """Build an on_change/on_blur handler that validates ONE field live.
+
+        The rules come from the same database-backed validator the Save button
+        uses (column_settings), so what the analyst sees while typing is exactly
+        what will be enforced when they save -- no second, drifting copy of the
+        rules living in the UI.
+
+        While TYPING, only the format is checked: flashing "is required" at
+        someone who has not finished the first character is noise. The required
+        check joins in on BLUR, when leaving a field empty is a real statement.
+        """
+        def handler(e=None, check_required=False):
+            control = ref.current
+            if control is None or validation_service is None:
+                return
+            value = (getattr(control, 'value', '') or '')
+            value = value.strip() if isinstance(value, str) else str(value)
+            try:
+                extra = context() if callable(context) else (context or {})
+                if extra:
+                    ok, msg = validation_service.validate_field_from_db(column, value, **extra)
+                elif not value and not check_required:
+                    ok, msg = True, ""
+                else:
+                    ok, msg = validation_service.validate_field_generic(
+                        column, value, check_required=check_required)
+            except Exception:
+                return                      # never let validation break typing
+            new_error = None if ok else msg
+            if getattr(control, 'error_text', None) != new_error:
+                control.error_text = new_error
+                try:
+                    control.update()
+                except Exception:
+                    pass
+        return handler
+
+    def live_pair(column, ref, context=None):
+        """(on_change, on_blur) for a field: format while typing, required on exit."""
+        handler = live_check(column, ref, context)
+        return handler, (lambda e=None: handler(e, check_required=True))
+
     def validate_entity_name_live(e):
         """Live validation for Reported Entity Name."""
         if entity_name_ref.current:
@@ -851,6 +894,18 @@ def show_report_dialog(
                 report_number_ref.current.value = nxt['report_number']; report_number_ref.current.read_only = True
             page.update()
 
+    # Live validation: same database-backed rules the Save button applies.
+    _live_report_date, _blur_report_date = live_pair('report_date', report_date_ref)
+    _live_sending_date, _blur_sending_date = live_pair('sending_date', sending_date_ref)
+    _live_fiu_recv, _blur_fiu_recv = live_pair('fiu_letter_receive_date', fiu_receive_date_ref)
+    _live_fiu_date, _blur_fiu_date = live_pair('fiu_date', fiu_date_ref)
+    _live_case_id_ref, _blur_case_id_ref = live_pair('case_id', case_id_ref)
+    _live_branch_ref, _blur_branch_ref = live_pair('branch_id', branch_ref)
+    _live_first_reason_ref, _blur_first_reason_ref = live_pair('first_reason_for_suspicion', first_reason_ref)
+    _live_total_transaction_ref, _blur_total_transaction_ref = live_pair('total_transaction', total_transaction_ref)
+    _live_fiu_number_ref, _blur_fiu_number_ref = live_pair('fiu_number', fiu_number_ref)
+    _live_fiu_letter_number_ref, _blur_fiu_letter_number_ref = live_pair('fiu_letter_number', fiu_letter_number_ref)
+
     # Build tabs
     def build_basic_info_tab():
         """Build Basic Information tab."""
@@ -889,6 +944,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=case_id_ref,
                                 hint_text=t("form.hint.case_id"),
+                                on_change=_live_case_id_ref,
+                                on_blur=_blur_case_id_ref,
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -896,6 +953,8 @@ def show_report_dialog(
                         spacing=4,
                     ),
                     create_date_picker(
+                        on_change=_live_report_date,
+                        on_blur=_blur_report_date,
                         label=_flabel("report_date"),
                         value=datetime.now(),
                         required=True,
@@ -993,18 +1052,19 @@ def show_report_dialog(
                         value=False,
                         on_change=update_id_type_display,
                     ),
+                    # id_type only ever echoes the checkbox above it ("CR" or
+                    # "ID"), so showing it is a second copy of the same answer.
+                    # Hidden, not removed: it is a stored column and the value
+                    # still has to travel with the form.
                     ft.Column(
+                        visible=False,
                         controls=[
-                            ft.Text(_flabel("id_type"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=id_type_display_ref,
                                 value="ID",
                                 read_only=True,
-                                text_size=13,
-                                border_radius=4,
                             ),
                         ],
-                        spacing=4,
                     ),
                     ft.Column(
                         controls=[
@@ -1028,18 +1088,17 @@ def show_report_dialog(
                         value=False,
                         on_change=update_relationship_display,
                     ),
+                    # Same for relationship: it just spells out the
+                    # account/membership checkbox above it.
                     ft.Column(
+                        visible=False,
                         controls=[
-                            ft.Text(_flabel("relationship"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=relationship_ref,
                                 value="Current Account",
                                 read_only=True,
-                                text_size=13,
-                                border_radius=4,
                             ),
                         ],
-                        spacing=4,
                     ),
                     ft.Column(
                         controls=[
@@ -1047,6 +1106,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=branch_ref,
                                 hint_text=t("form.hint.branch"),
+                                on_change=_live_branch_ref,
+                                on_blur=_blur_branch_ref,
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1071,6 +1132,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=first_reason_ref,
                                 hint_text=t("form.hint.first_reason"),
+                                on_change=_live_first_reason_ref,
+                                on_blur=_blur_first_reason_ref,
                                 multiline=True,
                                 min_lines=3,
                                 max_lines=5,
@@ -1124,6 +1187,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=total_transaction_ref,
                                 hint_text=t("form.hint.total"),
+                                on_change=_live_total_transaction_ref,
+                                on_blur=_blur_total_transaction_ref,
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1193,6 +1258,8 @@ def show_report_dialog(
                         spacing=4,
                     ),
                     create_date_picker(
+                        on_change=_live_sending_date,
+                        on_blur=_blur_sending_date,
                         label=_flabel("sending_date"),
                         ref=sending_date_ref,
                         page=page,
@@ -1216,6 +1283,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=fiu_number_ref,
                                 hint_text=t("form.hint.fiu_number"),
+                                on_change=_live_fiu_number_ref,
+                                on_blur=_blur_fiu_number_ref,
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1223,12 +1292,16 @@ def show_report_dialog(
                         spacing=4,
                     ),
                     create_date_picker(
+                        on_change=_live_fiu_date,
+                        on_blur=_blur_fiu_date,
                         label=_flabel("fiu_date"),
                         ref=fiu_date_ref,
                         page=page,
                         hint_text=t("form.hint.date_optional"),
                     ),
                     create_date_picker(
+                        on_change=_live_fiu_recv,
+                        on_blur=_blur_fiu_recv,
                         label=_flabel("fiu_letter_receive_date"),
                         ref=fiu_receive_date_ref,
                         page=page,
@@ -1252,6 +1325,8 @@ def show_report_dialog(
                             ft.TextField(
                                 ref=fiu_letter_number_ref,
                                 hint_text=t("form.hint.fiu_letter"),
+                                on_change=_live_fiu_letter_number_ref,
+                                on_blur=_blur_fiu_letter_number_ref,
                                 text_size=13,
                                 border_radius=4,
                             ),
