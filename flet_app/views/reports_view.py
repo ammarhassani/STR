@@ -130,6 +130,7 @@ def build_reports_view(
         'type_of_suspected_transaction': 'type_of_suspected_transaction',
         'report_classification': 'report_classification', 'report_source': 'report_source',
         'reporting_entity': 'reporting_entity', 'fiu_feedback': 'fiu_feedback',
+        'arb_staff': 'arb_staff', 'second_reason_for_suspicion': 'second_reason_for_suspicion',
     }
     def _cell_display(col_key, value):
         if not value:

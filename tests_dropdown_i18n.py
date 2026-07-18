@@ -80,8 +80,60 @@ def test_backward_compat_english_values():
     check("legacy getter still English", 'Male' in vals and 'ذكر' not in vals, vals)
 
 
+def test_arb_staff_cleaned_and_paired():
+    dbm, svc = _svc()
+    en = dict(svc.get_active_options('arb_staff', 'en'))
+    ar = dict(svc.get_active_options('arb_staff', 'ar'))
+    check("arb_staff is Yes/No (English canonical)", set(en) == {'Yes', 'No'}, en)
+    check("arb_staff English labels", en.get('Yes') == 'Yes' and en.get('No') == 'No')
+    check("arb_staff Arabic labels", ar.get('Yes') == 'نعم' and ar.get('No') == 'لا', ar)
+    check("no MAYBE junk in arb_staff", 'MAYBE' not in en and 'Maybe' not in en, en)
+
+
+def test_maybe_junk_removed_on_prod_db():
+    # simulate a prod DB with a MAYBE value + a report using it
+    import sqlite3
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    from services.dropdown_service import DropdownService
+    d = tempfile.mkdtemp(); db = os.path.join(d, "p.db")
+    initialize_database(db); migrate_database(db)   # migrate first drops the legacy CHECK
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO system_config (config_key, config_value, config_type, config_category, is_active) "
+                 "VALUES ('arb_x','MAYBE','dropdown','arb_staff',1)")
+    conn.execute("INSERT INTO reports (report_number, sn, report_date, reported_entity_name, arb_staff, created_by) "
+                 "VALUES ('R-1',1,'01/07/2026','E','MAYBE','ag1')")
+    conn.commit(); conn.close()
+    migrate_database(db)   # cleanup removes MAYBE
+    svc = DropdownService(DatabaseManager(db), None)
+    vals = [v for v, _ in svc.get_active_options('arb_staff', 'en')]
+    check("MAYBE dropdown value removed", 'MAYBE' not in vals, vals)
+    check("arb_staff cleaned to Yes/No", set(vals) == {'Yes', 'No'}, vals)
+    conn = sqlite3.connect(db)
+    stored = conn.execute("SELECT arb_staff FROM reports WHERE report_number='R-1'").fetchone()[0]
+    conn.close()
+    check("stored MAYBE cleared from report", stored == '', repr(stored))
+
+
+def test_second_reason_arabic_only_always():
+    import re
+    dbm, svc = _svc()
+    ar_re = re.compile(r'[؀-ۿ]')
+    vals = [v for v, _ in svc.get_active_options('second_reason_for_suspicion', 'en')]
+    check("no English second-reason values remain", all(ar_re.search(v) for v in vals), vals[:2])
+    en = svc.get_active_options('second_reason_for_suspicion', 'en')
+    ar = svc.get_active_options('second_reason_for_suspicion', 'ar')
+    check("second reason shows Arabic in BOTH localizations",
+          [l for _, l in en] == [l for _, l in ar] and all(ar_re.search(l) for _, l in en[:3]),
+          (en[:1], ar[:1]))
+
+
 if __name__ == "__main__":
     test_arabic_labels_populated()
+    test_arb_staff_cleaned_and_paired()
+    test_maybe_junk_removed_on_prod_db()
+    test_second_reason_arabic_only_always()
     test_get_active_options()
     test_resolve_label()
     test_other_disambiguated_per_category()

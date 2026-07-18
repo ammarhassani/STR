@@ -1547,6 +1547,46 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Arabic field labels skipped: {str(e)}")
 
+        # Dropdown value cleanup (owner directive #3): English shows in English
+        # localization, Arabic in Arabic. arb_staff -> clean Yes/No paired (the
+        # 'MAYBE' junk removed). second_reason_for_suspicion -> keep ONLY the
+        # Arabic formal (bank-wide) list; it is always shown in Arabic.
+        try:
+            import re as _re
+            _ar = _re.compile(r'[؀-ۿ]')
+
+            # arb_staff: rebuild to English-canonical Yes/No with Arabic labels
+            cursor.execute("DELETE FROM system_config WHERE config_type='dropdown' "
+                           "AND config_category='arb_staff'")
+            cursor.execute(
+                "INSERT INTO system_config (config_key, config_value, config_value_ar, "
+                "config_type, config_category, display_order, is_active) VALUES "
+                "('arb_staff_1','Yes','نعم','dropdown','arb_staff',1,1),"
+                "('arb_staff_2','No','لا','dropdown','arb_staff',2,1)")
+            # normalize stored report values; drop the 'MAYBE' junk
+            cursor.execute("UPDATE reports SET arb_staff='Yes' WHERE arb_staff IN ('نعم','yes','YES')")
+            cursor.execute("UPDATE reports SET arb_staff='No'  WHERE arb_staff IN ('لا','no','NO')")
+            cursor.execute("UPDATE reports SET arb_staff='' WHERE LOWER(arb_staff)='maybe'")
+
+            # second_reason: delete the English rows (no Arabic characters), keep Arabic
+            sr = cursor.execute(
+                "SELECT config_key, config_value FROM system_config WHERE config_type='dropdown' "
+                "AND config_category='second_reason_for_suspicion'").fetchall()
+            removed = 0
+            for key, val in sr:
+                if not _ar.search(val or ''):
+                    cursor.execute("DELETE FROM system_config WHERE config_key=?", (key,))
+                    removed += 1
+            # any config_value_ar on second_reason must be blank so it never
+            # localizes away from the formal Arabic text
+            cursor.execute("UPDATE system_config SET config_value_ar=NULL "
+                           "WHERE config_type='dropdown' AND config_category='second_reason_for_suspicion'")
+            conn.commit()
+            if removed:
+                messages.append(f"Dropdown cleanup: removed {removed} English second-reason values")
+        except Exception as e:
+            messages.append(f"Dropdown value cleanup skipped: {str(e)}")
+
         # Arabic dashboard-widget titles (#3): title_ar rendered when lang=ar.
         # Covers the enhanced BI set + refreshes the original seed titles.
         try:

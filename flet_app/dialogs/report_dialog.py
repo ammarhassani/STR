@@ -92,7 +92,7 @@ def show_report_dialog(
     nationalities = _opts('nationality')
     second_reasons = _opts('second_reason_for_suspicion')
     transaction_types = _opts('type_of_suspected_transaction')
-    arb_staff_values = dropdown_service.get_active_dropdown_values('arb_staff') if dropdown_service else []
+    arb_staff_values = _opts('arb_staff')
     classifications = _opts('report_classification')
     report_sources = _opts('report_source')
     reporting_entities = _opts('reporting_entity')
@@ -1042,7 +1042,7 @@ def show_report_dialog(
                             ft.Text(_flabel("arb_staff"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=arb_staff_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=a, text=a) for a in arb_staff_values],
+                                options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in arb_staff_values],
                                 text_size=13,
                                 border_radius=4,
                             ),
