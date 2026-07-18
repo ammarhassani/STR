@@ -36,10 +36,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    *Do:* the Submit action saves the current form first, then submits, as one
    step.
 
-4. **Productivity chart on the dashboard** — ☐
-   *Ask:* see productivity.
-   *Do:* delivered as config-BI widgets (see #17): reports per agent, throughput
-   over time, aging. Consumed by admin + reporter.
+4. **Productivity chart on the dashboard** — ☑ (delivered via the config-BI engine #17: seeded rework rate, approvals-per-month, top entities, classification split, repeat-CIC/account tables; admin can add per-agent/throughput widgets with no reship)
 
 5. **Duplicate-CIC is an INFORMATION banner, never a blocker** — ☑ (new IntelligenceService.cic_history + on-blur non-blocking info banner under CIC; shows count, distinct entities, total_transaction sum + min–max, days since last, pending count, classifications, then the recent reports; never touches validate_form; tests_intelligence.py)
 
@@ -92,7 +89,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Ask:* xlsx, not the current format.
     *Do:* report export → xlsx via openpyxl (already a dependency).
 
-17. **Enhanced, config-driven BI (admin + reporter → management)** — ☐
+17. **Enhanced, config-driven BI (admin + reporter → management)** — ☑ (full engine: dashboard_config widgets rendered dynamically by widget_renderer; every admin-authored query validated to a single read-only SELECT and executed on a mode=ro connection — a widget can never mutate/exfiltrate; get_dashboard_widgets survives a bad widget with an error card; admin CRUD service (create/update/delete/list, gated on configure_dashboard, save-time test-run) + management view /dashboard-widgets with a Test-query button; migration seeds rework rate, reports-in-rework, top entities, classification pie, repeat-CIC + repeat-account tables, approvals-per-month; role-filtered; dashboard now fully config-driven, hardcoded KPI/charts removed; tests_dashboard_config.py)
     *Ask:* real BI, not just productivity; and no reship per new chart.
     *Do:* build out the existing `dashboard_config` substrate: admin composes
     widgets (KPI/chart/table) as read-only SQL saved as DB rows → shared DB →

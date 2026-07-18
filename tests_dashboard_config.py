@@ -142,10 +142,48 @@ def test_get_dashboard_widgets_normalizes_and_survives_bad_widget():
           and (not good[0]['data'] or isinstance(good[0]['data'][0], dict)), good)
 
 
+def test_all_seeded_widgets_valid_and_runnable():
+    """Every widget shipped in schema + seeded by migration must pass validation
+    and actually run read-only — otherwise it renders a broken error card."""
+    dbm, auth, dash = _services()
+    auth.authenticate('admin', 'Admin@1234')
+    from services.dashboard_service import validate_widget_query
+    rows = dbm.execute_with_retry("SELECT title, sql_query FROM dashboard_config")
+    check("there are seeded widgets", len(rows) > 6, len(rows))
+    for title, sql in rows:
+        ok, reason = validate_widget_query(sql)
+        check(f"widget validates: {title}", ok, reason)
+        run_ok, _r, _c, err = dash.run_widget_query(sql)
+        check(f"widget runs read-only: {title}", run_ok, err)
+
+    # the specific #17/#4 charts are present
+    titles = {r[0] for r in rows}
+    for expected in ['Rework Rate %', 'Reports in Rework', 'Top Reported Entities',
+                     'Reports by Classification', 'Repeat CICs (multiple reports)',
+                     'Repeat Accounts (possible structuring)', 'Approvals per Month']:
+        check(f"BI chart seeded: {expected}", expected in titles, titles)
+
+
+def test_migration_seed_is_idempotent():
+    import os, tempfile
+    from database.init_db import initialize_database
+    from database.migrations import migrate_database
+    from database.db_manager import DatabaseManager
+    d = tempfile.mkdtemp(); db = os.path.join(d, "r.db")
+    initialize_database(db)
+    migrate_database(db); migrate_database(db)  # run twice
+    dbm = DatabaseManager(db)
+    n = dbm.execute_with_retry(
+        "SELECT COUNT(*) FROM dashboard_config WHERE title='Rework Rate %'")[0][0]
+    check("re-running migration does not duplicate seeded widgets", n == 1, n)
+
+
 if __name__ == "__main__":
     test_query_validation()
     test_run_widget_query_is_readonly()
     test_admin_crud_and_gating()
     test_get_dashboard_widgets_normalizes_and_survives_bad_widget()
+    test_all_seeded_widgets_valid_and_runnable()
+    test_migration_seed_is_idempotent()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

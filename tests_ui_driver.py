@@ -300,6 +300,19 @@ def run():
     finding(E, "export view UI still says CSV",
             'CSV' in ev_src or 'to CSV' in ev_src or '.csv' in ev_src)
 
+    # #17/#4: config-driven dashboard must render widgets (not hardcoded charts)
+    dv_src = open(os.path.join(REPO, 'flet_app/views/dashboard_view.py')).read()
+    finding(E, "dashboard is not config-driven (no widget grid)",
+            'render_widget_grid' not in dv_src or 'get_dashboard_widgets' not in dv_src)
+    finding(E, "dashboard still uses the old hardcoded charts",
+            'kpi_row' in dv_src or 'charts_row' in dv_src)
+    ds_src = open(os.path.join(REPO, 'services/dashboard_service.py')).read()
+    finding(E, "widget queries not executed read-only",
+            'mode=ro' not in ds_src or 'validate_widget_query' not in ds_src)
+    finding(E, "no admin widget management view",
+            not os.path.exists(os.path.join(REPO, 'flet_app/views/dashboard_widgets_view.py'))
+            or '/dashboard-widgets' not in main_src2)
+
     # #10: the review dialog must be roomy, not the cramped 650x520 / 280px form
     ap_src2 = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
     finding(E, "review dialog is still the cramped 650x520",

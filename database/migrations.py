@@ -1332,6 +1332,62 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"must_change_password column skipped: {str(e)}")
 
+        # Enhanced BI widgets (#17/#4): seed the analyst/management chart set.
+        # Idempotent by title. All queries are read-only SELECTs (the dashboard
+        # runs them on a read-only connection regardless).
+        try:
+            bi_widgets = [
+                # (widget_type, title, sql, color, icon, roles, order)
+                ('metric', 'Rework Rate %',
+                 "SELECT ROUND(100.0 * SUM(CASE WHEN approval_status='rework' THEN 1 ELSE 0 END) "
+                 "/ NULLIF(COUNT(*),0), 1) AS value FROM reports WHERE is_deleted = 0",
+                 '#f59e0b', 'replay', 'admin,supervisor', 10),
+                ('kpi_card', 'Reports in Rework',
+                 "SELECT COUNT(*) AS value FROM reports WHERE approval_status='rework' AND is_deleted = 0",
+                 '#ef4444', 'assignment-return', 'admin,supervisor', 11),
+                ('bar_chart', 'Top Reported Entities',
+                 "SELECT reported_entity_name AS label, COUNT(*) AS value FROM reports "
+                 "WHERE is_deleted = 0 AND reported_entity_name IS NOT NULL AND TRIM(reported_entity_name) != '' "
+                 "GROUP BY reported_entity_name ORDER BY value DESC LIMIT 8",
+                 '#8b5cf6', None, 'admin,reporter', 12),
+                ('pie_chart', 'Reports by Classification',
+                 "SELECT COALESCE(NULLIF(TRIM(report_classification),''),'(unset)') AS label, "
+                 "COUNT(*) AS value FROM reports WHERE is_deleted = 0 GROUP BY label",
+                 '#06b6d4', None, 'admin,reporter', 13),
+                ('table', 'Repeat CICs (multiple reports)',
+                 "SELECT cic AS CIC, COUNT(*) AS Reports, COUNT(DISTINCT reported_entity_name) AS Entities "
+                 "FROM reports WHERE is_deleted = 0 AND cic IS NOT NULL AND TRIM(cic) != '' "
+                 "GROUP BY cic HAVING COUNT(*) > 1 ORDER BY Reports DESC LIMIT 20",
+                 '#3b82f6', None, 'admin,supervisor', 14),
+                ('table', 'Repeat Accounts (possible structuring)',
+                 "SELECT account_membership AS Account, COUNT(*) AS Reports "
+                 "FROM reports WHERE is_deleted = 0 AND account_membership IS NOT NULL "
+                 "AND TRIM(account_membership) != '' GROUP BY account_membership "
+                 "HAVING COUNT(*) > 1 ORDER BY Reports DESC LIMIT 20",
+                 '#f59e0b', None, 'admin,supervisor', 15),
+                ('line_chart', 'Approvals per Month',
+                 "SELECT strftime('%Y-%m', reviewed_at) AS label, COUNT(*) AS value "
+                 "FROM report_approvals WHERE approval_status='approved' AND reviewed_at IS NOT NULL "
+                 "GROUP BY label ORDER BY label DESC LIMIT 12",
+                 '#10b981', None, 'admin,supervisor', 16),
+            ]
+            seeded = 0
+            for wtype, title, sql, color, icon, roles, order in bi_widgets:
+                cursor.execute("SELECT 1 FROM dashboard_config WHERE title = ?", (title,))
+                if cursor.fetchone():
+                    continue
+                cursor.execute(
+                    "INSERT INTO dashboard_config (widget_type, title, sql_query, color, icon, "
+                    "visible_to_roles, is_active, display_order, created_by) "
+                    "VALUES (?,?,?,?,?,?,1,?,'SYSTEM')",
+                    (wtype, title, sql, color, icon, roles, order))
+                seeded += 1
+            conn.commit()
+            if seeded:
+                messages.append(f"Seeded {seeded} enhanced BI dashboard widgets")
+        except Exception as e:
+            messages.append(f"BI widget seed skipped: {str(e)}")
+
         conn.close()
 
         if messages:

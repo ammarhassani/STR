@@ -10,6 +10,7 @@ from theme.theme_manager import theme_manager
 from components.kpi_card import create_kpi_card, create_stat_card
 from components.charts import create_pie_chart, create_bar_chart, create_line_chart
 from components.activity_timeline import create_activity_timeline, ACTION_ICONS, ACTION_COLORS
+from components.widget_renderer import render_widget_grid
 
 
 def build_dashboard_content(
@@ -45,18 +46,13 @@ def build_dashboard_content(
         "monthly_data": [],
         "top_reporters": [],
         "recent_activities": [],
+        "widgets": [],
     }
 
     # Refs for updating
     loading_ref = ft.Ref[ft.Container]()
     content_ref = ft.Ref[ft.Column]()
-    total_ref = ft.Ref[ft.Text]()
-    open_ref = ft.Ref[ft.Text]()
-    investigation_ref = ft.Ref[ft.Text]()
-    closed_ref = ft.Ref[ft.Text]()
-    pie_chart_ref = ft.Ref[ft.Container]()
-    bar_chart_ref = ft.Ref[ft.Container]()
-    line_chart_ref = ft.Ref[ft.Container]()
+    widgets_ref = ft.Ref[ft.Container]()
     activity_ref = ft.Ref[ft.Container]()
 
     async def load_dashboard_data():
@@ -64,30 +60,13 @@ def build_dashboard_content(
         try:
             loop = asyncio.get_event_loop()
 
-            # Load summary statistics
-            state["stats"] = await loop.run_in_executor(
+            # Config-driven widgets: whatever the admin has configured for this
+            # role, each query run safely (read-only) by the service.
+            role = app_state.get_user_role() or 'reporter'
+            state["widgets"] = await loop.run_in_executor(
                 None,
-                app_state.dashboard_service.get_summary_statistics
-            )
-
-            # Load reports by status
-            state["status_data"] = await loop.run_in_executor(
-                None,
-                app_state.dashboard_service.get_reports_by_status
-            )
-
-            # Load reports by month
-            state["monthly_data"] = await loop.run_in_executor(
-                None,
-                app_state.dashboard_service.get_reports_by_month,
-                12
-            )
-
-            # Load top reporters
-            state["top_reporters"] = await loop.run_in_executor(
-                None,
-                app_state.dashboard_service.get_top_reporters,
-                5
+                app_state.dashboard_service.get_dashboard_widgets,
+                role
             )
 
             # Load recent activities
@@ -118,37 +97,9 @@ def build_dashboard_content(
         if content_ref.current:
             content_ref.current.visible = True
 
-        # Update KPI values
-        if total_ref.current:
-            total_ref.current.value = str(state["stats"].get('total_reports', 0))
-        if open_ref.current:
-            open_ref.current.value = str(state["stats"].get('open_reports', 0))
-        if investigation_ref.current:
-            investigation_ref.current.value = str(state["stats"].get('under_investigation', 0))
-        if closed_ref.current:
-            closed_ref.current.value = str(state["stats"].get('closed_cases', 0))
-
-        # Update pie chart with status data
-        if pie_chart_ref.current and state["status_data"]:
-            pie_chart_data = [{"label": d.get('status', 'Unknown'), "value": d.get('count', 0)} for d in state["status_data"]]
-            new_pie = create_pie_chart(
-                data=pie_chart_data,
-                title="Reports by Status",
-                height=250,
-            )
-            pie_chart_ref.current.content = new_pie.content
-
-        # Update line chart with monthly trend
-        if line_chart_ref.current and state["monthly_data"]:
-            line_chart_data = [{"x": d.get('month', ''), "y": d.get('count', 0)} for d in state["monthly_data"]]
-            new_line = create_line_chart(
-                data=line_chart_data,
-                title="Reports Trend (12 Months)",
-                height=250,
-                x_key="x",
-                y_key="y",
-            )
-            line_chart_ref.current.content = new_line.content
+        # Render the config-driven widget grid
+        if widgets_ref.current:
+            widgets_ref.current.content = render_widget_grid(state["widgets"])
 
         # Update activity section
         if activity_ref.current:
@@ -325,208 +276,6 @@ def build_dashboard_content(
         visible=True,
     )
 
-    # KPI Cards Row
-    kpi_row = ft.Row(
-        controls=[
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Container(
-                                    content=ft.Icon(ft.Icons.DESCRIPTION, color=colors["info"], size=24),
-                                    width=44,
-                                    height=44,
-                                    border_radius=4,
-                                    bgcolor=f"{colors['info']}15",
-                                    alignment=ft.alignment.center,
-                                ),
-                            ],
-                        ),
-                        ft.Container(height=12),
-                        ft.Text(
-                            ref=total_ref,
-                            value="0",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=colors["text_primary"],
-                        ),
-                        ft.Text(
-                            "Total Reports",
-                            size=13,
-                            color=colors["text_secondary"],
-                            weight=ft.FontWeight.W_500,
-                        ),
-                    ],
-                    spacing=4,
-                ),
-                padding=20,
-                border_radius=12,
-                bgcolor=colors["card_bg"],
-                border=ft.border.all(1, colors["card_border"]),
-                expand=True,
-            ),
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Container(
-                                    content=ft.Icon(ft.Icons.FOLDER_OPEN, color=colors["success"], size=24),
-                                    width=44,
-                                    height=44,
-                                    border_radius=4,
-                                    bgcolor=f"{colors['success']}15",
-                                    alignment=ft.alignment.center,
-                                ),
-                            ],
-                        ),
-                        ft.Container(height=12),
-                        ft.Text(
-                            ref=open_ref,
-                            value="0",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=colors["text_primary"],
-                        ),
-                        ft.Text(
-                            "Draft / Rework",
-                            size=13,
-                            color=colors["text_secondary"],
-                            weight=ft.FontWeight.W_500,
-                        ),
-                    ],
-                    spacing=4,
-                ),
-                padding=20,
-                border_radius=12,
-                bgcolor=colors["card_bg"],
-                border=ft.border.all(1, colors["card_border"]),
-                expand=True,
-            ),
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Container(
-                                    content=ft.Icon(ft.Icons.SEARCH, color=colors["warning"], size=24),
-                                    width=44,
-                                    height=44,
-                                    border_radius=4,
-                                    bgcolor=f"{colors['warning']}15",
-                                    alignment=ft.alignment.center,
-                                ),
-                            ],
-                        ),
-                        ft.Container(height=12),
-                        ft.Text(
-                            ref=investigation_ref,
-                            value="0",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=colors["text_primary"],
-                        ),
-                        ft.Text(
-                            "Pending Approval",
-                            size=13,
-                            color=colors["text_secondary"],
-                            weight=ft.FontWeight.W_500,
-                        ),
-                    ],
-                    spacing=4,
-                ),
-                padding=20,
-                border_radius=12,
-                bgcolor=colors["card_bg"],
-                border=ft.border.all(1, colors["card_border"]),
-                expand=True,
-            ),
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Container(
-                                    content=ft.Icon(ft.Icons.CHECK_CIRCLE, color=colors["danger"], size=24),
-                                    width=44,
-                                    height=44,
-                                    border_radius=4,
-                                    bgcolor=f"{colors['danger']}15",
-                                    alignment=ft.alignment.center,
-                                ),
-                            ],
-                        ),
-                        ft.Container(height=12),
-                        ft.Text(
-                            ref=closed_ref,
-                            value="0",
-                            size=32,
-                            weight=ft.FontWeight.BOLD,
-                            color=colors["text_primary"],
-                        ),
-                        ft.Text(
-                            "Approved",
-                            size=13,
-                            color=colors["text_secondary"],
-                            weight=ft.FontWeight.W_500,
-                        ),
-                    ],
-                    spacing=4,
-                ),
-                padding=20,
-                border_radius=12,
-                bgcolor=colors["card_bg"],
-                border=ft.border.all(1, colors["card_border"]),
-                expand=True,
-            ),
-        ],
-        spacing=16,
-    )
-
-    # Charts Row - will be updated after data loads
-    charts_row = ft.Row(
-        controls=[
-            ft.Container(
-                ref=pie_chart_ref,
-                content=ft.Column(
-                    controls=[
-                        ft.Text("Reports by Status", size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
-                        ft.Container(
-                            content=ft.Text("Loading...", color=colors["text_muted"]),
-                            alignment=ft.alignment.center,
-                            height=200,
-                        ),
-                    ],
-                ),
-                bgcolor=colors["card_bg"],
-                border_radius=12,
-                border=ft.border.all(1, colors["card_border"]),
-                padding=16,
-                expand=True,
-            ),
-            ft.Container(
-                ref=line_chart_ref,
-                content=ft.Column(
-                    controls=[
-                        ft.Text("Reports Trend (12 Months)", size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
-                        ft.Container(
-                            content=ft.Text("Loading...", color=colors["text_muted"]),
-                            alignment=ft.alignment.center,
-                            height=200,
-                        ),
-                    ],
-                ),
-                bgcolor=colors["card_bg"],
-                border_radius=12,
-                border=ft.border.all(1, colors["card_border"]),
-                padding=16,
-                expand=True,
-            ),
-        ],
-        spacing=16,
-    )
-
     # Activity section container
     activity_container = ft.Container(
         ref=activity_ref,
@@ -588,12 +337,14 @@ def build_dashboard_content(
             ),
             ft.Container(height=16),
 
-            # KPI Cards
-            kpi_row,
-            ft.Container(height=24),
-
-            # Charts
-            charts_row,
+            # Config-driven widgets (KPIs, charts, tables — from dashboard_config)
+            ft.Container(
+                ref=widgets_ref,
+                content=ft.Container(
+                    content=ft.Text("Loading widgets...", color=colors["text_muted"]),
+                    alignment=ft.alignment.center, height=120,
+                ),
+            ),
             ft.Container(height=24),
 
             # Recent Activity

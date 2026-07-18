@@ -63,6 +63,7 @@ def create_sidebar(
                 {"icon": ft.Icons.SETTINGS, "label": "Settings", "route": "/settings"},
                 {"icon": ft.Icons.LIST, "label": "Dropdowns", "route": "/dropdown-management"},
                 {"icon": ft.Icons.TUNE, "label": "Fields", "route": "/field-management"},
+                {"icon": ft.Icons.DASHBOARD_CUSTOMIZE, "label": "Dashboard Widgets", "route": "/dashboard-widgets"},
             ])
 
         return items

@@ -38,6 +38,7 @@ from views.log_management_view import build_log_management_view
 from views.settings_view import build_settings_view
 from views.dropdown_management_view import build_dropdown_management_view
 from views.field_management_view import build_field_management_view
+from views.dashboard_widgets_view import build_dashboard_widgets_view
 from views.export_view import build_export_view
 from views.activity_view import build_activity_view
 
@@ -412,6 +413,7 @@ class FletApp:
             "/settings": lambda: build_settings_view(self.page, app_state),
             "/dropdown-management": lambda: build_dropdown_management_view(self.page, app_state),
             "/field-management": lambda: build_field_management_view(self.page, app_state),
+            "/dashboard-widgets": lambda: build_dashboard_widgets_view(self.page, app_state),
         }
 
         builder = route_content.get(route, route_content["/dashboard"])
@@ -431,6 +433,7 @@ class FletApp:
             "/settings": "Settings",
             "/dropdown-management": "Dropdown Management",
             "/field-management": "Field Management",
+            "/dashboard-widgets": "Dashboard Widgets",
         }
         return titles.get(route, "Dashboard")
 
