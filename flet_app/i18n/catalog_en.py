@@ -100,6 +100,24 @@ STRINGS = {
     "udlg.reset_pw": "Reset password",
     "udlg.err_userid": "User ID is required",
 
+    # settings
+    "set.title": "System Settings",
+    "set.info": "Configure system-wide settings. Changes take effect immediately after saving.",
+    "set.group.numbering": "Report Numbering",
+    "set.group.batch": "Batch Reservation",
+    "set.group.general": "General",
+    "set.numbering_help": "Numbering follows the calendar month automatically — a new sequence (from 001) opens when the month changes. Numbers you've already reserved keep their month and stay yours until you use or transfer them.",
+    "set.batch_pool": "Batch Pool Size:",
+    "set.batch_pool_hint": "Pre-reserved report numbers in batch pool. Higher = faster for concurrent users. Recommended: 10-30",
+    "set.expiry": "Reservation Expiry:",
+    "set.expiry_hint": "Time before reserved numbers expire. Longer = more flexibility. Recommended: 5-10 minutes",
+    "set.page_size": "Default Page Size:",
+    "set.page_size_hint": "Number of records to show per page in tables",
+    "set.suffix_records": "records",
+    "set.suffix_minutes": "minutes",
+    "set.reset": "Reset to Defaults",
+    "set.save": "Save Settings",
+
     # My Work
     "mywork.lane.rework": "Returned for Rework",
     "mywork.lane.draft": "Drafts",

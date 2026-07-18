@@ -8,6 +8,7 @@ from typing import Any, Dict
 from datetime import datetime
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.toast import show_success, show_error
 from components.app_button import app_button
 
@@ -153,12 +154,12 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         reset_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Reset to Defaults"),
+            title=ft.Text(t("set.reset")),
             content=ft.Text("Are you sure you want to reset all settings to their default values?"),
             actions=[
-                ft.TextButton("Cancel", on_click=cancel_reset),
+                ft.TextButton(t("common.cancel"), on_click=cancel_reset),
                 ft.ElevatedButton(
-                    "Reset",
+                    t("set.reset"),
                     bgcolor=colors["warning"],
                     color=ft.Colors.WHITE,
                     on_click=confirm_reset,
@@ -220,7 +221,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
     header_row = ft.Row(
         controls=[
             ft.Text(
-                "System Settings",
+                t("set.title"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
                 color=colors["text_primary"],
@@ -230,7 +231,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Info text
     info_text = ft.Text(
-        "Configure system-wide settings. Changes take effect immediately after saving.",
+        t("set.info"),
         size=13,
         color=colors["text_secondary"],
     )
@@ -243,7 +244,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                     controls=[
                         ft.Icon(ft.Icons.NUMBERS, color=colors["primary"], size=20),
                         ft.Text(
-                            "Report Numbering",
+                            t("set.group.numbering"),
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
@@ -254,10 +255,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Container(height=12),
                 ft.Text(ref=active_month_ref, value="Current numbering month: …",
                         size=13, color=colors["text_primary"], weight=ft.FontWeight.W_600),
-                ft.Text("Numbering follows the calendar month automatically — a new "
-                        "sequence (from 001) opens when the month changes. Numbers you've "
-                        "already reserved keep their month and stay yours until you use "
-                        "or transfer them.",
+                ft.Text(t("set.numbering_help"),
                         size=11, italic=True, color=colors["text_muted"]),
             ],
             spacing=8,
@@ -276,7 +274,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                     controls=[
                         ft.Icon(ft.Icons.REFRESH, color=colors["primary"], size=20),
                         ft.Text(
-                            "Batch Reservation",
+                            t("set.group.batch"),
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
@@ -286,20 +284,20 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 ft.Container(height=12),
                 create_setting_field(
-                    "Batch Pool Size:",
+                    t("set.batch_pool"),
                     batch_size_ref,
                     "20",
                     "numbers",
-                    "Pre-reserved report numbers in batch pool. Higher = faster for concurrent users. Recommended: 10-30",
+                    t("set.batch_pool_hint"),
                     5, 100,
                 ),
                 ft.Container(height=8),
                 create_setting_field(
-                    "Reservation Expiry:",
+                    t("set.expiry"),
                     reservation_expiry_ref,
                     "5",
-                    "minutes",
-                    "Time before reserved numbers expire. Longer = more flexibility. Recommended: 5-10 minutes",
+                    t("set.suffix_minutes"),
+                    t("set.expiry_hint"),
                     1, 60,
                 ),
             ],
@@ -319,7 +317,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                     controls=[
                         ft.Icon(ft.Icons.SETTINGS, color=colors["primary"], size=20),
                         ft.Text(
-                            "General",
+                            t("set.group.general"),
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
@@ -329,11 +327,11 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 ft.Container(height=12),
                 create_setting_field(
-                    "Default Page Size:",
+                    t("set.page_size"),
                     page_size_ref,
                     "50",
-                    "records",
-                    "Number of records to show per page in tables",
+                    t("set.suffix_records"),
+                    t("set.page_size_hint"),
                     10, 200,
                 ),
             ],
@@ -350,12 +348,12 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         controls=[
             ft.Container(expand=True),
             ft.OutlinedButton(
-                "Reset to Defaults",
+                t("set.reset"),
                 icon=ft.Icons.RESTORE,
                 on_click=handle_reset,
             ),
             app_button(
-                "Save Settings",
+                t("set.save"),
                 icon=ft.Icons.SAVE,
                 on_click=handle_save,
                 variant="primary",
