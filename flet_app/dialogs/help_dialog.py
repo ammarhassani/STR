@@ -7,6 +7,7 @@ from i18n import t
 from typing import Any
 
 from theme.theme_manager import theme_manager
+from components.branding import logo_image
 
 
 def show_help_dialog(page: ft.Page, app_state: Any = None):
@@ -99,7 +100,7 @@ Only users with Admin role can approve reports.
     # About content
     about_content = ft.Column(
         controls=[
-            ft.Icon(ft.Icons.SECURITY, size=64, color=colors["primary"]),
+            logo_image(64, fallback_color=colors["primary"]),
             ft.Container(height=16),
             ft.Text(
                 "FIU Report Management System",

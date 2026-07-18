@@ -8,6 +8,7 @@ from typing import Callable, Optional, Any, List
 from theme.theme_manager import theme_manager
 from theme.colors import Colors
 from i18n import t
+from components.branding import logo_image
 
 
 # Note: UserControl was removed in Flet 0.21+
@@ -156,7 +157,7 @@ def create_sidebar(
                 ft.Container(
                     content=ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.SHIELD, color=colors["accent"], size=28),
+                            logo_image(28, fallback_color=colors["accent"]),
                             ft.Text(t("app.title"), color=colors["text_primary"], size=16, weight=ft.FontWeight.BOLD),
                         ],
                         spacing=10,

@@ -10,6 +10,7 @@ from theme.theme_manager import theme_manager
 from theme.colors import Colors
 from components.toast import show_error
 from components.app_button import app_button
+from components.branding import logo_image
 from i18n import t
 
 
@@ -87,6 +88,8 @@ class LoginView:
                     ft.Container(
                         content=ft.Column(
                             controls=[
+                                logo_image(72),
+                                ft.Container(height=12),
                                 ft.Text(
                                     "FIU Report\nManagement System",
                                     size=24,
