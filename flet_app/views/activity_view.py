@@ -9,6 +9,7 @@ from typing import Any, Optional, List
 from datetime import datetime, timedelta
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.activity_timeline import create_activity_timeline, ACTION_ICONS, ACTION_COLORS
 
 
@@ -134,7 +135,7 @@ def build_activity_view(
                         controls=[
                             ft.Icon(ft.Icons.HISTORY, color=colors["text_muted"], size=48),
                             ft.Text(
-                                "No activity found",
+                                t("act.none"),
                                 size=16,
                                 color=colors["text_secondary"],
                             ),
@@ -334,7 +335,7 @@ def build_activity_view(
                     controls=[
                         ft.Icon(ft.Icons.HISTORY, color=colors["primary"], size=28),
                         ft.Text(
-                            "Activity Log",
+                            t("act.title"),
                             size=24,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
@@ -343,7 +344,7 @@ def build_activity_view(
                         ft.IconButton(
                             icon=ft.Icons.REFRESH,
                             icon_color=colors["primary"],
-                            tooltip="Refresh",
+                            tooltip=t("common.refresh"),
                             on_click=handle_refresh,
                         ),
                     ],
@@ -357,7 +358,7 @@ def build_activity_view(
                     controls=[
                         # Action type filter
                         searchable_dropdown(
-                            label="Action Type",
+                            label=t("act.action_type"),
                             width=180,
                             options=[ft.dropdown.Option(key=label, text=label) for label, _ in ACTION_TYPE_OPTIONS],
                             value="All",
@@ -367,7 +368,7 @@ def build_activity_view(
                         ),
                         # Date filter toggle
                         ft.Switch(
-                            label="Date Filter",
+                            label=t("act.date_filter"),
                             value=False,
                             on_change=handle_date_filter_toggle,
                             active_color=colors["primary"],
@@ -394,7 +395,7 @@ def build_activity_view(
                 content=ft.Column(
                     controls=[
                         ft.ProgressRing(width=32, height=32),
-                        ft.Text("Loading activities...", color=colors["text_secondary"]),
+                        ft.Text(t("act.loading"), color=colors["text_secondary"]),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=16,

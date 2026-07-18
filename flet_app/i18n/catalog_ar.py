@@ -157,6 +157,32 @@ STRINGS = {
     "help.tab.faq": "الأسئلة الشائعة",
     "help.tab.about": "حول",
 
+    # export view
+    "exp.title": "تصدير التقارير إلى Excel",
+    "exp.info": "صدّر تقاريرك بصيغة Excel (.xlsx) للتحليل في Excel أو أدوات أخرى. طبّق المرشحات لتصدير تقارير محددة فقط.",
+    "exp.filters": "مرشحات التصدير",
+    "exp.output": "موقع الحفظ",
+    "exp.enable_date": "تفعيل مرشح التاريخ",
+    "exp.browse": "استعراض...",
+    "exp.browse_prompt": "اختر مجلد الحفظ",
+    "exp.err_location": "الرجاء اختيار موقع الحفظ.",
+    "exp.err_dir": "مجلد الحفظ المحدد غير موجود.",
+    "exp.starting": "جارٍ بدء التصدير...",
+    "exp.success": "تم التصدير بنجاح",
+    "exp.no": "لا",
+    "exp.open_folder": "فتح المجلد",
+    "exp.no_filters": "لم تُطبّق مرشحات",
+    "exp.all_statuses": "كل الحالات",
+    "exp.preview": "معاينة العدد",
+    "exp.export": "تصدير إلى Excel",
+
+    # activity log
+    "act.title": "سجل النشاط",
+    "act.none": "لا يوجد نشاط",
+    "act.loading": "جارٍ تحميل الأنشطة...",
+    "act.action_type": "نوع الإجراء",
+    "act.date_filter": "مرشح التاريخ",
+
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",
     "mywork.lane.draft": "المسودّات",

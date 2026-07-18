@@ -156,6 +156,32 @@ STRINGS = {
     "help.tab.faq": "FAQ",
     "help.tab.about": "About",
 
+    # export view
+    "exp.title": "Export Reports to Excel",
+    "exp.info": "Export your reports to Excel (.xlsx) format for analysis in Excel or other tools. Apply filters to export only specific reports.",
+    "exp.filters": "Export Filters",
+    "exp.output": "Output Location",
+    "exp.enable_date": "Enable Date Filter",
+    "exp.browse": "Browse...",
+    "exp.browse_prompt": "Select Output Directory",
+    "exp.err_location": "Please select an output location.",
+    "exp.err_dir": "The selected output directory does not exist.",
+    "exp.starting": "Starting export...",
+    "exp.success": "Export Successful",
+    "exp.no": "No",
+    "exp.open_folder": "Open Folder",
+    "exp.no_filters": "No filters applied",
+    "exp.all_statuses": "All Statuses",
+    "exp.preview": "Preview Count",
+    "exp.export": "Export to Excel",
+
+    # activity log
+    "act.title": "Activity Log",
+    "act.none": "No activity found",
+    "act.loading": "Loading activities...",
+    "act.action_type": "Action Type",
+    "act.date_filter": "Date Filter",
+
     # My Work
     "mywork.lane.rework": "Returned for Rework",
     "mywork.lane.draft": "Drafts",

@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.toast import show_success, show_error
 from utils.file_dialog import choose_directory
 
@@ -125,7 +126,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
             if 'search_term' in filters:
                 filter_desc.append(f"Search: {filters['search_term']}")
 
-            filter_text = "\n".join(filter_desc) if filter_desc else "No filters applied"
+            filter_text = "\n".join(filter_desc) if filter_desc else t("exp.no_filters")
 
             if stats_ref.current:
                 stats_ref.current.visible = True
@@ -147,12 +148,12 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
         output_path = output_path_ref.current.value if output_path_ref.current else ''
 
         if not output_path:
-            show_error(page, "Please select an output location.")
+            show_error(page, t("exp.err_location"))
             return
 
         # Verify directory exists
         if not Path(output_path).exists():
-            show_error(page, "The selected output directory does not exist.")
+            show_error(page, t("exp.err_dir"))
             return
 
         is_exporting = True
@@ -169,7 +170,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
         if progress_bar_ref.current:
             progress_bar_ref.current.value = 0
         if progress_text_ref.current:
-            progress_text_ref.current.value = "Starting export..."
+            progress_text_ref.current.value = t("exp.starting")
 
         page.update()
 
@@ -228,12 +229,12 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
 
             dialog = ft.AlertDialog(
                 modal=True,
-                title=ft.Text("Export Successful"),
+                title=ft.Text(t("exp.success")),
                 content=ft.Text(f"File saved to:\n{file_path}\n\nWould you like to open the folder?"),
                 actions=[
-                    ft.TextButton("No", on_click=close_dialog),
+                    ft.TextButton(t("exp.no"), on_click=close_dialog),
                     ft.ElevatedButton(
-                        "Open Folder",
+                        t("exp.open_folder"),
                         bgcolor=colors["primary"],
                         color=ft.Colors.WHITE,
                         on_click=open_folder,
@@ -269,7 +270,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
         def run_dialog():
             current_path = output_path_ref.current.value if output_path_ref.current else default_path
             result = choose_directory(
-                prompt="Select Output Directory",
+                prompt=t("exp.browse_prompt"),
                 default_path=current_path
             )
             if result:
@@ -284,7 +285,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
     header_row = ft.Row(
         controls=[
             ft.Text(
-                "Export Reports to Excel",
+                t("exp.title"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
                 color=colors["text_primary"],
@@ -294,8 +295,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Description
     description = ft.Text(
-        "Export your reports to Excel (.xlsx) format for analysis in Excel or other tools. "
-        "Apply filters to export only specific reports.",
+        t("exp.info"),
         size=13,
         color=colors["text_secondary"],
     )
@@ -317,7 +317,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Row(
                     controls=[
                         ft.Icon(ft.Icons.FILTER_ALT, color=colors["primary"], size=20),
-                        ft.Text("Export Filters", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+                        ft.Text(t("exp.filters"), size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
                     ],
                     spacing=8,
                 ),
@@ -328,7 +328,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.Text("Status:", width=100, color=colors["text_secondary"]),
                         searchable_dropdown(
                             ref=status_ref,
-                            value="All Statuses",
+                            value=t("exp.all_statuses"),
                             options=[ft.dropdown.Option(key=s, text=s) for s in status_options],
                             width=250,
                             text_size=13,
@@ -358,7 +358,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ),
                         ft.Checkbox(
                             ref=date_filter_ref,
-                            label="Enable Date Filter",
+                            label=t("exp.enable_date"),
                             value=False,
                         ),
                     ],
@@ -395,7 +395,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Row(
                     controls=[
                         ft.Icon(ft.Icons.FOLDER, color=colors["primary"], size=20),
-                        ft.Text("Output Location", size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+                        ft.Text(t("exp.output"), size=14, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
                     ],
                     spacing=8,
                 ),
@@ -411,7 +411,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                             read_only=True,
                         ),
                         ft.ElevatedButton(
-                            "Browse...",
+                            t("exp.browse"),
                             icon=ft.Icons.FOLDER_OPEN,
                             on_click=handle_browse,
                         ),
@@ -488,14 +488,14 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
         controls=[
             ft.ElevatedButton(
                 ref=preview_btn_ref,
-                text="Preview Count",
+                text=t("exp.preview"),
                 icon=ft.Icons.SEARCH,
                 on_click=lambda _: page.run_task(preview_export),
             ),
             ft.Container(expand=True),
             ft.ElevatedButton(
                 ref=export_btn_ref,
-                text="Export to Excel",
+                text=t("exp.export"),
                 icon=ft.Icons.DOWNLOAD,
                 bgcolor=colors["primary"],
                 color=ft.Colors.WHITE,
