@@ -51,13 +51,13 @@ def show_report_dialog(
     current_user = app_state.current_user
     if not current_user:            # no session -> the form can't function
         from components.toast import show_error
-        show_error(page, "Please log in first.")
+        show_error(page, t("form.err.login_first"))
         return
     # #7: only users who may add reports can open the create form. Refuse cleanly
     # (a reporter, e.g.) instead of showing a misleading "reserve numbers" message.
     if not is_edit_mode and not app_state.auth_service.has_permission('add_report'):
         from components.toast import show_error
-        show_error(page, "Your role can't create reports.")
+        show_error(page, t("form.err.no_create"))
         return
 
     # State
@@ -635,7 +635,7 @@ def show_report_dialog(
         """Show success dialog."""
         success_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Success", color=colors["success"]),
+            title=ft.Text(t("form.success"), color=colors["success"]),
             content=ft.Text(message),
             actions=[
                 ft.TextButton("OK", on_click=lambda e: close_success_dialog()),
@@ -787,7 +787,7 @@ def show_report_dialog(
                             ft.Text(_flabel("sn", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=sn_ref,
-                                hint_text="Enter serial number (e.g., 1)",
+                                hint_text=t("form.hint.sn"),
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_sn_live,
@@ -800,7 +800,7 @@ def show_report_dialog(
                             ft.Text(_flabel("report_number", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=report_number_ref,
-                                hint_text="Format: YYYY/MM/NNN (e.g., 2025/11/001)",
+                                hint_text=t("form.hint.report_number"),
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_report_number_live,
@@ -813,7 +813,7 @@ def show_report_dialog(
                             ft.Text(_flabel("case_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=case_id_ref,
-                                hint_text="Enter Case ID (optional)",
+                                hint_text=t("form.hint.case_id"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -825,7 +825,7 @@ def show_report_dialog(
                             ft.Text(_flabel("report_date", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=report_date_ref,
-                                hint_text="DD/MM/YYYY",
+                                hint_text=t("form.hint.date"),
                                 value=datetime.now().strftime("%d/%m/%Y"),
                                 text_size=13,
                                 border_radius=4,
@@ -850,7 +850,7 @@ def show_report_dialog(
                             ft.Text(_flabel("reported_entity_name", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=entity_name_ref,
-                                hint_text="Enter entity name",
+                                hint_text=t("form.hint.entity"),
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_entity_name_live,
@@ -860,7 +860,7 @@ def show_report_dialog(
                     ),
                     ft.Checkbox(
                         ref=legal_owner_ref,
-                        label="Is Legal Entity Owner",
+                        label=t("form.chk.legal_owner"),
                         value=False,
                     ),
                     ft.Column(
@@ -892,7 +892,7 @@ def show_report_dialog(
                             ft.Text(_flabel("id_cr"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=id_cr_ref,
-                                hint_text="Enter ID or Commercial Registration number",
+                                hint_text=t("form.hint.id_cr"),
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_id_cr_live,
@@ -902,7 +902,7 @@ def show_report_dialog(
                     ),
                     ft.Checkbox(
                         ref=id_type_checkbox_ref,
-                        label="Is Commercial Registration (CR)",
+                        label=t("form.chk.is_cr"),
                         value=False,
                         on_change=update_id_type_display,
                     ),
@@ -924,7 +924,7 @@ def show_report_dialog(
                             ft.Text(_flabel("account_membership"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=account_ref,
-                                hint_text="Enter account or membership number",
+                                hint_text=t("form.hint.account"),
                                 text_size=13,
                                 border_radius=4,
                                 on_change=validate_account_live,
@@ -937,7 +937,7 @@ def show_report_dialog(
                     ),
                     ft.Checkbox(
                         ref=acc_membership_ref,
-                        label="Is Membership?",
+                        label=t("form.chk.is_membership"),
                         value=False,
                         on_change=update_relationship_display,
                     ),
@@ -959,7 +959,7 @@ def show_report_dialog(
                             ft.Text(_flabel("branch_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=branch_ref,
-                                hint_text="Enter branch ID",
+                                hint_text=t("form.hint.branch"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -971,7 +971,7 @@ def show_report_dialog(
                             ft.Text(_flabel("cic"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=cic_ref,
-                                hint_text="Enter CIC number (will auto-pad to 16 digits)",
+                                hint_text=t("form.hint.cic"),
                                 max_length=16,
                                 text_size=13,
                                 border_radius=4,
@@ -1000,7 +1000,7 @@ def show_report_dialog(
                             ft.Text(_flabel("first_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=first_reason_ref,
-                                hint_text="Describe the first reason for suspicion",
+                                hint_text=t("form.hint.first_reason"),
                                 multiline=True,
                                 min_lines=3,
                                 max_lines=5,
@@ -1018,7 +1018,7 @@ def show_report_dialog(
                             # constrained dropdown the analyst can't type into.
                             ft.TextField(
                                 ref=second_reason_ref,
-                                hint_text="Describe the second reason for suspicion",
+                                hint_text=t("form.hint.second_reason"),
                                 multiline=True,
                                 min_lines=3,
                                 max_lines=5,
@@ -1057,7 +1057,7 @@ def show_report_dialog(
                             ft.Text(_flabel("total_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=total_transaction_ref,
-                                hint_text="Enter amount with SAR (e.g., 605040 SAR)",
+                                hint_text=t("form.hint.total"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1117,7 +1117,7 @@ def show_report_dialog(
                             ft.Text(_flabel("reporter_initials"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=reporter_initials_ref,
-                                hint_text="Enter 2 uppercase letters (e.g., ZM)",
+                                hint_text=t("form.hint.initials"),
                                 max_length=2,
                                 text_size=13,
                                 border_radius=4,
@@ -1131,7 +1131,7 @@ def show_report_dialog(
                             ft.Text(_flabel("sending_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=sending_date_ref,
-                                hint_text="DD/MM/YYYY (optional)",
+                                hint_text=t("form.hint.date_optional"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1155,7 +1155,7 @@ def show_report_dialog(
                             ft.Text(_flabel("fiu_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_number_ref,
-                                hint_text="Enter FIU number",
+                                hint_text=t("form.hint.fiu_number"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1167,7 +1167,7 @@ def show_report_dialog(
                             ft.Text(_flabel("fiu_letter_receive_date"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_receive_date_ref,
-                                hint_text="DD/MM/YYYY (optional)",
+                                hint_text=t("form.hint.date_optional"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1191,7 +1191,7 @@ def show_report_dialog(
                             ft.Text(_flabel("fiu_letter_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=fiu_letter_number_ref,
-                                hint_text="Enter FIU letter number",
+                                hint_text=t("form.hint.fiu_letter"),
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1208,7 +1208,7 @@ def show_report_dialog(
     # Header with badges
     header_controls = [
         ft.Text(
-            "Edit Report" if is_edit_mode else "Add New Report",
+            t("form.edit_title") if is_edit_mode else t("form.new_title"),
             size=15,
             weight=ft.FontWeight.BOLD,
             color=colors["text_primary"],
@@ -1400,7 +1400,7 @@ def show_report_dialog(
             # (which targets error_banner_ref.current) would silently no-op.
             # Use a toast instead — it works pre-mount.
             from components.toast import show_error
-            show_error(page, "You have no reserved numbers — reserve numbers first (Ctrl+R).")
+            show_error(page, t("form.err.no_reserved"))
             return
 
     # Record-edit lock (R28): one editor per report. Acquire before opening in

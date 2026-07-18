@@ -272,9 +272,9 @@ def run():
 
     # #13: second reason for suspicion is a narrative (schema TEXT) — must be a
     # free-text field like the first reason, NOT a constrained dropdown.
-    # anchor on the field's stable hint (the label is now localized via _flabel)
-    _si = rd_src.find('Describe the second reason for suspicion')
-    _sr = rd_src[max(0, _si - 400):_si + 200] if _si >= 0 else ''
+    # anchor on the field's ref inside its TextField (stable across localization)
+    _si = rd_src.find('ref=second_reason_ref')
+    _sr = rd_src[_si:_si + 300] if _si >= 0 else ''
     finding(E, "second reason for suspicion is still a dropdown (not editable free text)",
             'searchable_dropdown' in _sr or 'dropdown.Option' in _sr)
     finding(E, "second reason for suspicion is not a multiline text field",
