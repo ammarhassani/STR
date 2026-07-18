@@ -421,8 +421,8 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                     f"('fiu_feedback_{idx}', '{feedback}', 'dropdown', 'fiu_feedback', {idx}, 1)"
                 )
 
-            # 8. Gender (Fixed category - for completeness)
-            genders = ['ذكر', 'أنثى']
+            # 8. Gender (English — the app is English-only per the BRD)
+            genders = ['Male', 'Female', 'Other', 'Not Specified']
             for idx, gender in enumerate(genders, 1):
                 dropdown_inserts.append(
                     f"('gender_{idx}', '{gender}', 'dropdown', 'gender', {idx}, 1)"
@@ -1331,6 +1331,38 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                 messages.append("Added must_change_password column to users")
         except Exception as e:
             messages.append(f"must_change_password column skipped: {str(e)}")
+
+        # Gender values: reconcile the one anomaly in an otherwise-English seed.
+        # Migration 12 historically seeded gender in Arabic (ذكر/أنثى) while every
+        # other category + the app (English-only per BRD) used English. Normalize
+        # the dropdown to English and the equivalent Arabic values already stored
+        # on reports — ذكر=Male, أنثى=Female. Only the specific Arabic seeds are
+        # removed, so any gender values an admin added are preserved.
+        try:
+            gender_map = {'ذكر': 'Male', 'أنثى': 'Female'}
+            changed = 0
+            # 1. stored report values (exact-equivalent translation, English-only app)
+            for ar, en in gender_map.items():
+                cursor.execute("UPDATE reports SET gender = ? WHERE gender = ?", (en, ar))
+                changed += cursor.rowcount or 0
+            # 2. drop the Arabic dropdown seeds
+            cursor.execute(
+                "DELETE FROM system_config WHERE config_type='dropdown' "
+                "AND config_category='gender' AND config_value IN ('ذكر', 'أنثى')")
+            changed += cursor.rowcount or 0
+            # 3. ensure the English canonical set is present (idempotent)
+            english_genders = ['Male', 'Female', 'Other', 'Not Specified']
+            for idx, g in enumerate(english_genders, 1):
+                cursor.execute(
+                    "INSERT OR IGNORE INTO system_config "
+                    "(config_key, config_value, config_type, config_category, display_order, is_active) "
+                    "VALUES (?, ?, 'dropdown', 'gender', ?, 1)",
+                    (f"gender_{idx}", g, idx))
+            conn.commit()
+            if changed:
+                messages.append("Normalized gender values to English")
+        except Exception as e:
+            messages.append(f"Gender normalization skipped: {str(e)}")
 
         # Enhanced BI widgets (#17/#4): seed the analyst/management chart set.
         # Idempotent by title. All queries are read-only SELECTs (the dashboard
