@@ -118,18 +118,10 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
 20. **Keyboard shortcuts didn't work (browser)** — ☑
     *Fixed by going native desktop* (browser no longer intercepts keys).
 
-21. **Runbook: a clear "do this first" golden path** — ☐
-    *Ask:* stop the setup tangling.
-    *Do:* rewrite `HOST_RUNBOOK.md` with a strict numbered Day-0 order (pick host
-    → set share → hard-reset to clean data → real users → run host windowless →
-    each client → autostart) + a quickstart at the top.
+21. **Runbook: a clear "do this first" golden path** — ☑ (added a top-of-doc "⭐ Do This First — Golden Path" to HOST_RUNBOOK.md: one-time site setup (pick host → set share → host wizard+start_host → clients wizard → first login admin123), daily check, code-update via git pull, failover one-liner, and the go-live hard-reset pointer; detail sections kept below)
 
-22. **Hard reset (test → production), documented** — ☐
-    *Ask:* wipe test state and start fresh for production.
-    *Do:* a guarded `--reset` (typed confirmation; destructive): wipes DB + bus
-    (queue/replica/backups/outbox) + local replicas + config + logs → fresh
-    install (schema's clean admin only, forced password change). Documented as
-    the pre-go-live step.
+22. **Hard reset (test → production), documented** — ☑ (reset_to_production.py: guarded typed "RESET" confirmation, auto-backup first, wipes all transactional tables + write queue, resets to a single fresh admin (must_change_password) + unclaimed host lease, PRESERVES dropdowns/fields/dashboard widgets/settings; documented as a runbook section; tests_hard_reset.py proves wipe vs preserve + fresh-admin auth)
+    *Note:* wipes DB DATA rows, not the config the admin built — intentional (test→prod keeps your dropdowns/fields/widgets). Bus/replica files on the share are republished by the host on restart.
 
 23. **No CMD window kept open (host/panel/client run hidden)** — ☐
     *Ask:* host shouldn't need a console window sitting open.

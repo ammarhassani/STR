@@ -8,6 +8,44 @@ This runbook covers setup, daily operations, failover procedures, and known limi
 
 ---
 
+## ⭐ Do This First — Golden Path
+
+If you read nothing else, do these steps in order. Everything below this section is detail and edge cases.
+
+### One-time, once per site
+
+1. **Pick the host PC.** One workstation that stays on during business hours. It owns the database.
+2. **Pick the shared folder.** A network path every PC can reach (e.g. `Z:\STR_data` or `\\server\STR_data`). The host writes a read-only replica there; clients read it.
+3. **On the host PC:**
+   1. `git pull` the latest code into the STR folder.
+   2. Run `python flet_app\main.py` once → the setup wizard opens → choose **Host**, enter the shared folder path.
+   3. Double-click `deploy\start_host.bat` → the host starts publishing. Leave it running.
+   4. Add `start_host.bat` to Startup (see *Initial Setup → Enable automatic startup*) so it relaunches after login.
+4. **On each client PC:**
+   1. `git pull` the latest code.
+   2. Run `python flet_app\main.py` once → wizard → choose **Client**, enter the **same** shared folder path.
+   3. Launch normally from then on — no scripts needed.
+5. **First login (any PC):** username `admin`, password `admin123`. You are forced to change it immediately. Then create the real users (Users screen).
+
+### Every business day
+
+- **Host PC:** confirm `start_host.bat` is running (a console window titled host). If the PC rebooted, log in once — Startup relaunches it.
+- **Anyone:** if writes seem stuck, open the panel (`deploy\start_panel.bat`) → check **Host = ONLINE** and **queue near 0**.
+
+### When you change the code (new feature / fix)
+
+- `git pull` on the host **and** each client. Restart the app (and `start_host.bat` on the host). Config-driven dashboard widgets and dropdowns update automatically from the shared database — no per-PC editing.
+
+### If the host PC dies
+
+- On a backup PC: `deploy\start_panel.bat` → confirm **Host = OFFLINE/STALE** → **Become Host Now** → `start_host.bat`. (Only one operator does this — see *Failover*.)
+
+### Going from testing to real use
+
+- Run **Hard Reset** (see that section) on the host to wipe all test reports/users and start clean, keeping your dropdowns, fields, and dashboard widgets.
+
+---
+
 ## What Runs Where
 
 ### Host Workstation (One Per Deployment)
@@ -234,6 +272,47 @@ Backups are snapshots of the replica taken at a point in time. Use restoration t
 
 - If prompted to login again after 30 minutes of inactivity, simply enter credentials again
 - All queued operations continue to be processed by the host
+
+---
+
+## Hard Reset (Test → Production)
+
+After you finish testing with sample data, wipe everything transactional and
+hand the system a clean slate — **without** losing the configuration you set up
+(dropdown values, custom fields, dashboard widgets, system settings).
+
+### What it does
+
+- **Deletes:** all reports, approvals, versions, reserved/queued numbers, record
+  locks, activity/audit/session logs, notifications, saved filters, and the
+  write queue.
+- **Resets users** to a single fresh `admin` (temporary password `admin123`,
+  forced change at first login) — all test users are removed.
+- **Resets the host lease** to an unclaimed state.
+- **Keeps:** dropdowns, fields, dashboard widgets, and all system settings.
+- **Backs up first:** writes `<database>.pre-reset-<timestamp>.bak` next to the
+  database before touching anything.
+
+### Procedure
+
+1. **On the HOST PC**, stop the host: close the `start_host.bat` window (nothing
+   should be reading or writing the database during a reset).
+2. From the STR folder, run:
+   ```
+   python reset_to_production.py
+   ```
+   It shows the target database, asks you to type `RESET` to confirm, backs the
+   database up, then wipes it.
+   - Add `--yes` to skip the typed confirmation (for scripted use).
+   - Add `--db PATH` to target a specific database file.
+3. **Restart the host:** run `deploy\start_host.bat` again so it republishes the
+   clean database to clients.
+4. **Log in** as `admin` / `admin123`, change the password, and create the real
+   users. You are now in production.
+
+> ⚠️ This is irreversible for the wiped data (the pre-reset backup is your only
+> undo). Only run it on the host, against the authoritative database, when you
+> genuinely mean to discard all reports.
 
 ---
 
