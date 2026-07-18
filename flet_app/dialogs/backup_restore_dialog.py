@@ -3,6 +3,7 @@ Backup & Restore Dialog for FIU Report Management System.
 Comprehensive backup and restore functionality for database.
 """
 import flet as ft
+from i18n import t
 import asyncio
 import shutil
 import sqlite3
@@ -123,7 +124,7 @@ def show_backup_restore_dialog(
                 backup_list.controls.append(
                     ft.Container(
                         content=ft.Text(
-                            "No backups found",
+                            t("bak.none"),
                             size=14,
                             color=colors["text_muted"],
                             text_align=ft.TextAlign.CENTER,
@@ -214,11 +215,11 @@ def show_backup_restore_dialog(
 
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Create Backup"),
-            content=ft.Text("Create a backup of the current database?"),
+            title=ft.Text(t("bak.create")),
+            content=ft.Text(t("bak.create_confirm")),
             actions=[
-                ft.TextButton("Cancel", on_click=on_cancel),
-                ft.ElevatedButton("Create Backup", on_click=on_confirm, bgcolor=colors["primary"], color=ft.Colors.WHITE),
+                ft.TextButton(t("common.cancel"), on_click=on_cancel),
+                ft.ElevatedButton(t("bak.create"), on_click=on_confirm, bgcolor=colors["primary"], color=ft.Colors.WHITE),
             ],
         )
         page.overlay.append(confirm_dialog)
@@ -273,7 +274,7 @@ def show_backup_restore_dialog(
             if app_state.logging_service:
                 app_state.logging_service.log_user_action("BACKUP_CREATED", {'file_path': backup_path})
 
-            show_success(page, f"Backup created: {Path(backup_path).name}")
+            show_success(page, t("bak.created", name=Path(backup_path).name))
             await refresh_backup_list()
 
         except Exception as ex:
@@ -301,24 +302,23 @@ def show_backup_restore_dialog(
 
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("⚠️ Restore Database"),
+            title=ft.Text(t("bak.restore_title")),
             content=ft.Container(
                 content=ft.Column(
                     controls=[
                         ft.Text(
-                            "WARNING: This will replace your current database!",
+                            t("bak.restore_warning"),
                             size=14,
                             weight=ft.FontWeight.BOLD,
                             color=colors["warning"],
                         ),
                         ft.Text(
-                            "All changes made since this backup will be lost.\n"
-                            "A backup of your current database will be created first.",
+                            t("bak.restore_note"),
                             size=12,
                             color=colors["text_secondary"],
                         ),
                         ft.Text(
-                            "Are you absolutely sure you want to continue?",
+                            t("bak.restore_confirm"),
                             size=12,
                         ),
                     ],
@@ -328,8 +328,8 @@ def show_backup_restore_dialog(
                 width=400,
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=on_cancel),
-                ft.ElevatedButton("Restore", on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
+                ft.TextButton(t("common.cancel"), on_click=on_cancel),
+                ft.ElevatedButton(t("bak.restore"), on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
             ],
         )
         page.overlay.append(confirm_dialog)
@@ -380,7 +380,7 @@ def show_backup_restore_dialog(
             if app_state.logging_service:
                 app_state.logging_service.log_user_action("DATABASE_RESTORED", {})
 
-            show_success(page, "Database restored! Please restart the application.")
+            show_success(page, t("bak.restored"))
 
             if on_restore_complete:
                 on_restore_complete()
@@ -471,11 +471,11 @@ def show_backup_restore_dialog(
 
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Delete Backup"),
-            content=ft.Text(f"Delete backup: {Path(selected_backup_path).name}?\n\nThis cannot be undone."),
+            title=ft.Text(t("bak.delete_title")),
+            content=ft.Text(t("bak.delete_confirm", name=Path(selected_backup_path).name)),
             actions=[
-                ft.TextButton("Cancel", on_click=on_cancel),
-                ft.ElevatedButton("Delete", on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
+                ft.TextButton(t("common.cancel"), on_click=on_cancel),
+                ft.ElevatedButton(t("common.delete"), on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
             ],
         )
         page.overlay.append(confirm_dialog)
@@ -491,7 +491,7 @@ def show_backup_restore_dialog(
             if app_state.logging_service:
                 app_state.logging_service.log_user_action("BACKUP_DELETED", {'file_path': selected_backup_path})
 
-            show_success(page, "Backup deleted.")
+            show_success(page, t("bak.deleted"))
             selected_backup_path = None
             await refresh_backup_list()
 
@@ -530,7 +530,7 @@ def show_backup_restore_dialog(
         title=ft.Row(
             controls=[
                 ft.Icon(ft.Icons.BACKUP, color=colors["primary"]),
-                ft.Text("Database Backup & Restore", weight=ft.FontWeight.BOLD),
+                ft.Text(t("bak.title"), weight=ft.FontWeight.BOLD),
             ],
             spacing=12,
         ),
@@ -539,18 +539,18 @@ def show_backup_restore_dialog(
                 controls=[
                     # Info
                     ft.Text(
-                        "Create backups to protect against data loss. Restore from any backup to revert to a previous state.",
+                        t("bak.info"),
                         size=12,
                         color=colors["text_secondary"],
                     ),
                     ft.Container(height=8),
 
                     # Backup actions
-                    ft.Text("Backup Actions", weight=ft.FontWeight.BOLD, size=13),
+                    ft.Text(t("bak.actions"), weight=ft.FontWeight.BOLD, size=13),
                     ft.Row(
                         controls=[
                             ft.ElevatedButton(
-                                "Create Backup Now",
+                                t("bak.create_now"),
                                 icon=ft.Icons.SAVE,
                                 bgcolor=colors["primary"],
                                 color=ft.Colors.WHITE,
@@ -576,7 +576,7 @@ def show_backup_restore_dialog(
                     progress_bar,
 
                     # Existing backups
-                    ft.Text("Existing Backups", weight=ft.FontWeight.BOLD, size=13),
+                    ft.Text(t("bak.existing"), weight=ft.FontWeight.BOLD, size=13),
                     ft.Container(
                         content=backup_list,
                         border=ft.border.all(1, colors["border"]),
@@ -606,11 +606,11 @@ def show_backup_restore_dialog(
         ),
         actions=[
             ft.ElevatedButton(
-                "Refresh List",
+                t("bak.refresh"),
                 icon=ft.Icons.REFRESH,
                 on_click=lambda e: page.run_task(refresh_backup_list),
             ),
-            ft.TextButton("Close", on_click=close_dialog),
+            ft.TextButton(t("common.close"), on_click=close_dialog),
         ],
     )
 
