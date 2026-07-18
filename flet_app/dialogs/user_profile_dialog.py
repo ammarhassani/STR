@@ -3,6 +3,7 @@ User Profile Dialog for FIU Report Management System.
 View and edit current user profile information.
 """
 import flet as ft
+from i18n import t
 import asyncio
 from typing import Any
 from datetime import datetime
@@ -38,19 +39,19 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
 
     # Input fields
     full_name_input = ft.TextField(
-        label="Full Name",
+        label=t("prof.fullname"),
         value=current_user.get('full_name', ''),
     )
 
     username_display = ft.TextField(
-        label="Username",
+        label=t("prof.username"),
         value=current_user.get('username', ''),
         read_only=True,
         bgcolor=colors["bg_tertiary"],
     )
 
     role_display = ft.TextField(
-        label="Role",
+        label=t("prof.role"),
         value=current_user.get('role', '').title(),
         read_only=True,
         bgcolor=colors["bg_tertiary"],
@@ -63,7 +64,7 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
     reports_created_text = ft.Text("Loading...", size=12, color=colors["text_secondary"])
     reports_edited_text = ft.Text("Loading...", size=12, color=colors["text_secondary"])
     last_action_text = ft.Text("Loading...", size=12, color=colors["text_secondary"])
-    recent_activity_text = ft.Text("Loading recent activity...", size=11, color=colors["text_muted"])
+    recent_activity_text = ft.Text(t("prof.loading_activity"), size=11, color=colors["text_muted"])
     password_changed_text = ft.Text("Last changed: Loading...", size=11, color=colors["text_muted"])
 
     async def load_stats():
@@ -208,12 +209,12 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
 
     # Profile Tab
     profile_tab = ft.Tab(
-        text="Profile",
+        text=t("prof.tab.profile"),
         icon=ft.Icons.PERSON,
         content=ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Basic Information", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.basic_info"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
                     full_name_input,
                     ft.Container(height=8),
@@ -229,24 +230,24 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
 
     # Activity Tab
     activity_tab = ft.Tab(
-        text="Activity",
+        text=t("prof.tab.activity"),
         icon=ft.Icons.HISTORY,
         content=ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Account Information", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.account_info"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
-                    create_stat_row("Account Created:", created_at_text),
-                    create_stat_row("Last Login:", last_login_text),
-                    create_stat_row("Total Logins:", login_count_text),
+                    create_stat_row(t("prof.account_created"), created_at_text),
+                    create_stat_row(t("prof.last_login"), last_login_text),
+                    create_stat_row(t("prof.total_logins"), login_count_text),
                     ft.Container(height=16),
-                    ft.Text("Activity Statistics", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.activity_stats"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
-                    create_stat_row("Reports Created:", reports_created_text),
-                    create_stat_row("Reports Edited:", reports_edited_text),
-                    create_stat_row("Last Activity:", last_action_text),
+                    create_stat_row(t("prof.reports_created"), reports_created_text),
+                    create_stat_row(t("prof.reports_edited"), reports_edited_text),
+                    create_stat_row(t("prof.last_activity"), last_action_text),
                     ft.Container(height=16),
-                    ft.Text("Recent Activity", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.recent_activity"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
                     ft.Container(
                         content=recent_activity_text,
@@ -267,12 +268,12 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
         show_change_password_dialog(page, app_state)
 
     security_tab = ft.Tab(
-        text="Security",
+        text=t("prof.tab.security"),
         icon=ft.Icons.SECURITY,
         content=ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Password & Authentication", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.password_auth"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
                     ft.Text(
                         "Keep your account secure by using a strong password and changing it regularly.",
@@ -281,14 +282,14 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
                     ),
                     ft.Container(height=12),
                     ft.ElevatedButton(
-                        "Change Password",
+                        t("prof.change_password"),
                         icon=ft.Icons.KEY,
                         on_click=handle_change_password,
                     ),
                     ft.Container(height=4),
                     password_changed_text,
                     ft.Container(height=24),
-                    ft.Text("Session Information", weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
+                    ft.Text(t("prof.session_info"), weight=ft.FontWeight.BOLD, size=14, color=colors["text_primary"]),
                     ft.Container(height=8),
                     ft.Text(
                         f"Logged in as: {current_user['username']}\n"
@@ -309,7 +310,7 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
         new_name = full_name_input.value.strip() if full_name_input.value else ""
 
         if not new_name:
-            show_error(page, "Full name is required.")
+            show_error(page, t("prof.err_fullname"))
             return
 
         try:
@@ -373,7 +374,7 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
         actions=[
             ft.TextButton("Cancel", on_click=close_dialog),
             ft.ElevatedButton(
-                "Save Changes",
+                t("prof.save_changes"),
                 icon=ft.Icons.SAVE,
                 bgcolor=colors["primary"],
                 color=ft.Colors.WHITE,

@@ -4,6 +4,7 @@ Shows version history with diff comparison, delete options, and activity log.
 GitHub-style version management.
 """
 import flet as ft
+from i18n import t
 from typing import Optional, Any, Callable, List
 
 from theme.theme_manager import theme_manager
@@ -85,7 +86,7 @@ def show_version_history_dialog(
                         controls=[
                             ft.Icon(ft.Icons.HISTORY, color=colors["text_muted"], size=48),
                             ft.Text(
-                                "No version history available",
+                                t("vh.no_versions"),
                                 color=colors["text_secondary"],
                             ),
                         ],
@@ -103,7 +104,7 @@ def show_version_history_dialog(
 
         # Update compare button state
         compare_btn.disabled = len(state["selected_versions"]) != 2
-        compare_btn.text = f"Compare ({len(state['selected_versions'])}/2)"
+        compare_btn.text = t('vh.compare', n=len(state['selected_versions']))
 
         page.update()
 
@@ -118,7 +119,7 @@ def show_version_history_dialog(
                         controls=[
                             ft.Icon(ft.Icons.HISTORY, color=colors["text_muted"], size=48),
                             ft.Text(
-                                "No activity recorded",
+                                t("vh.no_activity"),
                                 color=colors["text_secondary"],
                             ),
                         ],
@@ -224,7 +225,7 @@ def show_version_history_dialog(
             ft.IconButton(
                 icon=ft.Icons.RESTORE,
                 icon_color=colors["primary"],
-                tooltip="Restore to this version",
+                tooltip=t("vh.restore_tip"),
                 on_click=handle_restore_version,
                 visible=not is_deleted,
             ),
@@ -285,7 +286,7 @@ def show_version_history_dialog(
                             ft.Row(
                                 controls=[
                                     ft.Text(
-                                        f"Version {version_num}",
+                                        t("vh.version_n", n=version_num),
                                         size=14,
                                         weight=ft.FontWeight.W_500,
                                         color=colors["text_muted"] if is_deleted else colors["text_primary"],
@@ -312,7 +313,7 @@ def show_version_history_dialog(
                                 color=colors["text_secondary"],
                             ),
                             ft.Text(
-                                change_reason or "No description",
+                                change_reason or t("vh.no_description"),
                                 size=11,
                                 color=colors["text_muted"],
                                 italic=True,
@@ -442,7 +443,7 @@ def show_version_history_dialog(
                     else:
                         show_error(message)
                 else:
-                    show_error("Version service not available")
+                    show_error(t("vh.no_service"))
 
             except Exception as ex:
                 show_error(f"Failed to restore version: {str(ex)}")
@@ -456,19 +457,17 @@ def show_version_history_dialog(
             title=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.RESTORE, color=colors["primary"], size=24),
-                    ft.Text("Confirm Restore", weight=ft.FontWeight.BOLD),
+                    ft.Text(t("vh.confirm_restore"), weight=ft.FontWeight.BOLD),
                 ],
                 spacing=8,
             ),
             content=ft.Text(
-                f"Are you sure you want to restore to Version {version_num}?\n\n"
-                "This will create a new version with the restored data.\n"
-                "The current version will be preserved in history."
+                t("vh.restore_confirm", n=version_num)
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=cancel_restore),
+                ft.TextButton(t("common.cancel"), on_click=cancel_restore),
                 ft.ElevatedButton(
-                    "Restore",
+                    t("vh.restore"),
                     icon=ft.Icons.RESTORE,
                     bgcolor=colors["primary"],
                     color=ft.Colors.WHITE,
@@ -550,7 +549,7 @@ def show_version_history_dialog(
 
     # Tab buttons
     versions_tab_btn = ft.ElevatedButton(
-        "Versions",
+        t("vh.tab.versions"),
         icon=ft.Icons.HISTORY,
         bgcolor=colors["primary"],
         color=ft.Colors.WHITE,
@@ -558,7 +557,7 @@ def show_version_history_dialog(
     )
 
     activity_tab_btn = ft.ElevatedButton(
-        "Activity",
+        t("vh.tab.activity"),
         icon=ft.Icons.TIMELINE,
         bgcolor=colors["bg_tertiary"],
         color=colors["text_primary"],
@@ -607,7 +606,7 @@ def show_version_history_dialog(
             compare_btn,
             ft.Container(expand=True),
             ft.Switch(
-                label="Show Deleted",
+                label=t("vh.show_deleted"),
                 value=False,
                 on_change=toggle_show_deleted,
                 active_color=colors["primary"],
@@ -624,7 +623,7 @@ def show_version_history_dialog(
                 ft.Row(
                     controls=[
                         ft.Text(
-                            "Version History",
+                            t("vh.title"),
                             size=18,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
@@ -680,7 +679,7 @@ def show_version_history_dialog(
                     controls=[
                         ft.Container(expand=True),
                         ft.TextButton(
-                            "Close",
+                            t("common.close"),
                             on_click=close_dialog,
                         ),
                     ],
