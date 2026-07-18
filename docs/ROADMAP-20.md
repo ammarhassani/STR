@@ -94,7 +94,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Do:* on entering an account number, if ≥2 reports on it within 0–2 days,
     show a non-blocking banner. Same intelligence layer as #5.
 
-15. **Numbering: drop the grace period; clean month rollover** — ☐
+15. **Numbering: drop the grace period; clean month rollover** — ☑ (calendar-driven; grace + manual close removed everywhere; rollover + $100-bill persistence proven in tests_numbering.py)
     *Ask:* month closes → new sequence from 1; reserved numbers stay with owners.
     *Do:* remove the grace-period logic in `report_number_service`; `_active_month`
     = true current calendar month; new reservations start `YYYY/MM/001`;

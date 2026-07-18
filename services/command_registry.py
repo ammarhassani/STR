@@ -23,7 +23,6 @@ WRITE_COMMANDS = {
     "version_service.restore_deleted_version": ("version_service", "restore_deleted_version"),
     "report_number_service.reserve_block": ("report_number_service", "reserve_block"),
     "report_number_service.transfer_numbers": ("report_number_service", "transfer_numbers"),
-    "report_number_service.close_month": ("report_number_service", "close_month"),
     "dropdown_service.add_dropdown_value": ("dropdown_service", "add_dropdown_value"),
     "dropdown_service.update_dropdown_value": ("dropdown_service", "update_dropdown_value"),
     "dropdown_service.delete_dropdown_value": ("dropdown_service", "delete_dropdown_value"),

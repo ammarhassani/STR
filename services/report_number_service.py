@@ -22,7 +22,7 @@ class ReportNumberService:
     Key Features:
     - Database-level locking for atomicity
     - Owned-block reservation (reserve_block / consume_next_available)
-    - Month close / grace period (R50, R51)
+    - Calendar-driven monthly numbering (automatic month rollover)
     """
 
     def __init__(self, db_manager, logging_service):
@@ -35,6 +35,9 @@ class ReportNumberService:
         """
         self.db_manager = db_manager
         self.logger = logging_service
+        # Numbering month = the current calendar month. Injectable so tests can
+        # simulate a month rollover.
+        self._now = datetime.now
 
     def _generate_next_numbers(self, cursor) -> Tuple[str, int]:
         """
@@ -43,7 +46,8 @@ class ReportNumberService:
         Report Number Format: YYYY/MM/NNN (resets each month)
         Serial Number: Global incrementing counter (never resets)
 
-        Uses grace period for month transitions (configurable, default 3 days).
+        The month prefix is the current calendar month; it rolls over
+        automatically when the month changes (no grace period, no manual close).
 
         Args:
             cursor: Database cursor (must be in transaction)
@@ -51,8 +55,7 @@ class ReportNumberService:
         Returns:
             Tuple of (report_number, serial_number)
         """
-        # Month prefix respects admin month-close (R50/R51): numbering stays in
-        # the open month until an admin closes it, then advances by one.
+        # Month prefix is the current calendar month (auto rollover).
         prefix = self._active_month(cursor) + "/"
 
         # Get next report number for this month
@@ -125,122 +128,19 @@ class ReportNumberService:
 
         return report_number, serial_number
 
-    def _get_month_grace_period(self, cursor) -> int:
-        """
-        Get month grace period setting from system config.
-
-        Args:
-            cursor: Database cursor
-
-        Returns:
-            Grace period in days (default: 3)
-        """
-        try:
-            cursor.execute("""
-                SELECT config_value
-                FROM system_config
-                WHERE config_key = 'month_grace_period'
-                  AND is_active = 1
-            """)
-            result = cursor.fetchone()
-            if result:
-                return int(result[0])
-        except:
-            pass
-        return 3  # Default to 3 days
-
-    def get_month_with_grace_period(self, grace_days: int = 3) -> str:
-        """
-        Get the current month for report numbering with grace period.
-
-        Example: If grace_days=3:
-        - On Dec 1st, 2nd, 3rd → returns "2025/11" (still November)
-        - On Dec 4th onwards → returns "2025/12" (December)
-
-        Args:
-            grace_days: Number of days into new month to keep using previous month
-
-        Returns:
-            Month prefix as "YYYY/MM"
-        """
-        now = datetime.now()
-
-        # If we're within the grace period of a new month, use previous month
-        if now.day <= grace_days and grace_days > 0:
-            # Go back to previous month
-            if now.month == 1:
-                # January -> previous December
-                year = now.year - 1
-                month = 12
-            else:
-                year = now.year
-                month = now.month - 1
-        else:
-            year = now.year
-            month = now.month
-
-        return f"{year}/{month:02d}"
-
-    # ---- Month close / grace period (R50, R51) ------------------------
-    @staticmethod
-    def _next_month(month: str) -> str:
-        """'2025/07' -> '2025/08', '2025/12' -> '2026/01'."""
-        y, m = int(month[:4]), int(month[5:7])
-        return f"{y+1}/01" if m == 12 else f"{y}/{m+1:02d}"
-
-    def _active_month(self, cursor) -> str:
-        """The month numbering should use RIGHT NOW. Numbering never advances by
-        the calendar on its own (grace period, R50); it advances only when an
-        admin closes the current month (R51). So: one past the latest closed
-        month, else the month of the latest existing report, else this month."""
-        cursor.execute("SELECT MAX(month) FROM closed_months")
-        row = cursor.fetchone()
-        if row and row[0]:
-            return self._next_month(row[0])
-        cursor.execute(
-            "SELECT MAX(substr(report_number, 1, 7)) FROM reports "
-            "WHERE report_number GLOB '[0-9][0-9][0-9][0-9]/[0-9][0-9]/*'")
-        row = cursor.fetchone()
-        if row and row[0]:
-            return row[0]
-        now = datetime.now()
+    # ---- Calendar-driven numbering month -------------------------------
+    # The numbering month IS the current calendar month. It rolls over
+    # automatically when the month changes — no grace period, no manual admin
+    # close. Already-reserved numbers keep the month they were reserved in (the
+    # number is fixed at reservation) and stay owned by their assignee until
+    # acted on, so a number reserved in June still works in July.
+    def _active_month(self, cursor=None) -> str:
+        now = self._now()
         return f"{now.year}/{now.month:02d}"
 
-    def is_month_closed(self, month: str) -> bool:
-        try:
-            r = self.db_manager.execute_with_retry(
-                "SELECT 1 FROM closed_months WHERE month = ?", (month,))
-            return bool(r)
-        except Exception:
-            return False
-
-    def close_month(self, month: str, username: str) -> Tuple[bool, str]:
-        """Close a numbering month so numbering advances to the next (R51).
-        Admin only; a closed month can never be reopened (no such method)."""
-        try:
-            if not re.match(r'^\d{4}/(0[1-9]|1[0-2])$', str(month)):
-                return False, "Invalid month format (expected YYYY/MM)"
-            who = self.db_manager.execute_with_retry(
-                "SELECT role FROM users WHERE username = ? AND is_active = 1", (username,))
-            if not who or who[0][0] != 'admin':
-                return False, "Only administrators can close a month"
-            if self.is_month_closed(month):
-                return False, "This month is already closed"
-            self.db_manager.execute_write(
-                "INSERT INTO closed_months (month, closed_by) VALUES (?, ?)", (month, username))
-            self.logger.info(f"Month {month} closed by {username}")
-            return True, f"Month {month} closed; numbering advanced"
-        except Exception as e:
-            self.logger.error(f"Error closing month: {str(e)}")
-            return False, f"Error closing month: {str(e)}"
-
     def get_active_numbering_month(self) -> str:
-        """Public read of the current active numbering month."""
-        conn = sqlite3.connect(self.db_manager.db_path)
-        try:
-            return self._active_month(conn.cursor())
-        finally:
-            conn.close()
+        """The current active numbering month (the calendar month)."""
+        return self._active_month()
 
     # ---- Owned-block reservation (Phase 2) -----------------------------
 

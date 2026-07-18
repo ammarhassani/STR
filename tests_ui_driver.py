@@ -209,8 +209,12 @@ def run():
     finding(E, 'reject_report not passed reassign_to from UI',
             'reassign_to=reassign_to' not in ap_src)
     set_src = open(os.path.join(REPO, 'flet_app/views/settings_view.py')).read()
-    finding(E, 'settings missing Close Month control',
-            'handle_close_month' not in set_src or 'close_month(' not in set_src)
+    # #15: numbering is calendar-driven now — the manual Close-Month control is
+    # GONE; settings shows the current numbering month instead.
+    finding(E, 'settings still has the removed Close-Month control',
+            'handle_close_month' in set_src or 'close_month(' in set_src)
+    finding(E, 'settings lost the numbering-month display',
+            'get_active_numbering_month' not in set_src)
     rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py')).read()
     finding(E, 'report dialog missing edit-lock acquire/release',
             'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)

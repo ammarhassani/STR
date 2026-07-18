@@ -26,7 +26,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
     colors = theme_manager.get_colors()
 
     # Refs for inputs
-    grace_period_ref = ft.Ref[ft.TextField]()
     batch_size_ref = ft.Ref[ft.TextField]()
     reservation_expiry_ref = ft.Ref[ft.TextField]()
     page_size_ref = ft.Ref[ft.TextField]()
@@ -39,7 +38,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
             def fetch_settings():
                 settings = {}
                 queries = [
-                    ('month_grace_period', '3'),
                     ('batch_pool_size', '20'),
                     ('reservation_expiry_minutes', '5'),
                     ('records_per_page', '50'),
@@ -57,8 +55,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
             settings = await loop.run_in_executor(None, fetch_settings)
 
             # Update UI
-            if grace_period_ref.current:
-                grace_period_ref.current.value = settings.get('month_grace_period', '3')
             if batch_size_ref.current:
                 batch_size_ref.current.value = settings.get('batch_pool_size', '20')
             if reservation_expiry_ref.current:
@@ -105,14 +101,12 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Save all settings."""
         try:
             # Validate inputs
-            grace = grace_period_ref.current.value if grace_period_ref.current else '3'
             batch = batch_size_ref.current.value if batch_size_ref.current else '20'
             expiry = reservation_expiry_ref.current.value if reservation_expiry_ref.current else '5'
             page_size = page_size_ref.current.value if page_size_ref.current else '50'
 
             # Validate numeric values
             try:
-                int(grace)
                 int(batch)
                 int(expiry)
                 int(page_size)
@@ -121,7 +115,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 return
 
             # Save settings
-            save_setting('month_grace_period', grace)
             save_setting('batch_pool_size', batch)
             save_setting('reservation_expiry_minutes', expiry)
             save_setting('records_per_page', page_size)
@@ -144,8 +137,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
             reset_dialog.open = False
             page.update()
 
-            if grace_period_ref.current:
-                grace_period_ref.current.value = "3"
             if batch_size_ref.current:
                 batch_size_ref.current.value = "20"
             if reservation_expiry_ref.current:
@@ -188,44 +179,6 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
             except Exception:
                 active_month_ref.current.value = "Current numbering month: unknown"
 
-    def handle_close_month(e):
-        """Admin closes the current numbering month (R50/R51). No reopen."""
-        svc = getattr(app_state, 'report_number_service', None)
-        user = app_state.current_user or {}
-        if not svc:
-            show_error(page, "Numbering service unavailable")
-            return
-        month = svc.get_active_numbering_month()
-
-        def do_close(ev):
-            confirm.open = False
-            page.update()
-            ok, msg = svc.close_month(month, user.get('username', ''))
-            if ok:
-                show_success(page, msg)
-                refresh_active_month()
-                page.update()
-            else:
-                show_error(page, msg)
-
-        def cancel(ev):
-            confirm.open = False
-            page.update()
-
-        confirm = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("Close Numbering Month"),
-            content=ft.Text(
-                f"Close month {month}? New reports will use the next month. "
-                f"This cannot be undone and existing report numbers are unchanged."),
-            actions=[
-                ft.TextButton("Cancel", on_click=cancel),
-                app_button("Close Month", on_click=do_close, variant="danger"),
-            ],
-        )
-        page.overlay.append(confirm)
-        confirm.open = True
-        page.update()
 
     def create_setting_field(
         label: str,
@@ -299,26 +252,13 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                     spacing=8,
                 ),
                 ft.Container(height=12),
-                create_setting_field(
-                    "Month Grace Period:",
-                    grace_period_ref,
-                    "3",
-                    "days",
-                    "Days into new month to continue using previous month. Example: Set to 3 means Dec 1st-3rd still use November (2025/11)",
-                    0, 15,
-                ),
-                ft.Divider(height=1, color=colors["border"]),
                 ft.Text(ref=active_month_ref, value="Current numbering month: …",
-                        size=12, color=colors["text_secondary"]),
-                ft.Row(controls=[
-                    ft.OutlinedButton(
-                        "Close Current Month",
-                        icon=ft.Icons.EVENT_BUSY,
-                        on_click=handle_close_month,
-                    ),
-                    ft.Text("Advances numbering to the next month. Cannot be undone.",
-                            size=11, italic=True, color=colors["text_muted"]),
-                ], spacing=10),
+                        size=13, color=colors["text_primary"], weight=ft.FontWeight.W_600),
+                ft.Text("Numbering follows the calendar month automatically — a new "
+                        "sequence (from 001) opens when the month changes. Numbers you've "
+                        "already reserved keep their month and stay yours until you use "
+                        "or transfer them.",
+                        size=11, italic=True, color=colors["text_muted"]),
             ],
             spacing=8,
         ),

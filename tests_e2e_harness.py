@@ -273,8 +273,9 @@ def phase1():
     rn_list = [n['report_number'] for n in all_nums]
     check(F, 'no duplicate report numbers across owners', len(rn_list) == len(set(rn_list)), rn_list)
 
-    month = agent.numbers.get_month_with_grace_period()
-    check(F, 'grace-period month format YYYY/MM', len(month.split('/')) == 2, month)
+    month = agent.numbers.get_active_numbering_month()
+    check(F, 'numbering month is the current calendar month (YYYY/MM)',
+          month == f"{datetime.now().year}/{datetime.now().month:02d}", month)
 
     # ------------------------------------------------------------ report CRUD
     F = '04 Report CRUD'

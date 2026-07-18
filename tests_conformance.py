@@ -347,21 +347,27 @@ def part3_features():
     agents = admin.approvals.get_active_agents()
     conf('R36', 'get_active_agents lists agents', len(agents) >= 2, len(agents))
 
-    # ---- R50/R51 month close
+    # ---- Numbering is calendar-driven now (#15): no grace, no manual close
+    import datetime as _dt
     N = admin.numbers
+    _now = _dt.datetime.now()
     active = N.get_active_numbering_month()
-    conf('R51', 'non-admin cannot close month', not agent.numbers.close_month(active, 'agent1')[0])
-    conf('R51', 'invalid month format rejected', not N.close_month('bad', 'admin')[0])
-    okc, msg = N.close_month(active, 'admin')
-    conf('R50', 'admin closes current month', okc, msg)
-    conf('R51', 'closing an already-closed month rejected', not N.close_month(active, 'admin')[0])
-    new_active = N.get_active_numbering_month()
-    conf('R50', 'numbering advances after close', new_active != active, f"{active}->{new_active}")
-    conf('R51', 'no reopen method exists', not hasattr(N, 'reopen_month'))
-    # a new report now uses the advanced month
+    conf('NUM', 'active numbering month is the current calendar month',
+         active == f"{_now.year}/{_now.month:02d}", active)
+    conf('NUM', 'manual month-close removed', not hasattr(N, 'close_month'))
+    conf('NUM', 'grace-period logic removed', not hasattr(N, 'get_month_with_grace_period'))
+    # simulate a month rollover: a brand-new month opens its sequence at 001
+    N._now = lambda: _dt.datetime(2999, 1, 15)
+    ok_r, nums_r, _m = N.reserve_block('admin', 1)
+    conf('NUM', 'rolled-over month opens sequence at 001',
+         ok_r and nums_r and nums_r[0] == '2999/01/001', nums_r)
+    N._now = _dt.datetime.now   # restore
+    # a report consumes one of the owner's RESERVED numbers (a $100 bill of
+    # whatever month it was reserved in — not necessarily this calendar month) (#15)
     ok, rid4, _ = admin.make_report({'cic': '7000000000000004'})
     rn = q1("SELECT report_number FROM reports WHERE report_id=?", (rid4,))
-    conf('R50', 'new report uses advanced month prefix', rn.startswith(new_active), rn)
+    conf('NUM', 'new report consumes a reserved YYYY/MM/NNN number',
+         bool(rn) and len(str(rn).split('/')) == 3, rn)
 
     # ---- R80 auto-purge
     from services.maintenance_service import MaintenanceService

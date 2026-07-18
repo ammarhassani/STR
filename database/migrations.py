@@ -292,7 +292,6 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         cursor.execute("""
             INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, config_category, is_active)
             VALUES
-                ('month_grace_period', '3', 'setting', 'system', 1),
                 ('batch_pool_size', '20', 'setting', 'system', 1),
                 ('reservation_expiry_minutes', '5', 'setting', 'system', 1),
                 ('records_per_page', '50', 'setting', 'system', 1)
@@ -1268,6 +1267,13 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                 messages.append("Created host_lease table")
         except Exception as e:
             messages.append(f"host_lease table skipped: {str(e)}")
+
+        # Numbering is calendar-driven now (#15): drop the dead month grace-period config.
+        try:
+            cursor.execute("DELETE FROM system_config WHERE config_key = 'month_grace_period'")
+            conn.commit()
+        except Exception as e:
+            messages.append(f"month_grace_period cleanup skipped: {str(e)}")
 
         # must_change_password: force a password change at next login (security)
         try:
