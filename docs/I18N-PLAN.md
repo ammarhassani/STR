@@ -69,8 +69,9 @@ be called "done" until the content is real.
 - ✅ Drafted Arabic for all 7 active categories (gender, nationality,
   report_classification, report_source, reporting_entity, fiu_feedback,
   type_of_suspected_transaction — 71 values). `arb_staff` skipped (its EN/AR
-  divergence is a separate semantic question); `second_reason_for_suspicion` is
-  now free text (#13) so its old 157 dropdown values are dead/ignored.
+  divergence is a separate semantic question). `second_reason_for_suspicion` IS
+  a dropdown (157 values, mixed en/ar, unpaired) — bilingual pairing of that
+  list is a follow-up content task, not yet done.
 - ✅ `dropdown_service.get_active_options(category, lang)` → `[(code, label)]` and
   `resolve_label(category, code_or_value, lang)` (accepts a code OR a legacy stored
   label; unknown values pass through). Existing `get_active_dropdown_values`
