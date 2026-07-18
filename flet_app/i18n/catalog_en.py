@@ -132,6 +132,30 @@ STRINGS = {
     "res.err_recipient": "Select a recipient.",
     "res.err_select": "Select at least one number to transfer.",
 
+    # change password
+    "cpw.title": "Change Password",
+    "cpw.current": "Current Password",
+    "cpw.new": "New Password",
+    "cpw.confirm": "Confirm New Password",
+    "cpw.strong": "Strong password",
+    "cpw.weak": "Weak: {feedback}",
+    "cpw.err.current": "Please enter your current password.",
+    "cpw.err.new": "Please enter a new password.",
+    "cpw.err.confirm": "Please confirm your new password.",
+    "cpw.err.length": "Password must be at least 8 characters.",
+    "cpw.err.upper": "Password must contain at least one uppercase letter.",
+    "cpw.err.lower": "Password must contain at least one lowercase letter.",
+    "cpw.err.digit": "Password must contain at least one number.",
+    "cpw.err.match": "New passwords do not match.",
+    "cpw.err.same": "New password must be different from current password.",
+
+    # help dialog (chrome; the doc content stays English for now)
+    "help.title": "Help & Documentation",
+    "help.tab.getting_started": "Getting Started",
+    "help.tab.shortcuts": "Shortcuts",
+    "help.tab.faq": "FAQ",
+    "help.tab.about": "About",
+
     # My Work
     "mywork.lane.rework": "Returned for Rework",
     "mywork.lane.draft": "Drafts",

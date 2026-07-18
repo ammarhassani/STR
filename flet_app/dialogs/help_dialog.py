@@ -3,6 +3,7 @@ Help Dialog for FIU Report Management System.
 Comprehensive help system with documentation and shortcuts.
 """
 import flet as ft
+from i18n import t
 from typing import Any
 
 from theme.theme_manager import theme_manager
@@ -168,13 +169,13 @@ Only users with Admin role can approve reports.
         selected_index=0,
         animation_duration=200,
         tabs=[
-            ft.Tab(text="Getting Started", icon=ft.Icons.ROCKET_LAUNCH,
+            ft.Tab(text=t("help.tab.getting_started"), icon=ft.Icons.ROCKET_LAUNCH,
                    content=scroll_pane(md(getting_started_content))),
-            ft.Tab(text="Shortcuts", icon=ft.Icons.KEYBOARD,
+            ft.Tab(text=t("help.tab.shortcuts"), icon=ft.Icons.KEYBOARD,
                    content=scroll_pane(md(shortcuts_content))),
-            ft.Tab(text="FAQ", icon=ft.Icons.HELP_OUTLINE,
+            ft.Tab(text=t("help.tab.faq"), icon=ft.Icons.HELP_OUTLINE,
                    content=scroll_pane(md(faq_content))),
-            ft.Tab(text="About", icon=ft.Icons.INFO_OUTLINE,
+            ft.Tab(text=t("help.tab.about"), icon=ft.Icons.INFO_OUTLINE,
                    content=scroll_pane(about_content, center=True)),
         ],
     )
@@ -189,7 +190,7 @@ Only users with Admin role can approve reports.
             controls=[
                 ft.Icon(ft.Icons.HELP, color=colors["primary"]),
                 ft.Container(width=8),
-                ft.Text("Help & Documentation"),
+                ft.Text(t("help.title")),
                 ft.Container(expand=True),
                 ft.Text("v2.0.0", size=11, color=colors["text_muted"]),
             ],
@@ -200,7 +201,7 @@ Only users with Admin role can approve reports.
             height=450,
         ),
         actions=[
-            ft.TextButton("Close", on_click=close_dialog),
+            ft.TextButton(t("common.close"), on_click=close_dialog),
         ],
     )
 

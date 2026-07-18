@@ -133,6 +133,30 @@ STRINGS = {
     "res.err_recipient": "اختر مستلِماً.",
     "res.err_select": "اختر رقماً واحداً على الأقل للنقل.",
 
+    # change password
+    "cpw.title": "تغيير كلمة المرور",
+    "cpw.current": "كلمة المرور الحالية",
+    "cpw.new": "كلمة المرور الجديدة",
+    "cpw.confirm": "تأكيد كلمة المرور الجديدة",
+    "cpw.strong": "كلمة مرور قوية",
+    "cpw.weak": "ضعيفة: {feedback}",
+    "cpw.err.current": "الرجاء إدخال كلمة المرور الحالية.",
+    "cpw.err.new": "الرجاء إدخال كلمة مرور جديدة.",
+    "cpw.err.confirm": "الرجاء تأكيد كلمة المرور الجديدة.",
+    "cpw.err.length": "يجب أن تتكوّن كلمة المرور من 8 أحرف على الأقل.",
+    "cpw.err.upper": "يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل.",
+    "cpw.err.lower": "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل.",
+    "cpw.err.digit": "يجب أن تحتوي كلمة المرور على رقم واحد على الأقل.",
+    "cpw.err.match": "كلمتا المرور الجديدتان غير متطابقتين.",
+    "cpw.err.same": "يجب أن تختلف كلمة المرور الجديدة عن الحالية.",
+
+    # help dialog (chrome; the doc content stays English for now)
+    "help.title": "المساعدة والتوثيق",
+    "help.tab.getting_started": "البدء",
+    "help.tab.shortcuts": "الاختصارات",
+    "help.tab.faq": "الأسئلة الشائعة",
+    "help.tab.about": "حول",
+
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",
     "mywork.lane.draft": "المسودّات",

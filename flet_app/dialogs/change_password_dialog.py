@@ -3,6 +3,7 @@ Change Password Dialog for FIU Report Management System.
 Allows users to change their password.
 """
 import flet as ft
+from i18n import t
 from typing import Any
 
 from theme.theme_manager import theme_manager
@@ -26,20 +27,20 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
 
     # Input fields
     current_password = ft.TextField(
-        label="Current Password",
+        label=t("cpw.current"),
         password=True,
         can_reveal_password=True,
         autofocus=True,
     )
 
     new_password = ft.TextField(
-        label="New Password",
+        label=t("cpw.new"),
         password=True,
         can_reveal_password=True,
     )
 
     confirm_password = ft.TextField(
-        label="Confirm New Password",
+        label=t("cpw.confirm"),
         password=True,
         can_reveal_password=True,
     )
@@ -79,10 +80,10 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
             feedback.append("add number")
 
         if strength == 4:
-            strength_text.value = "Strong password"
+            strength_text.value = t("cpw.strong")
             strength_text.color = colors["success"]
         elif strength >= 2:
-            strength_text.value = f"Weak: {', '.join(feedback)}"
+            strength_text.value = t('cpw.weak', feedback=', '.join(feedback))
             strength_text.color = colors["warning"]
         else:
             strength_text.value = f"Too weak: {', '.join(feedback)}"
@@ -99,23 +100,23 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
         confirm = confirm_password.value.strip() if confirm_password.value else ""
 
         if not cur:
-            return False, "Please enter your current password."
+            return False, t("cpw.err.current")
         if not new:
-            return False, "Please enter a new password."
+            return False, t("cpw.err.new")
         if not confirm:
-            return False, "Please confirm your new password."
+            return False, t("cpw.err.confirm")
         if len(new) < 8:
-            return False, "Password must be at least 8 characters."
+            return False, t("cpw.err.length")
         if not any(c.isupper() for c in new):
-            return False, "Password must contain at least one uppercase letter."
+            return False, t("cpw.err.upper")
         if not any(c.islower() for c in new):
-            return False, "Password must contain at least one lowercase letter."
+            return False, t("cpw.err.lower")
         if not any(c.isdigit() for c in new):
-            return False, "Password must contain at least one number."
+            return False, t("cpw.err.digit")
         if new != confirm:
-            return False, "New passwords do not match."
+            return False, t("cpw.err.match")
         if cur == new:
-            return False, "New password must be different from current password."
+            return False, t("cpw.err.same")
 
         return True, ""
 
@@ -159,7 +160,7 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
 
     dialog = ft.AlertDialog(
         modal=True,
-        title=ft.Text("Change Password"),
+        title=ft.Text(t("cpw.title")),
         content=ft.Container(
             content=ft.Column(
                 controls=[
@@ -197,9 +198,9 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
             width=400,
         ),
         actions=[
-            ft.TextButton("Cancel", on_click=close_dialog),
+            ft.TextButton(t("common.cancel"), on_click=close_dialog),
             ft.ElevatedButton(
-                "Change Password",
+                t("cpw.title"),
                 icon=ft.Icons.KEY,
                 bgcolor=colors["primary"],
                 color=ft.Colors.WHITE,
