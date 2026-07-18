@@ -225,7 +225,24 @@ def child_main():
             if stolen:
                 defect("IDENTITY",
                        f"{username} reserved numbers into {victim}'s pool", stolen)
-        # 2. steal another user's reserved numbers
+        # 2. destroy another user's reserved numbers via release
+        refresh()
+        theirs_before = {n["report_number"] for n in (N.get_available_numbers(victim) or [])}
+        if theirs_before:
+            attempt("release ANOTHER user's numbers", N.release_numbers,
+                    victim, sorted(theirs_before)[:2])
+            refresh()
+            theirs_after = {n["report_number"] for n in (N.get_available_numbers(victim) or [])}
+            destroyed = theirs_before - theirs_after
+            # the victim may legitimately have spent one on a report meanwhile,
+            # so only count numbers that vanished from the reservations entirely
+            gone = [rn for rn in destroyed
+                    if not any(r.get("report_number") == rn
+                               for r in (R.get_reports(None, rn, None, None, None, 5, 0)[0] or []))]
+            if gone:
+                defect("IDENTITY", f"{username} released {victim}'s reserved numbers", gone)
+
+        # 3. steal another user's reserved numbers
         refresh()
         theirs = N.get_available_numbers(victim) or []
         if theirs:

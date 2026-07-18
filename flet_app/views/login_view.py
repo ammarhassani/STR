@@ -3,6 +3,8 @@ Login View for FIU Report Management System.
 Flet-based authentication interface.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 import asyncio
 from typing import Callable, Optional, Any
 
@@ -235,6 +237,7 @@ class LoginView:
             if not ok:
                 _err(msg or "Could not complete registration."); return
             dlg.open = False
+            _overlay_dismiss(self.page, dlg)
             self.page.update()
             success, user, m = await loop.run_in_executor(None, self.app_state.authenticate, username, p1)
             if success:

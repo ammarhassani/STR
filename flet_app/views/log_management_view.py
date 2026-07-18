@@ -3,6 +3,8 @@ Log Management View for FIU Report Management System.
 Admin view for viewing, filtering, and managing system logs.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
@@ -228,6 +230,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
             import os, subprocess
             folder_path = str(Path(file_path).parent)
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
             if os.name == 'nt':
                 os.startfile(folder_path)
@@ -236,6 +239,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def close_dialog(ev):
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
 
         dialog = ft.AlertDialog(
@@ -248,14 +252,14 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                                   color=ft.Colors.WHITE, on_click=open_folder),
             ],
         )
-        page.overlay.append(dialog)
-        dialog.open = True
+        _overlay_mount(page, dialog, update=False)
         page.update()
 
     def handle_clear_logs(e):
         """Clear all logs."""
         def confirm_clear(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
             try:
@@ -281,6 +285,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def cancel_clear(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -300,8 +305,7 @@ def build_log_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     # Header row

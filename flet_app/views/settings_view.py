@@ -3,6 +3,8 @@ Settings View for FIU Report Management System.
 Admin panel for configuring system-wide settings.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 import asyncio
 from typing import Any, Dict
 from datetime import datetime
@@ -136,6 +138,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Reset to default values."""
         def confirm_reset(e):
             reset_dialog.open = False
+            _overlay_dismiss(page, reset_dialog)
             page.update()
 
             if batch_size_ref.current:
@@ -150,6 +153,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def cancel_reset(e):
             reset_dialog.open = False
+            _overlay_dismiss(page, reset_dialog)
             page.update()
 
         reset_dialog = ft.AlertDialog(
@@ -166,8 +170,7 @@ def build_settings_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
             ],
         )
-        page.overlay.append(reset_dialog)
-        reset_dialog.open = True
+        _overlay_mount(page, reset_dialog, update=False)
         page.update()
 
     active_month_ref = ft.Ref[ft.Text]()

@@ -3,6 +3,8 @@ Diff View Dialog for FIU Report Management System.
 Shows side-by-side and unified diff views for comparing report versions.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from typing import Optional, Any, Callable, Dict
 
 from theme.theme_manager import theme_manager
@@ -384,6 +386,7 @@ def show_diff_view_dialog(
     def close_dialog(e):
         """Close the dialog."""
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
         if on_close:
             on_close()
@@ -504,8 +507,7 @@ def show_diff_view_dialog(
     )
 
     # Show dialog
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
     # Load comparison data

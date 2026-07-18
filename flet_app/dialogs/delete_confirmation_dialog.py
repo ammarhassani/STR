@@ -3,6 +3,8 @@ Delete Confirmation Dialog for FIU Report Management System.
 Provides soft delete and hard delete options with appropriate warnings.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from typing import Optional, Any, Callable, Dict
 
 from theme.theme_manager import theme_manager
@@ -36,6 +38,7 @@ def show_delete_confirmation_dialog(
 
     def close_dialog(e=None):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     def handle_soft_delete(e):
@@ -47,12 +50,14 @@ def show_delete_confirmation_dialog(
         # Show additional confirmation for hard delete
         def confirm_hard_delete(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
             if on_hard_delete:
                 on_hard_delete()
 
         def cancel_hard_delete(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         # flat danger button, disabled until the user types DELETE (live-toggled)
@@ -109,8 +114,7 @@ def show_delete_confirmation_dialog(
             # live-toggle the flat danger button as the user types DELETE
             set_button_enabled(confirm_btn, value.upper() == "DELETE")
 
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         close_dialog()
         page.update()
 
@@ -328,8 +332,7 @@ def show_delete_confirmation_dialog(
     )
 
     # Show dialog
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
 

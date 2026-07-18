@@ -7,6 +7,8 @@ knows an FIU reporter's password. Admins here manage the ID, role, and active
 status — and can "Reset password" (re-arm the handshake) but never set one.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
 
@@ -46,6 +48,7 @@ def show_user_dialog(
 
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     def save_user(e):
@@ -70,6 +73,7 @@ def show_user_dialog(
                 show_error(msg); return
             show_success(msg)
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
             if on_save:
                 on_save()
@@ -85,6 +89,7 @@ def show_user_dialog(
                 show_error(msg); return
             show_success(msg)
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
             if on_save:
                 on_save()
@@ -205,6 +210,5 @@ def show_user_dialog(
     )
     dialog = ft.AlertDialog(
         modal=True, content=dialog_content, shape=ft.RoundedRectangleBorder(radius=12))
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()

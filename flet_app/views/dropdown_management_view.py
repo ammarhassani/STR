@@ -3,6 +3,8 @@ Dropdown Management View for FIU Report Management System.
 Admin panel for managing dropdown values (CRUD operations).
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
@@ -313,6 +315,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
                 if success:
                     dialog.open = False
+                    _overlay_dismiss(page, dialog)
                     page.update()
                     show_success(page, message)
                     page.run_task(load_values)
@@ -324,6 +327,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def close_dialog(e):
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
 
         dialog = ft.AlertDialog(
@@ -353,8 +357,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
             ],
         )
-        page.overlay.append(dialog)
-        dialog.open = True
+        _overlay_mount(page, dialog, update=False)
         page.update()
 
     def handle_add(e):
@@ -372,6 +375,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Handle delete value (soft delete)."""
         def confirm_delete(e):
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
 
             current_user = app_state.auth_service.get_current_user()
@@ -394,6 +398,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def cancel_delete(e):
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
 
         dialog = ft.AlertDialog(
@@ -413,8 +418,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
             ],
         )
-        page.overlay.append(dialog)
-        dialog.open = True
+        _overlay_mount(page, dialog, update=False)
         page.update()
 
     def handle_restore(value_data: Dict):

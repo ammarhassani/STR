@@ -3,6 +3,8 @@ Help Dialog for FIU Report Management System.
 Comprehensive help system with documentation and shortcuts.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 from typing import Any
 
@@ -111,6 +113,7 @@ def show_help_dialog(page: ft.Page, app_state: Any = None):
 
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     dialog = ft.AlertDialog(
@@ -134,6 +137,5 @@ def show_help_dialog(page: ft.Page, app_state: Any = None):
         ],
     )
 
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()

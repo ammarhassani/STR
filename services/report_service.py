@@ -93,7 +93,7 @@ class ReportService:
         'fiu_number', 'fiu_letter_receive_date', 'fiu_feedback',
         'fiu_letter_number', 'fiu_date', 'current_version',
         'approval_status', 'legal_entity_owner_checkbox', 'acc_membership_checkbox',
-        'relationship', 'id_type', 'case_id'
+        'relationship', 'id_type', 'case_id', 'customer_segment'
     }
 
     # Columns no caller may set through update_report: the approval workflow

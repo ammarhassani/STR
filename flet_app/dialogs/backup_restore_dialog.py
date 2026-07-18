@@ -3,6 +3,8 @@ Backup & Restore Dialog for FIU Report Management System.
 Comprehensive backup and restore functionality for database.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 import asyncio
 import shutil
@@ -206,11 +208,13 @@ def show_backup_restore_dialog(
         # Confirm dialog
         def on_confirm(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
             page.run_task(do_backup)
 
         def on_cancel(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -222,8 +226,7 @@ def show_backup_restore_dialog(
                 ft.ElevatedButton(t("bak.create"), on_click=on_confirm, bgcolor=colors["primary"], color=ft.Colors.WHITE),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     async def do_backup():
@@ -293,11 +296,13 @@ def show_backup_restore_dialog(
 
         def on_confirm(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
             page.run_task(do_restore)
 
         def on_cancel(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -332,8 +337,7 @@ def show_backup_restore_dialog(
                 ft.ElevatedButton(t("bak.restore"), on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     async def do_restore():
@@ -462,11 +466,13 @@ def show_backup_restore_dialog(
 
         def on_confirm(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
             page.run_task(do_delete)
 
         def on_cancel(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -478,8 +484,7 @@ def show_backup_restore_dialog(
                 ft.ElevatedButton(t("common.delete"), on_click=on_confirm, bgcolor=colors["danger"], color=ft.Colors.WHITE),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     async def do_delete():
@@ -523,6 +528,7 @@ def show_backup_restore_dialog(
 
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     dialog = ft.AlertDialog(
@@ -614,8 +620,7 @@ def show_backup_restore_dialog(
         ],
     )
 
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
     # Load backups

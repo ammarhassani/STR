@@ -3,6 +3,8 @@ rows in dashboard_config. Every query is validated + test-run read-only before
 it can be saved, so a broken or dangerous widget never reaches the board.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from typing import Any, Dict, Optional
 
 from theme.theme_manager import theme_manager
@@ -57,6 +59,7 @@ def build_dashboard_widgets_view(page: ft.Page, app_state: Any) -> ft.Control:
         def do(e):
             ok, msg = dash.delete_widget(w['widget_id'])
             dlg.open = False
+            _overlay_dismiss(page, dlg)
             page.update()
             (show_success if ok else show_error)(page, msg)
             if ok:

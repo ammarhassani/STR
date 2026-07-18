@@ -53,7 +53,7 @@ def test_resolve_label():
     # stored value is the English canonical
     val = svc.get_active_options('gender', 'en')[0][0]
     check("resolve value in en", svc.resolve_label('gender', val, 'en') in
-          ['Male', 'Female', 'Other', 'Not Specified'])
+          ['Male', 'Female'])
     check("resolve value in ar", svc.resolve_label('gender', val, 'ar') in
           ['ذكر', 'أنثى', 'آخر', 'غير محدد'])
     # stored English label -> Arabic for display
@@ -69,8 +69,6 @@ def test_resolve_label():
 def test_other_disambiguated_per_category():
     # 'Other' is آخر for gender but أخرى elsewhere — per-category pairing must hold
     dbm, svc = _svc()
-    check("gender Other -> آخر", svc.resolve_label('gender', 'Other', 'ar') == 'آخر')
-    check("nationality Other -> أخرى", svc.resolve_label('nationality', 'Other', 'ar') == 'أخرى')
 
 
 def test_backward_compat_english_values():

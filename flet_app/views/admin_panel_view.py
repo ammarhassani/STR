@@ -3,6 +3,8 @@ Admin Panel View for FIU Report Management System.
 User management interface for administrators.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
@@ -263,6 +265,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Handle delete user."""
         def confirm_delete(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
             try:
@@ -282,6 +285,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         def cancel_delete(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -301,8 +305,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     def handle_refresh(e):

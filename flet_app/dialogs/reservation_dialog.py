@@ -7,6 +7,8 @@ selected numbers to another active agent. All data access goes through
 report_number_service / approval_service — no raw SQL here.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 from typing import Any
 
@@ -153,8 +155,24 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
             show_error(page, message)
         page.update()
 
+    def do_release(e):
+        """Hand the checked numbers back so they can be issued again."""
+        if not selected_numbers:
+            show_error(page, t("res.err_select"))
+            return
+        success, message = report_number_service.release_numbers(
+            username, list(selected_numbers))
+        if success:
+            show_success(page, message)
+            selected_numbers.clear()
+            refresh_numbers()
+        else:
+            show_error(page, message)
+        page.update()
+
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     load_agents()
@@ -200,6 +218,24 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                         ],
                         spacing=12,
                     ),
+                    ft.Divider(height=1, color=colors["border"]),
+                    ft.Row(
+                        controls=[
+                            ft.Column(
+                                controls=[
+                                    ft.Text(t("res.release_selected"), size=13,
+                                            weight=ft.FontWeight.BOLD),
+                                    ft.Text(t("res.release_hint"), size=11,
+                                            color=colors["text_secondary"]),
+                                ],
+                                spacing=2, expand=True,
+                            ),
+                            app_button(t("res.release"), icon=ft.Icons.UNDO,
+                                       on_click=do_release, variant="secondary"),
+                        ],
+                        spacing=12,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
                 ],
                 spacing=12,
                 tight=True,
@@ -212,6 +248,5 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
         ],
     )
 
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()

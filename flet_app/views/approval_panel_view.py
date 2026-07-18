@@ -3,6 +3,8 @@ Approval Panel View for FIU Report Management System.
 Admin-only view for managing report approval requests.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 import asyncio
 from typing import Any, Dict, List
@@ -413,6 +415,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
             # Now approve the report
             review_dialog.open = False
+            _overlay_dismiss(page, review_dialog)
             page.update()
             comment = comment_ref.current.value.strip() if comment_ref.current else ""
             process_decision(approval, "approve", comment or "Approved after admin edit")
@@ -438,11 +441,14 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 reassign_to = reassign_ref.current.value
 
             review_dialog.open = False
+
+            _overlay_dismiss(page, review_dialog)
             page.update()
             process_decision(approval, decision, comment, reassign_to)
 
         def cancel_review(e):
             review_dialog.open = False
+            _overlay_dismiss(page, review_dialog)
             page.update()
 
         def on_decision_change(e):
@@ -632,8 +638,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             actions_alignment=ft.MainAxisAlignment.END,
         )
 
-        page.overlay.append(review_dialog)
-        review_dialog.open = True
+        _overlay_mount(page, review_dialog, update=False)
         page.update()
 
         # Load report data after dialog is shown

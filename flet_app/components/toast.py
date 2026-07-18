@@ -83,6 +83,28 @@ class Toast:
             margin=ft.margin.only(bottom=20, right=20, left=20),
         )
 
+        # A snack bar left in the overlay never goes away: after a few messages
+        # the page carries a stack of dead bars. Clear the spent ones, then let
+        # this one remove itself when it times out.
+        from components.overlay import prune
+        prune(self.page)
+        # Only one toast belongs on screen at a time. Without this, a user who
+        # hits the same refusal repeatedly stacks a bar per attempt and they sit
+        # over the UI until each one's timer fires.
+        for old in [c for c in list(self.page.overlay) if isinstance(c, ft.SnackBar)]:
+            old.open = False
+            try:
+                self.page.overlay.remove(old)
+            except ValueError:
+                pass
+
+        def _gone(e=None):
+            try:
+                self.page.overlay.remove(snack_bar)
+            except (ValueError, AttributeError):
+                pass
+        snack_bar.on_dismiss = _gone
+
         self.page.overlay.append(snack_bar)
         snack_bar.open = True
         self.page.update()

@@ -147,7 +147,11 @@ def test_customer_profile_lookup():
           == 'Falcon Trading LLC')
 
     # a soft-deleted report must never be used as a source of customer details
-    dbm.execute_with_retry("UPDATE reports SET is_deleted=1 WHERE report_number='R-11'")
+    # updated_by must be set on the SAME update: the soft-delete audit trigger
+    # copies it into change_history.changed_by, which is NOT NULL
+    dbm.execute_with_retry(
+        "UPDATE reports SET is_deleted=1, updated_by='ag1', updated_at=datetime('now') "
+        "WHERE report_number='R-11'")
     check("deleted reports are not used as a profile source",
           (intel.customer_profile('1234567890123456') or {}).get('reported_entity_name')
           == 'Falcon Trading Est')

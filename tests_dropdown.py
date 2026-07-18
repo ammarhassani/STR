@@ -64,9 +64,81 @@ def test_pick_fires_on_change_and_typing_does_not():
     check("field shows picked text", sd._field.value == "Egyptian", sd._field.value)
 
 
+
+
+# ---------------------------------------------------------------------------
+# Component-level interaction tests.
+#
+# These drive the dropdown the way a user does -- open, click a row, reopen,
+# click another -- instead of assigning .value directly. Every earlier UI test
+# set .value, so a bug that made re-selection impossible (the menu opened
+# filtered by the CURRENT selection, leaving one row) passed everything.
+# ---------------------------------------------------------------------------
+def _sd(values):
+    import flet as ft
+    from components.searchable_dropdown import SearchableDropdown
+    return SearchableDropdown(
+        options=[ft.dropdown.Option(key=v, text=v) for v in values])
+
+
+def _rows(d):
+    return [c.content.value for c in d._list.controls
+            if hasattr(c.content, "value") and c.content.value != "No matches"]
+
+
+def _click(d, text):
+    for c in d._list.controls:
+        if getattr(c.content, "value", None) == text:
+            c.on_click(None)
+            return True
+    return False
+
+
+def test_dropdown_can_change_its_mind():
+    d = _sd(["Male", "Female"])
+    d._open_menu()
+    check("menu opens with every option", _rows(d) == ["Male", "Female"], _rows(d))
+    check("picking Female works", _click(d, "Female") and d.value == "Female", d.value)
+
+    d._open_menu()
+    check("reopening still shows every option (not just the chosen one)",
+          _rows(d) == ["Male", "Female"], _rows(d))
+    check("the choice can be changed back", _click(d, "Male") and d.value == "Male", d.value)
+
+    # and again, several times over
+    for want in ("Female", "Male", "Female"):
+        d._open_menu()
+        _click(d, want)
+        check(f"switched to {want}", d.value == want, d.value)
+
+
+def test_dropdown_typing_still_filters():
+    d = _sd(["Saudi Arabian", "Egyptian", "Emirati"])
+    d._open_menu()
+    d._field.value = "emir"
+    d._on_type(None)
+    check("typing narrows the list", _rows(d) == ["Emirati"], _rows(d))
+    check("a filtered pick sets the value", _click(d, "Emirati") and d.value == "Emirati", d.value)
+    # after that pick, the next open must NOT still be filtered by 'Emirati'
+    d._open_menu()
+    check("the filter does not survive into the next open",
+          len(_rows(d)) == 3, _rows(d))
+
+
+def test_dropdown_blur_keeps_the_selection():
+    d = _sd(["Male", "Female"])
+    d._open_menu(); _click(d, "Female")
+    d._field.value = "half typed nonsense"
+    d._on_blur(None)
+    check("free text is discarded on blur", d.value == "Female", d.value)
+    check("the field shows the selection again", d._field.value == "Female", d._field.value)
+
 if __name__ == "__main__":
     test_filter()
     test_surface()
     test_pick_fires_on_change_and_typing_does_not()
+    test_dropdown_can_change_its_mind()
+    test_dropdown_typing_still_filters()
+    test_dropdown_blur_keeps_the_selection()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

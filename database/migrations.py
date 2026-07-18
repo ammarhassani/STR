@@ -422,7 +422,7 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                 )
 
             # 8. Gender (English — the app is English-only per the BRD)
-            genders = ['Male', 'Female', 'Other', 'Not Specified']
+            genders = ['Male', 'Female']
             for idx, gender in enumerate(genders, 1):
                 dropdown_inserts.append(
                     f"('gender_{idx}', '{gender}', 'dropdown', 'gender', {idx}, 1)"
@@ -1372,7 +1372,7 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
                 "AND config_category='gender' AND config_value IN ('ذكر', 'أنثى')")
             changed += cursor.rowcount or 0
             # 3. ensure the English canonical set is present (idempotent)
-            english_genders = ['Male', 'Female', 'Other', 'Not Specified']
+            english_genders = ['Male', 'Female']
             for idx, g in enumerate(english_genders, 1):
                 cursor.execute(
                     "INSERT OR IGNORE INTO system_config "
@@ -1398,7 +1398,7 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
 
             ar_pairs = {
                 'gender': {
-                    'Male': 'ذكر', 'Female': 'أنثى', 'Other': 'آخر', 'Not Specified': 'غير محدد'},
+                    'Male': 'ذكر', 'Female': 'أنثى'},
                 'nationality': {
                     'Saudi Arabian': 'سعودي', 'Emirati': 'إماراتي', 'Qatari': 'قطري',
                     'Bahraini': 'بحريني', 'Kuwaiti': 'كويتي', 'Omani': 'عُماني',
@@ -1611,6 +1611,65 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
             conn.commit()
         except Exception as e:
             messages.append(f"Widget Arabic titles skipped: {str(e)}")
+
+        # Customer segment (owner directive): Retail (an individual person) or
+        # Corporate. It also decides what the ID field holds -- a Corporate
+        # customer has a commercial registration, a Retail one a national ID --
+        # so the analyst no longer ticks a separate "is CR" box that only ever
+        # restated the segment they had already chosen.
+        try:
+            cursor.execute("PRAGMA table_info(reports)")
+            if 'customer_segment' not in [c[1] for c in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE reports ADD COLUMN customer_segment TEXT")
+                messages.append("Added customer_segment column to reports")
+            cursor.execute(
+                "INSERT OR IGNORE INTO system_config (config_key, config_value, config_value_ar, "
+                "config_type, config_category, display_order, is_active) VALUES "
+                "('customer_segment_1','Retail','أفراد','dropdown','customer_segment',1,1),"
+                "('customer_segment_2','Corporate','شركات','dropdown','customer_segment',2,1)")
+            cursor.execute(
+                "INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_name_ar, "
+                "data_type, is_visible, is_required, display_order, validation_rules) "
+                "VALUES ('customer_segment','Customer Segment','شريحة العميل','DROPDOWN',1,0,6,'{}')")
+            # backfill: a report that already said CR is a corporate customer
+            cursor.execute(
+                "UPDATE reports SET customer_segment = CASE WHEN id_type='CR' THEN 'Corporate' "
+                "ELSE 'Retail' END WHERE customer_segment IS NULL OR customer_segment=''")
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Customer segment setup skipped: {str(e)}")
+
+        # The gender rule still listed the old Arabic options; values are English
+        # now and the option list is served from the dropdown table.
+        try:
+            cursor.execute(
+                "UPDATE column_settings SET validation_rules='{}' "
+                "WHERE column_name='gender' AND validation_rules LIKE '%ذكر%'")
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Gender rule cleanup skipped: {str(e)}")
+
+        # Gender is Male/Female only (owner directive). The customer's sex comes
+        # from the bank's own customer record and the national ID, so 'Other'
+        # and 'Not Specified' were dropdown values nothing downstream could map.
+        try:
+            cursor.execute(
+                "DELETE FROM system_config WHERE config_type='dropdown' "
+                "AND config_category='gender' AND config_value IN ('Other','Not Specified')")
+            dropped = cursor.rowcount
+            # any report already carrying one is cleared rather than guessed at:
+            # an empty gender is honest, an invented one is not
+            cursor.execute(
+                "UPDATE reports SET gender='' WHERE gender IN "
+                "('Other','Not Specified','آخر','غير محدد')")
+            cleared = cursor.rowcount
+            conn.commit()
+            if dropped or cleared:
+                messages.append(
+                    f"Gender options reduced to Male/Female "
+                    f"(removed {dropped} option(s), cleared {cleared} report value(s))")
+        except Exception as e:
+            messages.append(f"Gender option cleanup skipped: {str(e)}")
 
         # Pending-FIU phase: a saved report now waits for the FIU's number before
         # it can be submitted, so the "open work" tile must count that state or

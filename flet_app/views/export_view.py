@@ -3,6 +3,8 @@ Export View for FIU Report Management System.
 Export reports to Excel (.xlsx) with filtering and customization options.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 import asyncio
 import threading
@@ -216,6 +218,8 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 folder_path = str(Path(file_path).parent)
 
                 dialog.open = False
+
+                _overlay_dismiss(page, dialog)
                 page.update()
 
                 if os.name == 'nt':  # Windows
@@ -225,6 +229,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
 
             def close_dialog(e):
                 dialog.open = False
+                _overlay_dismiss(page, dialog)
                 page.update()
 
             dialog = ft.AlertDialog(
@@ -241,8 +246,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                     ),
                 ],
             )
-            page.overlay.append(dialog)
-            dialog.open = True
+            _overlay_mount(page, dialog, update=False)
             page.update()
 
         except Exception as ex:

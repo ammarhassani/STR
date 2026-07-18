@@ -3,6 +3,8 @@ Application Router for FIU Report Management System.
 Handles navigation, route guards, and view management.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from typing import Dict, Callable, Optional, Any
 
 
@@ -186,6 +188,7 @@ class AppRouter:
         """Show access denied dialog."""
         def close_dialog(e):
             dlg.open = False
+            _overlay_dismiss(self.page, dlg)
             self.page.update()
             # Navigate back to dashboard
             self.navigate("/dashboard")
@@ -213,6 +216,7 @@ class AppRouter:
         """
         def close_dialog(e):
             dlg.open = False
+            _overlay_dismiss(self.page, dlg)
             self.page.update()
 
         dlg = ft.AlertDialog(

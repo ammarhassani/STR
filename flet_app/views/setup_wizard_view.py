@@ -3,6 +3,8 @@ Setup Wizard View for FIU Report Management System.
 Multi-step wizard for first-time setup.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 import asyncio
 import os
@@ -632,6 +634,7 @@ def build_setup_wizard(
                     nonlocal use_existing_db, current_step
                     use_existing_db = True
                     confirm_dialog.open = False
+                    _overlay_dismiss(page, confirm_dialog)
                     current_step = 2
                     update_content()
 
@@ -639,11 +642,13 @@ def build_setup_wizard(
                     nonlocal use_existing_db, current_step
                     use_existing_db = False
                     confirm_dialog.open = False
+                    _overlay_dismiss(page, confirm_dialog)
                     current_step = 2
                     update_content()
 
                 def on_cancel(e):
                     confirm_dialog.open = False
+                    _overlay_dismiss(page, confirm_dialog)
                     page.update()
 
                 confirm_dialog = ft.AlertDialog(
@@ -659,8 +664,7 @@ def build_setup_wizard(
                         ft.ElevatedButton("Use Existing", on_click=on_use_existing, bgcolor=colors["primary"], color=ft.Colors.WHITE),
                     ],
                 )
-                page.overlay.append(confirm_dialog)
-                confirm_dialog.open = True
+                _overlay_mount(page, confirm_dialog, update=False)
                 page.update()
                 return
 

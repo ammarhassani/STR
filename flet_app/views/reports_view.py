@@ -4,6 +4,8 @@ Displays reports list with filtering, pagination, delete, and CRUD operations.
 GitHub-style report management.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 import asyncio
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
@@ -636,6 +638,7 @@ def build_reports_view(
 
         def confirm_restore(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
             try:
@@ -652,6 +655,7 @@ def build_reports_view(
 
         def cancel_restore(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -679,8 +683,7 @@ def build_reports_view(
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     def handle_hard_delete_report(report: Dict):
@@ -728,6 +731,7 @@ def build_reports_view(
 
         def confirm_bulk_delete(e):
             bulk_delete_dialog.open = False
+            _overlay_dismiss(page, bulk_delete_dialog)
             page.update()
 
             success_count = 0
@@ -753,6 +757,7 @@ def build_reports_view(
 
         def cancel_bulk_delete(e):
             bulk_delete_dialog.open = False
+            _overlay_dismiss(page, bulk_delete_dialog)
             page.update()
 
         bulk_delete_dialog = ft.AlertDialog(
@@ -792,8 +797,7 @@ def build_reports_view(
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.overlay.append(bulk_delete_dialog)
-        bulk_delete_dialog.open = True
+        _overlay_mount(page, bulk_delete_dialog, update=False)
         page.update()
 
     def handle_bulk_hard_delete(e):
@@ -811,6 +815,8 @@ def build_reports_view(
                 return
 
             bulk_hard_delete_dialog.open = False
+
+            _overlay_dismiss(page, bulk_hard_delete_dialog)
             page.update()
 
             success_count = 0
@@ -839,6 +845,7 @@ def build_reports_view(
 
         def cancel_bulk_hard_delete(e):
             bulk_hard_delete_dialog.open = False
+            _overlay_dismiss(page, bulk_hard_delete_dialog)
             page.update()
 
         bulk_hard_delete_dialog = ft.AlertDialog(
@@ -906,8 +913,7 @@ def build_reports_view(
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.overlay.append(bulk_hard_delete_dialog)
-        bulk_hard_delete_dialog.open = True
+        _overlay_mount(page, bulk_hard_delete_dialog, update=False)
         page.update()
 
     def handle_bulk_restore(e):
@@ -918,6 +924,7 @@ def build_reports_view(
 
         def confirm_bulk_restore(e):
             bulk_restore_dialog.open = False
+            _overlay_dismiss(page, bulk_restore_dialog)
             page.update()
 
             success_count = 0
@@ -943,6 +950,7 @@ def build_reports_view(
 
         def cancel_bulk_restore(e):
             bulk_restore_dialog.open = False
+            _overlay_dismiss(page, bulk_restore_dialog)
             page.update()
 
         bulk_restore_dialog = ft.AlertDialog(
@@ -970,8 +978,7 @@ def build_reports_view(
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.overlay.append(bulk_restore_dialog)
-        bulk_restore_dialog.open = True
+        _overlay_mount(page, bulk_restore_dialog, update=False)
         page.update()
 
     def handle_search(e):

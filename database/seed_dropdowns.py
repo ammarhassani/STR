@@ -225,8 +225,6 @@ def seed_dropdown_values(db_path):
             'gender': [
                 'Male',
                 'Female',
-                'Other',
-                'Not Specified',
             ],
             'reporting_method': [
                 'Paper',

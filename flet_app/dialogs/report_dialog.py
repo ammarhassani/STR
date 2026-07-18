@@ -3,6 +3,8 @@ Report Dialog for FIU Report Management System.
 Comprehensive 35-field tabbed form for creating and editing reports.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
@@ -101,6 +103,7 @@ def show_report_dialog(
     report_sources = _opts('report_source')
     reporting_entities = _opts('reporting_entity')
     fiu_feedbacks = _opts('fiu_feedback')
+    segments = _opts('customer_segment')
 
     # Form field references
     sn_ref = ft.Ref[ft.TextField]()
@@ -112,6 +115,7 @@ def show_report_dialog(
     nationality_ref = ft.Ref[ft.Dropdown]()
     id_cr_ref = ft.Ref[ft.TextField]()
     id_type_checkbox_ref = ft.Ref[ft.Checkbox]()
+    segment_ref = ft.Ref[ft.Dropdown]()
     id_type_display_ref = ft.Ref[ft.TextField]()
     account_ref = ft.Ref[ft.TextField]()
     acc_membership_ref = ft.Ref[ft.Checkbox]()
@@ -135,11 +139,28 @@ def show_report_dialog(
     fiu_date_ref = ft.Ref[ft.TextField]()
     case_id_ref = ft.Ref[ft.TextField]()
 
-    def update_id_type_display(e):
-        """Update ID type display based on checkbox."""
+    def is_corporate() -> bool:
+        """Corporate customers carry a commercial registration; retail ones a
+        national ID. The segment answers that, so nothing else has to ask."""
+        return (getattr(segment_ref.current, "value", "") or "") == "Corporate"
+
+    def update_id_type_display(e=None):
+        """Keep the stored id_type in step with the segment the analyst chose."""
         if id_type_display_ref.current:
-            id_type_display_ref.current.value = "CR" if id_type_checkbox_ref.current.value else "ID"
+            id_type_display_ref.current.value = "CR" if is_corporate() else "ID"
+        if id_cr_ref.current:
+            # the ID field's own rules differ for CR vs national ID
+            id_cr_ref.current.hint_text = (t("form.hint.cr") if is_corporate()
+                                           else t("form.hint.id"))
+            try:
+                id_cr_ref.current.update()
+            except Exception:
+                pass
+        validate_id_cr_live(None)
+        try:
             page.update()
+        except Exception:
+            pass
 
     def update_relationship_display(e):
         """Update relationship display based on checkbox."""
@@ -337,6 +358,36 @@ def show_report_dialog(
                 report_number_ref.current.error_text = None
             page.update()
 
+    def two_col(left, right=None):
+        """Put two fields on one row. The form is 35 fields deep; one field per
+        row meant scrolling past four screens to enter a single report."""
+        return ft.Row(
+            controls=[
+                ft.Container(content=left, expand=True),
+                ft.Container(content=right if right is not None else ft.Container(), expand=True),
+            ],
+            spacing=16,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+
+    def finalize_cic(e=None):
+        """Pad a short CIC to 16 digits on blur.
+
+        A CIC is a fixed 16-digit customer code; the bank's own systems print it
+        without leading zeros, so analysts type '12345' for '0000000000012345'.
+        Padding here is what makes the typed value match the stored one -- and
+        without it the CIC lookup and the duplicate check both silently miss.
+        """
+        if not cic_ref.current:
+            return
+        cic_text = (cic_ref.current.value or "").replace(' ', '').replace('-', '')
+        if cic_text and cic_text.isdigit() and len(cic_text) < 16:
+            cic_ref.current.value = cic_text.zfill(16)
+            try:
+                cic_ref.current.update()
+            except Exception:
+                pass
+
     def live_check(column, ref, context=None):
         """Build an on_change/on_blur handler that validates ONE field live.
 
@@ -434,7 +485,7 @@ def show_report_dialog(
 
             # Get context
             nationality = nationality_ref.current.value if nationality_ref.current else ""
-            is_cr = id_type_checkbox_ref.current.value if id_type_checkbox_ref.current else False
+            is_cr = is_corporate()
 
             # Validate using service
             is_valid, error_msg = validation_service.validate_field_from_db(
@@ -595,6 +646,7 @@ def show_report_dialog(
             'nationality': get_dropdown_value(nationality_ref),
             'id_cr': get_value(id_cr_ref) or None,
             'id_type': get_value(id_type_display_ref, "ID"),
+            'customer_segment': get_dropdown_value(segment_ref),
             'account_membership': get_value(account_ref) or None,
             'acc_membership_checkbox': get_checkbox_value(acc_membership_ref),
             'relationship': get_value(relationship_ref, "Current Account"),
@@ -643,6 +695,7 @@ def show_report_dialog(
             if success:
                 show_success_dialog(message)
                 dialog.open = False
+                _overlay_dismiss(page, dialog)
                 page.update()
                 if on_save:
                     on_save()
@@ -657,6 +710,7 @@ def show_report_dialog(
                 "Host offline — your entry is queued and will sync when the host returns."
             )
             dialog.open = False
+            _overlay_dismiss(page, dialog)
             page.update()
             if on_save:
                 on_save()
@@ -677,6 +731,7 @@ def show_report_dialog(
 
         def confirm_submit(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
             try:
@@ -704,6 +759,7 @@ def show_report_dialog(
                 if success:
                     show_success_dialog(message)
                     dialog.open = False
+                    _overlay_dismiss(page, dialog)
                     page.update()
                     if on_save:
                         on_save()
@@ -715,6 +771,7 @@ def show_report_dialog(
 
         def cancel_submit(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -729,8 +786,7 @@ def show_report_dialog(
                 ft.ElevatedButton("Submit", on_click=confirm_submit),
             ],
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     def show_error_dialog(message: str):
@@ -760,10 +816,10 @@ def show_report_dialog(
 
         def close_success_dialog():
             success_dialog.open = False
+            _overlay_dismiss(page, success_dialog)
             page.update()
 
-        page.overlay.append(success_dialog)
-        success_dialog.open = True
+        _overlay_mount(page, success_dialog, update=False)
         page.update()
 
     def close_dialog(e):
@@ -777,6 +833,8 @@ def show_report_dialog(
                     pass
 
         dialog.open = False
+
+        _overlay_dismiss(page, dialog)
         page.update()
 
     def view_history(e):
@@ -823,6 +881,9 @@ def show_report_dialog(
             id_cr_ref.current.value = report_data.get('id_cr', '')
         if id_type_checkbox_ref.current:
             id_type_checkbox_ref.current.value = report_data.get('id_type', 'ID') == 'CR'
+        if segment_ref.current:
+            segment_ref.current.value = report_data.get('customer_segment') or (
+                'Corporate' if report_data.get('id_type') == 'CR' else 'Retail')
         if id_type_display_ref.current:
             id_type_display_ref.current.value = report_data.get('id_type', 'ID')
         if account_ref.current:
@@ -912,55 +973,59 @@ def show_report_dialog(
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("sn", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=sn_ref,
-                                hint_text=t("form.hint.sn"),
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_sn_live,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("sn", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=sn_ref,
+                                    hint_text=t("form.hint.sn"),
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=validate_sn_live,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("report_number", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=report_number_ref,
+                                    hint_text=t("form.hint.report_number"),
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=validate_report_number_live,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("report_number", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=report_number_ref,
-                                hint_text=t("form.hint.report_number"),
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_report_number_live,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("case_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=case_id_ref,
-                                hint_text=t("form.hint.case_id"),
-                                on_change=_live_case_id_ref,
-                                on_blur=_blur_case_id_ref,
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    create_date_picker(
-                        on_change=_live_report_date,
-                        on_blur=_blur_report_date,
-                        label=_flabel("report_date"),
-                        value=datetime.now(),
-                        required=True,
-                        ref=report_date_ref,
-                        page=page,
-                        hint_text=t("form.hint.date"),
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("case_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=case_id_ref,
+                                    hint_text=t("form.hint.case_id"),
+                                    on_change=_live_case_id_ref,
+                                    on_blur=_blur_case_id_ref,
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        create_date_picker(
+                            on_change=_live_report_date,
+                            on_blur=_blur_report_date,
+                            label=_flabel("report_date"),
+                            value=datetime.now(),
+                            required=True,
+                            ref=report_date_ref,
+                            page=page,
+                            hint_text=t("form.hint.date"),
+                        ),
                     ),
                 ],
                 spacing=16,
@@ -970,10 +1035,14 @@ def show_report_dialog(
         )
 
     def build_entity_details_tab():
-        """Build Entity Details tab."""
+        """Entity Details, in the order an analyst actually works:
+        the CIC identifies the customer, the segment says what kind of customer
+        they are (which is also what makes the ID a national ID or a commercial
+        registration), then the details themselves."""
         return ft.Container(
             content=ft.Column(
                 controls=[
+                    two_col(
                     ft.Column(
                         controls=[
                             ft.Text(_flabel("cic"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
@@ -991,80 +1060,101 @@ def show_report_dialog(
                         ],
                         spacing=4,
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("reported_entity_name", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=entity_name_ref,
-                                hint_text=t("form.hint.entity"),
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_entity_name_live,
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("customer_segment"), size=12,
+                                        weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=segment_ref,
+                                    options=[ft.dropdown.Option(key=_v, text=_l)
+                                             for _v, _l in (segments or [
+                                                 ("Retail", t("form.segment.retail")),
+                                                 ("Corporate", t("form.segment.corporate"))])],
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=update_id_type_display,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                    ),
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("reported_entity_name", required=True), size=12,
+                                        weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=entity_name_ref,
+                                    hint_text=t("form.hint.entity"),
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=validate_entity_name_live,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Container(
+                            content=ft.Checkbox(
+                                ref=legal_owner_ref,
+                                label=t("form.chk.legal_owner"),
+                                value=False,
                             ),
-                        ],
-                        spacing=4,
+                            padding=ft.padding.only(top=22),
+                        ),
                     ),
-                    ft.Checkbox(
-                        ref=legal_owner_ref,
-                        label=t("form.chk.legal_owner"),
-                        value=False,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("gender"), size=12, weight=ft.FontWeight.W_500,
+                                        color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=gender_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")]
+                                            + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in genders],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("nationality"), size=12, weight=ft.FontWeight.W_500,
+                                        color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=nationality_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")]
+                                            + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in nationalities],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("gender"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=gender_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in genders],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("nationality"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=nationality_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in nationalities],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("id_cr"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=id_cr_ref,
-                                hint_text=t("form.hint.id_cr"),
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_id_cr_live,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Checkbox(
-                        ref=id_type_checkbox_ref,
-                        label=t("form.chk.is_cr"),
-                        value=False,
-                        on_change=update_id_type_display,
-                    ),
-                    # id_type only ever echoes the checkbox above it ("CR" or
-                    # "ID"), so showing it is a second copy of the same answer.
-                    # Hidden, not removed: it is a stored column and the value
-                    # still has to travel with the form.
-                    ft.Column(
-                        visible=False,
-                        controls=[
-                            ft.TextField(
-                                ref=id_type_display_ref,
-                                value="ID",
-                                read_only=True,
-                            ),
-                        ],
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("id_cr"), size=12, weight=ft.FontWeight.W_500,
+                                        color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=id_cr_ref,
+                                    hint_text=t("form.hint.id"),
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=validate_id_cr_live,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        # id_type is stored, but it is simply the segment
+                        # restated -- kept off screen, never asked for twice.
+                        ft.Column(
+                            visible=False,
+                            controls=[
+                                ft.TextField(ref=id_type_display_ref, value="ID", read_only=True),
+                            ],
+                        ),
                     ),
                     ft.Column(
                         controls=[
@@ -1126,74 +1216,80 @@ def show_report_dialog(
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("first_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=first_reason_ref,
-                                hint_text=t("form.hint.first_reason"),
-                                on_change=_live_first_reason_ref,
-                                on_blur=_blur_first_reason_ref,
-                                multiline=True,
-                                min_lines=3,
-                                max_lines=5,
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("first_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=first_reason_ref,
+                                    hint_text=t("form.hint.first_reason"),
+                                    on_change=_live_first_reason_ref,
+                                    on_blur=_blur_first_reason_ref,
+                                    multiline=True,
+                                    min_lines=3,
+                                    max_lines=5,
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("second_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                # Second reason is a PICK from the FIU's standard suspicion-
+                                # reason list (searchable). First reason stays free-text.
+                                searchable_dropdown(
+                                    ref=second_reason_ref,
+                                    options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in second_reasons],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("second_reason_for_suspicion"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            # Second reason is a PICK from the FIU's standard suspicion-
-                            # reason list (searchable). First reason stays free-text.
-                            searchable_dropdown(
-                                ref=second_reason_ref,
-                                options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in second_reasons],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("type_of_suspected_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=transaction_type_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in transaction_types],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("arb_staff"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=arb_staff_ref,
+                                    options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in arb_staff_values],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("type_of_suspected_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=transaction_type_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in transaction_types],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("arb_staff"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=arb_staff_ref,
-                                options=[ft.dropdown.Option(key=_v, text=_l) for _v, _l in arb_staff_values],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("total_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=total_transaction_ref,
-                                hint_text=t("form.hint.total"),
-                                on_change=_live_total_transaction_ref,
-                                on_blur=_blur_total_transaction_ref,
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("total_transaction"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=total_transaction_ref,
+                                    hint_text=t("form.hint.total"),
+                                    on_change=_live_total_transaction_ref,
+                                    on_blur=_blur_total_transaction_ref,
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
                 ],
                 spacing=16,
@@ -1207,63 +1303,69 @@ def show_report_dialog(
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("report_classification"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=classification_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in classifications],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("report_classification"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=classification_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in classifications],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("report_source"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=report_source_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in report_sources],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("report_source"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=report_source_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in report_sources],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("reporting_entity"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=reporting_entity_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in reporting_entities],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("reporter_initials"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=reporter_initials_ref,
+                                    hint_text=t("form.hint.initials"),
+                                    max_length=2,
+                                    text_size=13,
+                                    border_radius=4,
+                                    on_change=validate_initials_live,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("reporting_entity"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=reporting_entity_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in reporting_entities],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("reporter_initials"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=reporter_initials_ref,
-                                hint_text=t("form.hint.initials"),
-                                max_length=2,
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_initials_live,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    create_date_picker(
-                        on_change=_live_sending_date,
-                        on_blur=_blur_sending_date,
-                        label=_flabel("sending_date"),
-                        ref=sending_date_ref,
-                        page=page,
-                        hint_text=t("form.hint.date_optional"),
+                    two_col(
+                        create_date_picker(
+                            on_change=_live_sending_date,
+                            on_blur=_blur_sending_date,
+                            label=_flabel("sending_date"),
+                            ref=sending_date_ref,
+                            page=page,
+                            hint_text=t("form.hint.date_optional"),
+                        ),
                     ),
                 ],
                 spacing=16,
@@ -1277,61 +1379,67 @@ def show_report_dialog(
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("fiu_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=fiu_number_ref,
-                                hint_text=t("form.hint.fiu_number"),
-                                on_change=_live_fiu_number_ref,
-                                on_blur=_blur_fiu_number_ref,
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("fiu_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=fiu_number_ref,
+                                    hint_text=t("form.hint.fiu_number"),
+                                    on_change=_live_fiu_number_ref,
+                                    on_blur=_blur_fiu_number_ref,
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
+                        create_date_picker(
+                            on_change=_live_fiu_date,
+                            on_blur=_blur_fiu_date,
+                            label=_flabel("fiu_date"),
+                            ref=fiu_date_ref,
+                            page=page,
+                            hint_text=t("form.hint.date_optional"),
+                        ),
                     ),
-                    create_date_picker(
-                        on_change=_live_fiu_date,
-                        on_blur=_blur_fiu_date,
-                        label=_flabel("fiu_date"),
-                        ref=fiu_date_ref,
-                        page=page,
-                        hint_text=t("form.hint.date_optional"),
+                    two_col(
+                        create_date_picker(
+                            on_change=_live_fiu_recv,
+                            on_blur=_blur_fiu_recv,
+                            label=_flabel("fiu_letter_receive_date"),
+                            ref=fiu_receive_date_ref,
+                            page=page,
+                            hint_text=t("form.hint.date_optional"),
+                        ),
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("fiu_feedback"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                searchable_dropdown(
+                                    ref=fiu_feedback_ref,
+                                    options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in fiu_feedbacks],
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
-                    create_date_picker(
-                        on_change=_live_fiu_recv,
-                        on_blur=_blur_fiu_recv,
-                        label=_flabel("fiu_letter_receive_date"),
-                        ref=fiu_receive_date_ref,
-                        page=page,
-                        hint_text=t("form.hint.date_optional"),
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("fiu_feedback"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            searchable_dropdown(
-                                ref=fiu_feedback_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in fiu_feedbacks],
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("fiu_letter_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=fiu_letter_number_ref,
-                                hint_text=t("form.hint.fiu_letter"),
-                                on_change=_live_fiu_letter_number_ref,
-                                on_blur=_blur_fiu_letter_number_ref,
-                                text_size=13,
-                                border_radius=4,
-                            ),
-                        ],
-                        spacing=4,
+                    two_col(
+                        ft.Column(
+                            controls=[
+                                ft.Text(_flabel("fiu_letter_number"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                                ft.TextField(
+                                    ref=fiu_letter_number_ref,
+                                    hint_text=t("form.hint.fiu_letter"),
+                                    on_change=_live_fiu_letter_number_ref,
+                                    on_blur=_blur_fiu_letter_number_ref,
+                                    text_size=13,
+                                    border_radius=4,
+                                ),
+                            ],
+                            spacing=4,
+                        ),
                     ),
                 ],
                 spacing=16,
@@ -1549,8 +1657,7 @@ def show_report_dialog(
                 return
 
     # Show dialog
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
     # Load data or reserve numbers

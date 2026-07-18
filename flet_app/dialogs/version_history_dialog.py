@@ -4,6 +4,8 @@ Shows version history with diff comparison, delete options, and activity log.
 GitHub-style version management.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 from typing import Optional, Any, Callable, List
 
@@ -424,6 +426,7 @@ def show_version_history_dialog(
         """Restore the report to a specific version (creates new version)."""
         def confirm_restore(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
             try:
@@ -450,6 +453,7 @@ def show_version_history_dialog(
 
         def cancel_restore(e):
             confirm_dialog.open = False
+            _overlay_dismiss(page, confirm_dialog)
             page.update()
 
         confirm_dialog = ft.AlertDialog(
@@ -476,8 +480,7 @@ def show_version_history_dialog(
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.overlay.append(confirm_dialog)
-        confirm_dialog.open = True
+        _overlay_mount(page, confirm_dialog, update=False)
         page.update()
 
     def compare_versions(e):
@@ -545,6 +548,7 @@ def show_version_history_dialog(
     def close_dialog(e):
         """Close the dialog."""
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     # Tab buttons
@@ -701,8 +705,7 @@ def show_version_history_dialog(
     )
 
     # Show dialog
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
     # Load versions

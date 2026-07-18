@@ -37,7 +37,7 @@ def test_fresh_db_gender_is_english():
     check("fresh gender dropdown is English", 'Male' in vals and 'Female' in vals, vals)
     check("no Arabic gender values remain", 'ذكر' not in vals and 'أنثى' not in vals, vals)
     check("canonical English set present",
-          set(['Male', 'Female', 'Other', 'Not Specified']).issubset(set(vals)), vals)
+          set(['Male', 'Female']).issubset(set(vals)), vals)
 
 
 def test_normalizes_legacy_arabic_db():

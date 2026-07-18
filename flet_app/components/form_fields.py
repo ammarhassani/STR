@@ -3,6 +3,8 @@ Form Field Components for FIU Report Management System.
 Reusable form input components with validation support.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
 from typing import List, Optional, Callable, Any
 from datetime import datetime
@@ -211,8 +213,7 @@ def create_date_picker(
             last_date=datetime.now(),
             on_change=picked,
         )
-        page.overlay.append(picker)
-        picker.open = True
+        _overlay_mount(page, picker, update=False)
         page.update()
 
     return ft.Column(

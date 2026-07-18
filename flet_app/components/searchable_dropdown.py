@@ -162,7 +162,12 @@ class SearchableDropdown(ft.Column):
                 other._close_menu()
         if self not in _OPEN_MENUS:
             _OPEN_MENUS.append(self)
-        self._rebuild_list(self._field.value or "")
+        # Open on the FULL list, never filtered by the current selection.
+        # The field shows the selected option's text, so filtering by it left
+        # exactly one row -- the one already chosen -- and a user who picked
+        # "Female" could never get back to "Male". Typing filters; opening does
+        # not.
+        self._rebuild_list("")
         self._menu.visible = True
         self._safe_update(self._menu)
 

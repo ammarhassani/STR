@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS reports (
     outgoing_letter_number TEXT,
     reported_entity_name TEXT NOT NULL,
     legal_entity_owner TEXT,
-    gender TEXT CHECK(gender IN ('Ø°ÙƒØ±', 'Ø£Ù†Ø«Ù‰', '')),
+    gender TEXT, -- values come from the gender dropdown (Male/Female)
     nationality TEXT,
     id_cr TEXT,
     account_membership TEXT,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS reports (
     first_reason_for_suspicion TEXT,
     second_reason_for_suspicion TEXT,
     type_of_suspected_transaction TEXT,
-    arb_staff TEXT CHECK(arb_staff IN ('Ù†Ø¹Ù…', 'Ù„Ø§', '')),
+    arb_staff TEXT, -- values come from the arb_staff dropdown (Yes/No)
     total_transaction TEXT,
     report_classification TEXT,
     report_source TEXT,

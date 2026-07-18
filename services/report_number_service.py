@@ -233,6 +233,46 @@ class ReportNumberService:
             (report_id,))
         return True, (r[0][0] if r else None), "ok"
 
+    def release_numbers(self, username, report_numbers):
+        """Give back reserved numbers the user does not need.
+
+        Only the caller's OWN numbers, and only ones never written to a report,
+        can be released -- a number already spent on a report is part of the
+        record and must stay.
+
+        The reservation row is deleted rather than flagged. The next number is
+        derived from the MAX of what exists, so releasing the unused tail of a
+        block (reserve 10, use 3, hand back 7) lets those numbers be issued
+        again immediately and leaves NO gap in the sequence. That is the case
+        this exists for. A number released from the middle of the sequence --
+        possible only when someone else has already reserved above you -- stays
+        a gap, which is the numbering model's existing behaviour (ADR-007).
+        """
+        if not self._may_reserve():
+            return False, "You do not have permission to release report numbers"
+        if not _is_username(username):
+            return False, "Invalid user"
+        if not report_numbers or not isinstance(report_numbers, (list, tuple, set)):
+            return False, "No numbers selected"
+
+        released = []
+        for rn in report_numbers:
+            if not isinstance(rn, str):
+                continue        # unbindable type; a real report number is a string
+            n = self.db_manager.execute_write(
+                "DELETE FROM reserved_numbers WHERE report_number = ? AND owned_by = ? "
+                "AND status = 'available' AND used_by_report_id IS NULL",
+                (rn, username))
+            if n:
+                released.append(rn)
+
+        if not released:
+            return False, "No releasable numbers (must be yours and unused)"
+
+        self.logger.info(
+            f"{username} released {len(released)} reserved number(s): {', '.join(released)}")
+        return True, f"Released {len(released)} number(s)"
+
     def transfer_numbers(self, from_user, to_user, report_numbers):
         """Reassign owned_by for the given 'available' numbers (must currently
         be owned by from_user). to_user must be an active user."""

@@ -3,6 +3,8 @@ User Profile Dialog for FIU Report Management System.
 View and edit current user profile information.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 import asyncio
 from typing import Any
@@ -327,6 +329,8 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
                 app_state.logging_service.log_user_action("PROFILE_UPDATED", {'user_id': current_user['user_id']})
 
             dialog.open = False
+
+            _overlay_dismiss(page, dialog)
             page.update()
             show_success(page, "Profile updated successfully!")
 
@@ -335,6 +339,7 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
 
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     # Avatar
@@ -383,8 +388,7 @@ def show_user_profile_dialog(page: ft.Page, app_state: Any):
         ],
     )
 
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
 
     # Load stats asynchronously

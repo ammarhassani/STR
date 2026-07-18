@@ -99,9 +99,61 @@ def test_year_rollover():
     check("january rolls the year -> 2027/01/001", okj and jan == ['2027/01/001'], jan)
 
 
+def test_release_numbers():
+    """Handing back numbers you will not use."""
+    dbm, auth, N, R = _setup()
+    auth.authenticate('agent1', 'Pass@123')
+    ok, nums, msg = N.reserve_block('agent1', 5)
+    check("reserved a block of 5", ok and len(nums) == 5, msg)
+
+    # release the unused tail -- the case this exists for
+    tail = nums[2:]
+    okr, msgr = N.release_numbers('agent1', tail)
+    check("released the unused tail", okr, msgr)
+    left = {n['report_number'] for n in N.get_available_numbers('agent1')}
+    check("released numbers left the pool", not (set(tail) & left), left)
+    check("the numbers kept are still there", set(nums[:2]) <= left, left)
+
+    # and the sequence hands the SAME numbers out again -- no gap
+    ok2, again, _ = N.reserve_block('agent1', 3)
+    check("released numbers are issued again, leaving no gap",
+          ok2 and list(again) == list(tail), (again, tail))
+
+    # a number already spent on a report can never be released
+    auth.authenticate('agent1', 'Pass@123')
+    okc, rid, msgc = R.create_report({'report_date': '01/07/2026',
+                                      'reported_entity_name': 'Spent Number Co'})
+    check("created a report (spends a number)", okc, msgc)
+    spent = dbm.execute_with_retry(
+        "SELECT report_number FROM reserved_numbers WHERE used_by_report_id = ?", (rid,))
+    if spent:
+        oks, msgs = N.release_numbers('agent1', [spent[0][0]])
+        check("a number already used on a report cannot be released", not oks, msgs)
+        still = dbm.execute_with_retry(
+            "SELECT COUNT(*) FROM reserved_numbers WHERE report_number = ?", (spent[0][0],))
+        check("the used number's record survives the attempt", still[0][0] == 1)
+
+    # you cannot release someone else's numbers
+    auth.authenticate('admin', 'Admin@1234')
+    auth.create_user('agent9', 'Pass@123', 'Agent Nine', 'agent')
+    auth.authenticate('agent9', 'Pass@123')
+    ok9, mine9, _ = N.reserve_block('agent9', 2)
+    auth.authenticate('agent1', 'Pass@123')
+    oko, msgo = N.release_numbers('agent1', list(mine9))
+    check("cannot release another user's numbers", not oko, msgo)
+    check("their numbers are untouched",
+          len(N.get_available_numbers('agent9')) == 2)
+
+    # junk in, no crash
+    for junk in (None, [], "not-a-list", [123], [None]):
+        okj, _ = N.release_numbers('agent1', junk)
+        check(f"release refuses junk input {junk!r}", not okj)
+
+
 if __name__ == "__main__":
     test_calendar_month_no_grace()
     test_rollover_and_reservation_persistence()
     test_year_rollover()
+    test_release_numbers()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

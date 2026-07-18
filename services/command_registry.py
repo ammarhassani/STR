@@ -23,6 +23,7 @@ WRITE_COMMANDS = {
     "version_service.restore_deleted_version": ("version_service", "restore_deleted_version"),
     "report_number_service.reserve_block": ("report_number_service", "reserve_block"),
     "report_number_service.transfer_numbers": ("report_number_service", "transfer_numbers"),
+    "report_number_service.release_numbers": ("report_number_service", "release_numbers"),
     "dropdown_service.add_dropdown_value": ("dropdown_service", "add_dropdown_value"),
     "dropdown_service.update_dropdown_value": ("dropdown_service", "update_dropdown_value"),
     "dropdown_service.delete_dropdown_value": ("dropdown_service", "delete_dropdown_value"),
@@ -65,6 +66,7 @@ IDENTITY_ARGS = {
     # transfer_numbers(from_user, to_user, numbers): only the SOURCE is identity.
     # The recipient is a legitimate free choice.
     "report_number_service.transfer_numbers": ("username", 0, "from_user"),
+    "report_number_service.release_numbers": ("username", 0, "username"),
     "settings_service.save_settings": ("user_id", 1, "user_id"),
     "settings_service.save_setting": ("user_id", 2, "user_id"),
     "settings_service.reset_to_defaults": ("user_id", 0, "user_id"),

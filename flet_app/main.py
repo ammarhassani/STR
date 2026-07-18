@@ -14,6 +14,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 
 # Import configuration
 from config import Config
@@ -156,6 +158,7 @@ class FletApp:
             for overlay in self.page.overlay[:]:
                 if isinstance(overlay, ft.AlertDialog) and overlay.open:
                     overlay.open = False
+                    _overlay_dismiss(self.page, overlay)
             self.page.update()
 
     def _start(self):

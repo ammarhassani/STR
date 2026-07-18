@@ -319,6 +319,20 @@ def test_live_validation_and_hidden_echo_fields():
         check(f"the read-only echo field '{c.value}' is hidden",
               not _is_visible(c, tree), c.value)
 
+    # Every wired handler must actually exist. A missing one raises NameError
+    # inside Flet's event thread, which kills the dialog and leaves the user
+    # staring at a greyed-out screen with nothing in the UI to explain it.
+    for c in fields:
+        for hook in ('on_change', 'on_blur'):
+            fn = getattr(c, hook, None)
+            if fn is None:
+                continue
+            try:
+                fn(None)
+            except Exception as ex:
+                check(f"{hook} on the '{(getattr(c, 'hint_text', '') or '?')[:24]}' field runs",
+                      False, f"{type(ex).__name__}: {ex}")
+
     # typing an impossible date must flag the field immediately, with no Save
     date_fields = [c for c in fields
                    if 'dd/mm/yyyy' in (getattr(c, 'hint_text', '') or '').lower()]

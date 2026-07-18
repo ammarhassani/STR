@@ -3,6 +3,8 @@ Change Password Dialog for FIU Report Management System.
 Allows users to change their password.
 """
 import flet as ft
+from components.overlay import (mount as _overlay_mount,
+                                dismiss as _overlay_dismiss)
 from i18n import t
 from typing import Any
 
@@ -146,6 +148,7 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
 
             if success:
                 dialog.open = False
+                _overlay_dismiss(page, dialog)
                 page.update()
                 show_success(page, "Password changed successfully!")
             else:
@@ -156,6 +159,7 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
 
     def close_dialog(e):
         dialog.open = False
+        _overlay_dismiss(page, dialog)
         page.update()
 
     dialog = ft.AlertDialog(
@@ -209,6 +213,5 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
         ],
     )
 
-    page.overlay.append(dialog)
-    dialog.open = True
+    _overlay_mount(page, dialog, update=False)
     page.update()
