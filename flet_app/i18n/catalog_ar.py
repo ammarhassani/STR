@@ -61,4 +61,16 @@ STRINGS = {
     "header.notifications": "الإشعارات",
     "header.admin_tools": "أدوات المشرف",
     "header.reservation_mgmt": "إدارة الأرقام",
+
+    # dashboard
+    "dash.welcome": "مرحباً بعودتك، {name}!",
+    "dash.refresh": "تحديث",
+    "dash.recent_activity": "النشاط الأخير",
+    "dash.view_all": "عرض الكل",
+    "dash.no_activity": "لا يوجد نشاط حديث",
+    "dash.loading": "جارٍ تحميل لوحة المعلومات...",
+    "dash.loading_activity": "جارٍ تحميل النشاط...",
+    "dash.loading_widgets": "جارٍ تحميل العناصر...",
+    "dash.no_widgets": "لا توجد عناصر مُهيّأة للوحة.",
+    "dash.nav_activity_hint": "انتقل إلى سجل النشاط من الشريط الجانبي",
 }

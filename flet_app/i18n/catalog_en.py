@@ -60,4 +60,16 @@ STRINGS = {
     "header.notifications": "Notifications",
     "header.admin_tools": "Admin Tools",
     "header.reservation_mgmt": "Reservation Management",
+
+    # dashboard
+    "dash.welcome": "Welcome back, {name}!",
+    "dash.refresh": "Refresh",
+    "dash.recent_activity": "Recent Activity",
+    "dash.view_all": "View All",
+    "dash.no_activity": "No recent activity",
+    "dash.loading": "Loading dashboard...",
+    "dash.loading_activity": "Loading activity...",
+    "dash.loading_widgets": "Loading widgets...",
+    "dash.no_widgets": "No dashboard widgets configured.",
+    "dash.nav_activity_hint": "Navigate to Activity Log in the sidebar",
 }

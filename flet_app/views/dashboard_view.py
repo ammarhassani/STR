@@ -11,6 +11,7 @@ from components.kpi_card import create_kpi_card, create_stat_card
 from components.charts import create_pie_chart, create_bar_chart, create_line_chart
 from components.activity_timeline import create_activity_timeline, ACTION_ICONS, ACTION_COLORS
 from components.widget_renderer import render_widget_grid
+from i18n import t
 
 
 def build_dashboard_content(
@@ -118,14 +119,14 @@ def build_dashboard_content(
                         controls=[
                             ft.Icon(ft.Icons.TIMELINE, color=colors["primary"], size=20),
                             ft.Text(
-                                "Recent Activity",
+                                t("dash.recent_activity"),
                                 size=16,
                                 weight=ft.FontWeight.BOLD,
                                 color=colors["text_primary"],
                             ),
                             ft.Container(expand=True),
                             ft.TextButton(
-                                "View All",
+                                t("dash.view_all"),
                                 style=ft.ButtonStyle(color=colors["primary"]),
                                 on_click=lambda e: navigate_to_activity(),
                             ),
@@ -137,7 +138,7 @@ def build_dashboard_content(
                             controls=[
                                 ft.Icon(ft.Icons.HISTORY, color=colors["text_muted"], size=40),
                                 ft.Text(
-                                    "No recent activity",
+                                    t("dash.no_activity"),
                                     color=colors["text_muted"],
                                     size=14,
                                 ),
@@ -216,14 +217,14 @@ def build_dashboard_content(
                     controls=[
                         ft.Icon(ft.Icons.TIMELINE, color=colors["primary"], size=20),
                         ft.Text(
-                            "Recent Activity",
+                            t("dash.recent_activity"),
                             size=16,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
                         ),
                         ft.Container(expand=True),
                         ft.TextButton(
-                            "View All",
+                            t("dash.view_all"),
                             style=ft.ButtonStyle(color=colors["primary"]),
                             on_click=lambda e: navigate_to_activity(),
                         ),
@@ -244,7 +245,7 @@ def build_dashboard_content(
         else:
             # Fallback - show a message to use the sidebar
             page.snack_bar = ft.SnackBar(
-                content=ft.Text("Navigate to Activity Log in the sidebar"),
+                content=ft.Text(t("dash.nav_activity_hint")),
                 bgcolor=colors["info"],
             )
             page.snack_bar.open = True
@@ -266,7 +267,7 @@ def build_dashboard_content(
         content=ft.Column(
             controls=[
                 ft.ProgressRing(width=48, height=48, color=colors["primary"]),
-                ft.Text("Loading dashboard...", color=colors["text_secondary"]),
+                ft.Text(t("dash.loading"), color=colors["text_secondary"]),
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=16,
@@ -285,21 +286,21 @@ def build_dashboard_content(
                     controls=[
                         ft.Icon(ft.Icons.TIMELINE, color=colors["primary"], size=20),
                         ft.Text(
-                            "Recent Activity",
+                            t("dash.recent_activity"),
                             size=16,
                             weight=ft.FontWeight.BOLD,
                             color=colors["text_primary"],
                         ),
                         ft.Container(expand=True),
                         ft.TextButton(
-                            "View All",
+                            t("dash.view_all"),
                             style=ft.ButtonStyle(color=colors["primary"]),
                         ),
                     ],
                 ),
                 ft.Container(height=12),
                 ft.Text(
-                    "Loading activity...",
+                    t("dash.loading_activity"),
                     color=colors["text_muted"],
                     size=13,
                 ),
@@ -319,13 +320,13 @@ def build_dashboard_content(
             ft.Row(
                 controls=[
                     ft.Text(
-                        f"Welcome back, {app_state.get_user_display_name()}!",
+                        t("dash.welcome", name=app_state.get_user_display_name()),
                         size=16,
                         color=colors["text_secondary"],
                     ),
                     ft.Container(expand=True),
                     ft.ElevatedButton(
-                        "Refresh",
+                        t("dash.refresh"),
                         icon=ft.Icons.REFRESH,
                         on_click=handle_refresh,
                         style=ft.ButtonStyle(
@@ -341,7 +342,7 @@ def build_dashboard_content(
             ft.Container(
                 ref=widgets_ref,
                 content=ft.Container(
-                    content=ft.Text("Loading widgets...", color=colors["text_muted"]),
+                    content=ft.Text(t("dash.loading_widgets"), color=colors["text_muted"]),
                     alignment=ft.alignment.center, height=120,
                 ),
             ),

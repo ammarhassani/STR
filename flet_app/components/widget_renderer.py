@@ -8,6 +8,14 @@ from typing import Any, Dict, List
 
 from theme.theme_manager import theme_manager
 from components.charts import create_pie_chart, create_bar_chart, create_line_chart
+from i18n import t, get_language
+
+
+def _title(widget):
+    """Widget title in the active language (dashboard_config carries title_ar)."""
+    if get_language() == 'ar' and (widget.get('title_ar') or '').strip():
+        return widget['title_ar']
+    return widget.get('title', '')
 
 
 def _label_value(data: List[Dict], columns: List[str]) -> List[Dict[str, Any]]:
@@ -63,7 +71,7 @@ def _kpi_card(colors, widget):
             ft.Container(height=10),
             ft.Text(_single_value(widget['data']), size=30, weight=ft.FontWeight.BOLD,
                     color=colors["text_primary"]),
-            ft.Text(widget['title'], size=13, color=colors["text_secondary"], weight=ft.FontWeight.W_500),
+            ft.Text(_title(widget), size=13, color=colors["text_secondary"], weight=ft.FontWeight.W_500),
         ], spacing=2, tight=True))
 
 
@@ -78,7 +86,7 @@ def _table_widget(colors, widget):
         heading_row_color=colors["bg_tertiary"], border_radius=4,
     )
     return _card(colors, ft.Column([
-        ft.Text(widget['title'], size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
+        ft.Text(_title(widget), size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
         ft.Container(height=8),
         ft.Container(content=table, ),
     ], scroll=ft.ScrollMode.AUTO, tight=True))
@@ -87,7 +95,7 @@ def _table_widget(colors, widget):
 def _error_card(colors, widget):
     return _card(colors, ft.Column([
         ft.Row([ft.Icon(ft.Icons.WARNING_AMBER, color=colors["warning"], size=18),
-                ft.Text(widget['title'], size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"])],
+                ft.Text(_title(widget), size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"])],
                spacing=6),
         ft.Text(widget.get('error') or "Widget failed to load.", size=12, color=colors["text_muted"],
                 selectable=True),
@@ -101,7 +109,7 @@ def render_widget(widget: Dict[str, Any]) -> ft.Control:
     wtype = widget.get('widget_type')
     data = widget.get('data') or []
     columns = widget.get('columns') or []
-    title = widget.get('title', '')
+    title = _title(widget)
 
     if wtype in ('kpi_card', 'metric'):
         return _kpi_card(colors, widget)
@@ -125,7 +133,7 @@ def render_widget_grid(widgets: List[Dict[str, Any]]) -> ft.Control:
     and tables take a wider column."""
     if not widgets:
         colors = theme_manager.get_colors()
-        return ft.Text("No dashboard widgets configured.", color=theme_manager.get_colors()["text_muted"])
+        return ft.Text(t("dash.no_widgets"), color=theme_manager.get_colors()["text_muted"])
     row = ft.ResponsiveRow(columns=12, spacing=16, run_spacing=16)
     for w in widgets:
         control = render_widget(w)

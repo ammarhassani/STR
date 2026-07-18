@@ -1507,6 +1507,31 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"BI widget seed skipped: {str(e)}")
 
+        # Arabic dashboard-widget titles (#3): title_ar rendered when lang=ar.
+        # Covers the enhanced BI set + refreshes the original seed titles.
+        try:
+            widget_titles_ar = {
+                'Total Reports': 'إجمالي التقارير',
+                'Draft / Rework': 'مسودة / إعادة عمل',
+                'Pending Approval': 'قيد الاعتماد',
+                'Approved': 'معتمدة',
+                'Reports by Status': 'التقارير حسب الحالة',
+                'Reports by Month': 'التقارير حسب الشهر',
+                'Rework Rate %': 'نسبة إعادة العمل ٪',
+                'Reports in Rework': 'تقارير قيد إعادة العمل',
+                'Top Reported Entities': 'أبرز الجهات المُبلّغ عنها',
+                'Reports by Classification': 'التقارير حسب التصنيف',
+                'Repeat CICs (multiple reports)': 'أرقام CIC المتكررة (تقارير متعددة)',
+                'Repeat Accounts (possible structuring)': 'حسابات متكررة (احتمال تجزئة)',
+                'Approvals per Month': 'الاعتمادات شهرياً',
+            }
+            for en_title, ar_title in widget_titles_ar.items():
+                cursor.execute("UPDATE dashboard_config SET title_ar = ? WHERE title = ?",
+                               (ar_title, en_title))
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Widget Arabic titles skipped: {str(e)}")
+
         conn.close()
 
         if messages:
