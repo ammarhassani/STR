@@ -1,24 +1,84 @@
 """
 Dashboard and statistics service.
 Provides aggregated data for dashboard widgets and analytics.
+
+Config-driven widgets run admin-authored SQL. Since this is an AML system,
+that SQL is treated as hostile input: every widget query is validated to be a
+single read-only SELECT and executed on a READ-ONLY connection so the database
+engine itself refuses any write, ATTACH, or PRAGMA — a malicious or fat-fingered
+widget can never mutate or exfiltrate data.
 """
 
-from typing import Dict, List, Any, Optional
+import re
+import sqlite3
+from typing import Dict, List, Any, Optional, Tuple
+
+
+# Tokens that must never appear in a widget query (defense-in-depth on top of
+# the read-only connection). Word-boundary matched, case-insensitive.
+_FORBIDDEN = (
+    "insert", "update", "delete", "drop", "alter", "create", "replace",
+    "attach", "detach", "pragma", "vacuum", "reindex", "trigger", "grant",
+    "truncate", "load_extension",
+)
+_FORBIDDEN_RE = re.compile(r"\b(" + "|".join(_FORBIDDEN) + r")\b", re.IGNORECASE)
+_COMMENT_RE = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
+
+
+def validate_widget_query(sql: str) -> Tuple[bool, str]:
+    """A widget query must be a single, read-only SELECT (or WITH…SELECT).
+    Returns (ok, reason)."""
+    if not sql or not sql.strip():
+        return False, "Query is empty."
+    stripped = _COMMENT_RE.sub(" ", sql).strip().rstrip(";").strip()
+    if not stripped:
+        return False, "Query is empty."
+    if ";" in stripped:
+        return False, "Only a single statement is allowed."
+    head = stripped.lstrip("(").lstrip()[:6].lower()
+    if not (head.startswith("select") or head.startswith("with")):
+        return False, "Query must start with SELECT."
+    m = _FORBIDDEN_RE.search(stripped)
+    if m:
+        return False, f"Keyword '{m.group(1).upper()}' is not allowed in a widget query."
+    return True, ""
 
 
 class DashboardService:
     """Service for dashboard statistics and analytics."""
 
-    def __init__(self, db_manager, logging_service):
+    def __init__(self, db_manager, logging_service, auth_service=None):
         """
         Initialize the dashboard service.
 
         Args:
             db_manager: DatabaseManager instance
             logging_service: LoggingService instance
+            auth_service: AuthService (required to manage/configure widgets)
         """
         self.db_manager = db_manager
         self.logger = logging_service
+        self.auth_service = auth_service
+
+    def run_widget_query(self, sql: str, limit: int = 500) -> Tuple[bool, List[Any], List[str], str]:
+        """Validate + execute a widget query on a READ-ONLY connection.
+        Returns (ok, rows, column_names, error). Never mutates the DB."""
+        ok, reason = validate_widget_query(sql)
+        if not ok:
+            return False, [], [], reason
+        conn = None
+        try:
+            conn = sqlite3.connect(f"file:{self.db_manager.db_path}?mode=ro", uri=True, timeout=5)
+            conn.execute("PRAGMA query_only = ON")  # belt-and-braces
+            cur = conn.execute(sql)
+            cols = [d[0] for d in (cur.description or [])]
+            rows = cur.fetchmany(limit)
+            return True, [list(r) for r in rows], cols, ""
+        except sqlite3.Error as e:
+            return False, [], [], f"Query error: {e}"
+        finally:
+            if conn is not None:
+                conn.close()
 
     def get_summary_statistics(self) -> Dict[str, Any]:
         """
@@ -289,13 +349,17 @@ class DashboardService:
                     'icon': row[10]
                 }
 
-                # Execute widget query to get data
-                try:
-                    widget_data = self.db_manager.execute_with_retry(row[4])
-                    widget['data'] = widget_data
-                except Exception as e:
-                    self.logger.warning(f"Error executing widget query: {str(e)}")
+                # Execute the widget query SAFELY (read-only, validated).
+                ok, rows, cols, err = self.run_widget_query(row[4])
+                if not ok:
                     widget['data'] = []
+                    widget['error'] = err
+                    if self.logger:
+                        self.logger.warning(f"Widget {row[0]} query rejected/failed: {err}")
+                else:
+                    widget['data'] = [dict(zip(cols, r)) for r in rows]
+                    widget['columns'] = cols
+                    widget['error'] = None
 
                 widgets.append(widget)
 
@@ -304,3 +368,98 @@ class DashboardService:
         except Exception as e:
             self.logger.error(f"Error fetching dashboard widgets: {str(e)}", exc_info=True)
             return []
+
+    # ---------------------------------------------------------------- admin CRUD
+    _WIDGET_TYPES = ('kpi_card', 'bar_chart', 'line_chart', 'pie_chart', 'table', 'metric')
+
+    def _require_config(self) -> Tuple[bool, str]:
+        if not (self.auth_service and self.auth_service.has_permission('configure_dashboard')):
+            return False, "You don't have permission to configure the dashboard."
+        return True, ""
+
+    def list_all_widgets(self) -> List[Dict[str, Any]]:
+        """All widgets (active or not) for the admin config screen."""
+        ok, _ = self._require_config()
+        if not ok:
+            return []
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT widget_id, widget_type, title, title_ar, sql_query, color, icon, "
+                "visible_to_roles, is_active, display_order FROM dashboard_config "
+                "ORDER BY display_order, widget_id")
+            keys = ['widget_id', 'widget_type', 'title', 'title_ar', 'sql_query', 'color',
+                    'icon', 'visible_to_roles', 'is_active', 'display_order']
+            return [dict(zip(keys, r)) for r in (rows or [])]
+        except Exception as e:
+            self.logger.error(f"Error listing widgets: {e}")
+            return []
+
+    def _validate_widget(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        if data.get('widget_type') not in self._WIDGET_TYPES:
+            return False, f"Invalid widget type. Choose one of: {', '.join(self._WIDGET_TYPES)}."
+        if not (data.get('title') or '').strip():
+            return False, "Title is required."
+        ok, reason = validate_widget_query(data.get('sql_query', ''))
+        if not ok:
+            return False, reason
+        # the query must actually run (read-only) — reject broken widgets at save
+        run_ok, _rows, _cols, err = self.run_widget_query(data['sql_query'])
+        if not run_ok:
+            return False, err
+        return True, ""
+
+    def create_widget(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+        ok, msg = self._require_config()
+        if not ok:
+            return False, msg
+        ok, msg = self._validate_widget(data)
+        if not ok:
+            return False, msg
+        try:
+            user = self.auth_service.get_current_user() or {}
+            self.db_manager.execute_write(
+                "INSERT INTO dashboard_config (widget_type, title, title_ar, sql_query, color, "
+                "icon, visible_to_roles, is_active, display_order, created_by) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (data['widget_type'], data['title'].strip(), data.get('title_ar'),
+                 data['sql_query'], data.get('color') or '#3b82f6', data.get('icon'),
+                 data.get('visible_to_roles') or 'admin', int(data.get('is_active', 1)),
+                 int(data.get('display_order', 0)), user.get('username', 'admin')))
+            return True, "Widget created."
+        except Exception as e:
+            self.logger.error(f"Error creating widget: {e}")
+            return False, f"Failed to create widget: {e}"
+
+    def update_widget(self, widget_id: int, data: Dict[str, Any]) -> Tuple[bool, str]:
+        ok, msg = self._require_config()
+        if not ok:
+            return False, msg
+        ok, msg = self._validate_widget(data)
+        if not ok:
+            return False, msg
+        try:
+            user = self.auth_service.get_current_user() or {}
+            self.db_manager.execute_write(
+                "UPDATE dashboard_config SET widget_type=?, title=?, title_ar=?, sql_query=?, "
+                "color=?, icon=?, visible_to_roles=?, is_active=?, display_order=?, "
+                "updated_by=?, updated_at=datetime('now') WHERE widget_id=?",
+                (data['widget_type'], data['title'].strip(), data.get('title_ar'),
+                 data['sql_query'], data.get('color') or '#3b82f6', data.get('icon'),
+                 data.get('visible_to_roles') or 'admin', int(data.get('is_active', 1)),
+                 int(data.get('display_order', 0)), user.get('username', 'admin'), widget_id))
+            return True, "Widget updated."
+        except Exception as e:
+            self.logger.error(f"Error updating widget: {e}")
+            return False, f"Failed to update widget: {e}"
+
+    def delete_widget(self, widget_id: int) -> Tuple[bool, str]:
+        ok, msg = self._require_config()
+        if not ok:
+            return False, msg
+        try:
+            self.db_manager.execute_write(
+                "DELETE FROM dashboard_config WHERE widget_id=?", (widget_id,))
+            return True, "Widget deleted."
+        except Exception as e:
+            self.logger.error(f"Error deleting widget: {e}")
+            return False, f"Failed to delete widget: {e}"
