@@ -19,12 +19,12 @@ If you read nothing else, do these steps in order. Everything below this section
 3. **On the host PC:**
    1. `git pull` the latest code into the STR folder.
    2. Run `python flet_app\main.py` once → the setup wizard opens → choose **Host**, enter the shared folder path.
-   3. Double-click `deploy\start_host.bat` → the host starts publishing. Leave it running.
-   4. Add `start_host.bat` to Startup (see *Initial Setup → Enable automatic startup*) so it relaunches after login.
+   3. Double-click `deploy\start_host.vbs` → the host starts publishing **hidden** (no CMD window; output goes to `logs\host.log`). Leave it.
+   4. Add `start_host.vbs` to Startup (see *Initial Setup → Enable automatic startup*) so it relaunches — invisibly — after login.
 4. **On each client PC:**
    1. `git pull` the latest code.
    2. Run `python flet_app\main.py` once → wizard → choose **Client**, enter the **same** shared folder path.
-   3. Launch normally from then on — no scripts needed.
+   3. From then on launch via `deploy\start_client.vbs` (no console window) — or just the app normally.
 5. **First login (any PC):** username `admin`, password `admin123`. You are forced to change it immediately. Then create the real users (Users screen).
 
 ### Every business day
@@ -34,7 +34,14 @@ If you read nothing else, do these steps in order. Everything below this section
 
 ### When you change the code (new feature / fix)
 
-- `git pull` on the host **and** each client. Restart the app (and `start_host.bat` on the host). Config-driven dashboard widgets and dropdowns update automatically from the shared database — no per-PC editing.
+- **Push once** to the repo. The **host** pulls it and publishes a code snapshot
+  to the shared folder; each **client** copies that snapshot on its next launch.
+  All automatic (`updater.py` in the launchers) — no per-PC visits.
+- Rollout: **push → relaunch the host (`start_host.vbs`) → tell users to reopen
+  the app.** Config-driven dashboard widgets and dropdowns also update from the
+  shared database with no reship.
+- Best-effort: if the host is offline or a client can't reach the share it skips
+  quietly and runs the code it already has (see *Software Updates*).
 
 ### If the host PC dies
 
@@ -81,16 +88,19 @@ If you read nothing else, do these steps in order. Everything below this section
    - When prompted, provide the full path to a shared network folder accessible from all workstations (e.g., `\\shared-server\STR_data` or `Z:\STR_data`)
    - Ensure the operator account has read/write access to this folder
 
-3. **Launch the host service:**
-   - Run `deploy\start_host.bat` to start the host process
-   - The host will begin publishing the replica and heartbeat to the shared folder
-   - You should see console output confirming the database is initialized
+3. **Launch the host service (hidden):**
+   - Run `deploy\start_host.vbs` to start the host process **windowless** — no CMD
+     window stays open. It runs under `pythonw` and writes to `logs\host.log`.
+   - (For troubleshooting you can instead run `deploy\start_host.bat`, which keeps
+     a visible window with live output.)
+   - The host begins publishing the replica and heartbeat to the shared folder.
+   - Confirm startup by tailing `logs\host.log` or opening the panel.
 
-4. **Enable automatic startup:**
-   - Right-click on `deploy\start_host.bat` → Create Shortcut
+4. **Enable automatic startup (windowless):**
+   - Right-click on `deploy\start_host.vbs` → Create Shortcut
    - Press `Win+R`, type `shell:startup`, and press Enter to open the Startup folder
    - Move the shortcut into the Startup folder
-   - On the next Windows login, the host will automatically start (see Limits: Cold Reboot Login Requirement)
+   - On the next Windows login, the host auto-starts **invisibly** (see Limits: Cold Reboot Login Requirement)
 
 ### Setup on Each Client PC
 
@@ -102,8 +112,8 @@ If you read nothing else, do these steps in order. Everything below this section
    - Provide the same shared folder path used on the host PC (e.g., `\\shared-server\STR_data`)
    - Verify you have read access to the folder
 
-3. **Start the application normally:**
-   - Launch STR normally; no additional startup scripts are needed
+3. **Start the application:**
+   - Launch via `deploy\start_client.vbs` (no console window) — or run STR normally
    - The app will connect to the replica and begin queuing writes if offline
 
 ---
@@ -272,6 +282,55 @@ Backups are snapshots of the replica taken at a point in time. Use restoration t
 
 - If prompted to login again after 30 minutes of inactivity, simply enter credentials again
 - All queued operations continue to be processed by the host
+
+---
+
+## Software Updates (Push Once, Clients Self-Update)
+
+You never have to touch each client PC to ship a fix or feature. Client PCs
+reach only the shared folder — so the **host is the update hub**.
+
+- **How it works** (all automatic, run by `updater.py` in the launchers):
+  - **Host** (`start_host.vbs`): does a safe `git pull --ff-only`, then
+    **publishes** a clean snapshot of the code to `<share>\app\<version>\` and
+    writes `<share>\app\latest.txt`. Only tracked code is published — never the
+    database, config, or logs.
+  - **Client** (`start_client.vbs`): on launch, compares its own version to
+    `latest.txt`; if the share is newer it **copies the snapshot over its app
+    folder** (leaving its local config/db/logs untouched) and records the new
+    version. A copied schema change is applied by the migrations that run at app
+    start.
+- **Your workflow:** push the change to the repo → relaunch the **host**
+  (`start_host.vbs`) so it pulls and publishes → tell users to reopen the app.
+  Each client self-updates from the share on its next launch. No per-PC visits.
+- **Safety / offline:** best-effort and never blocks launch. If the host is
+  offline it can't pull (keeps serving current code); if a client can't reach the
+  share or the version is missing, it logs the reason (`logs\*.log`) and starts
+  the code it already has.
+- **Rollback:** the host keeps the last few version folders on the share. To roll
+  a client back, set its `.str_version` file to an older version id (a folder name
+  under `<share>\app\`); it re-copies that snapshot on next launch.
+- **Manual update:** host — `python updater.py` (pulls + publishes); client —
+  `python updater.py` (copies from the share).
+
+> Update the host first (it publishes), then the clients pull from the share, so
+> code and schema stay in step across the deployment.
+
+---
+
+## Windowless Operation (No CMD Window)
+
+The host must run unattended without a black console window sitting open.
+
+- **Host:** launch with `deploy\start_host.vbs` (used in the golden path and
+  Startup). It runs under `pythonw` — no console — and logs to `logs\host.log`.
+- **Clients:** `deploy\start_client.vbs` launches the app with no console window
+  (the app's own window still appears); logs to `logs\client.log`.
+- **When you need to SEE output** (troubleshooting): run the `.bat` equivalents
+  (`start_host.bat` / `start_client.bat`) — same behavior, visible window + live
+  output.
+- **Operator panel** stays a visible window on purpose — it is interactive
+  (`deploy\start_panel.bat`).
 
 ---
 

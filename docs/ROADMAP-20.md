@@ -101,7 +101,8 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Ask:* let me scroll it.
     *Do:* add scroll to the help dialog (same fix class as the wizard scroll bug).
 
-19. **Updater — push once, every client self-updates (no per-PC visits)** — ☐ (subsystem)
+19. **Updater — push once, every client self-updates (no per-PC visits)** — ☑ (updater.py, mode-aware: HOST git-pulls then publishes a clean git-archive snapshot to share/app/<version>/ + latest.txt (tracked code only — no db/config/logs); CLIENT copies the snapshot over its app folder on launch (local db/config/logs untouched) + records .str_version; keeps last 5 versions on the share for rollback; best-effort/never-fatal; wired into the .vbs/.bat launchers before app start; runbook "Software Updates" section; tests_updater.py proves publish→consume, roll-forward, rollback retention, local-file safety, offline no-ops)
+    *Note:* clients reach ONLY the share (confirmed) — hence host-as-hub, not git-pull-per-PC.
     *Ask:* when the codebase changes (add/retire a feature, a fix), clients must
     NOT be told to manually fetch/delete their copy — that's friction + defects.
     *Do:* distribute app code through the **shared folder** (clients have no
@@ -123,12 +124,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
 22. **Hard reset (test → production), documented** — ☑ (reset_to_production.py: guarded typed "RESET" confirmation, auto-backup first, wipes all transactional tables + write queue, resets to a single fresh admin (must_change_password) + unclaimed host lease, PRESERVES dropdowns/fields/dashboard widgets/settings; documented as a runbook section; tests_hard_reset.py proves wipe vs preserve + fresh-admin auth)
     *Note:* wipes DB DATA rows, not the config the admin built — intentional (test→prod keeps your dropdowns/fields/widgets). Bus/replica files on the share are republished by the host on restart.
 
-23. **No CMD window kept open (host/panel/client run hidden)** — ☐
-    *Ask:* host shouldn't need a console window sitting open.
-    *Do:* `pythonw.exe` + hidden `.vbs` launchers for host, panel, and client;
-    Startup-folder shortcut auto-starts hidden. Honest limit (no admin, no
-    service): a user process still dies on logoff/reboot until login — manual
-    failover covers the host; documented.
+23. **No CMD window kept open (host/panel/client run hidden)** — ☑ (deploy/start_host.vbs + start_client.vbs launch via pythonw with WScript.Shell.Run window-style 0 = fully hidden, output to logs/*.log; .bat variants kept as visible troubleshooting launchers; panel stays visible on purpose (interactive); runbook "Windowless Operation" section + Startup uses the .vbs; honest limit unchanged: no-admin user process still needs a login after cold reboot — documented)
 
 ---
 
