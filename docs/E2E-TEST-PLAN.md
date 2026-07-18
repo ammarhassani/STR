@@ -197,6 +197,34 @@ read access to the repo, the repo cloned to the same folder (e.g. `C:\STR`).
 
 ---
 
+## Layer 1.6 — Warzone (`tests_warzone.py`)
+
+`python tests_warzone.py [seconds]` builds one host process plus **21 client
+processes** (2 admins, 4 supervisors, 11 agents, 4 reporters), each a separate
+install talking over the real folder queue, and has every persona attack the
+rules of its own role: reporters try to write, agents try to approve, everyone
+tries to act as somebody else, and malformed data is pushed at every entry
+point. A defect is anything that succeeded when the BRD says it must not (or
+was refused when it must be allowed), plus nine post-run DB invariants.
+
+It found, and the same run now proves fixed:
+
+| Class | Defect |
+|-------|--------|
+| IDENTITY | `reserve_block(username)` / `transfer_numbers(from_user)` took the acting user as an argument the host never checked — an agent transferred another agent's reserved numbers to itself |
+| RBAC | `reserve_block` had no permission check at all: a **reporter** could burn official FIU report numbers, punching permanent gaps in the regulator-facing sequence |
+| STATUS-FORGERY | `approval_status` was writable through `update_report`, so an author could mark their **own** report `approved` with no approver, or roll a decided report back to `draft` |
+| WORKFLOW | a report under approval could be edited by its author, so the approver decided on text they never saw; a rejected report was equally editable |
+| WORKFLOW | `reject_report` accepted an **empty comment** — work came back to an agent with no reason given (the requirement was enforced only in the UI) |
+| VALIDATION | `31/31/2026`, `yesterday`, a far-future date, a negative amount and a 2-digit CIC all reached the database |
+| FILTER | the date-range filter compared `DD/MM/YYYY` text against `YYYY-MM-DD` bounds, so a period filter returned the wrong reports — a 1900–1901 range returned 36 live reports |
+| AUDIT | `update_report` created no version, so any edit not made through a dialog left no history; `clear_logs` was ungated and unaudited |
+
+**Pass gate:** `distinct defects: 0`, `invariant failures: 0`, and all personas
+finished.
+
+---
+
 ## Layer 1.5 — Single-Windows-PC lab (run 2026-07-18)
 
 Between the two layers there is a middle run that needs no VMs: three clones of

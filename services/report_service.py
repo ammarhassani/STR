@@ -8,6 +8,76 @@ from datetime import datetime
 from typing import Optional, Dict, List, Tuple, Any
 
 
+def _date_key(value):
+    """Normalise a date bound to a sortable YYYYMMDD key.
+
+    report_date is stored as DD/MM/YYYY, but callers pass bounds in whichever
+    format their widget produced (reports_view sends YYYY-MM-DD). Comparing
+    those as strings in SQL is meaningless -- '01/01/1900' > '2026-01-15'
+    lexically -- so a date filter silently returned the wrong period, which for
+    an FIU means reporting the wrong window to the regulator.
+    """
+    if not isinstance(value, str):
+        return None
+    v = value.strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(v, fmt).strftime("%Y%m%d")
+        except ValueError:
+            continue
+    return None
+
+
+# SQL that turns the stored DD/MM/YYYY into the same YYYYMMDD key.
+_DATE_KEY_SQL = ("(substr(report_date,7,4) || substr(report_date,4,2) || substr(report_date,1,2))")
+
+
+def _validate_core_fields(data, now=None):
+    """Server-side format checks for the fields an FIU report is judged on.
+
+    The UI validates these too, but the UI is not the security boundary: the
+    host applies whatever a client sends. Without this, '31/31/2026',
+    'yesterday', a negative amount and a 2-digit CIC all reached the database
+    (proven by tests_warzone), which corrupts every downstream period report
+    and CIC lookup.
+
+    Returns an error string, or None when the payload is acceptable.
+    """
+    date_fields = ('report_date', 'sending_date', 'fiu_letter_receive_date', 'fiu_date')
+    for field in date_fields:
+        raw = data.get(field)
+        if raw in (None, ''):
+            continue
+        if not isinstance(raw, str) or _date_key(raw) is None:
+            return f"{field} must be a real date in DD/MM/YYYY format"
+
+    raw = data.get('report_date')
+    if isinstance(raw, str) and _date_key(raw):
+        when = datetime.strptime(_date_key(raw), "%Y%m%d")
+        # A report about something that has not happened yet is a typo, always.
+        if (when - (now or datetime.now())).days > 1:
+            return "report_date cannot be in the future"
+
+    amount = data.get('total_transaction')
+    if amount not in (None, ''):
+        try:
+            value = float(str(amount).replace(',', ''))
+        except (TypeError, ValueError):
+            return "total_transaction must be a number"
+        if value < 0:
+            return "total_transaction cannot be negative"
+
+    cic = data.get('cic')
+    if cic not in (None, ''):
+        digits = str(cic).replace(' ', '').replace('-', '')
+        if not digits.isdigit():
+            return "cic must contain digits only"
+        if len(digits) != 16:
+            return "cic must be exactly 16 digits"
+
+    return None
+
+
 class ReportService:
     """Service for managing financial crime reports."""
 
@@ -25,6 +95,17 @@ class ReportService:
         'approval_status', 'legal_entity_owner_checkbox', 'acc_membership_checkbox',
         'relationship', 'id_type', 'case_id'
     }
+
+    # Columns no caller may set through update_report: the approval workflow
+    # (approval_service) and the version service own them. They stay in
+    # ALLOWED_FIELDS because create_report and version restore set them
+    # internally.
+    WORKFLOW_OWNED_FIELDS = {'approval_status', 'current_version'}
+
+    # Statuses in which a report is frozen: it is either under review by someone
+    # else (editing it would mean the approver decides on text they never saw)
+    # or terminally rejected. BRD 04§4 / 06§14.
+    LOCKED_STATUSES = {'pending_approval', 'rejected'}
 
     # Coarse per-field length backstop (characters). Real format rules live in
     # column_settings; this just stops storage/DoS abuse of unbounded TEXT.
@@ -45,10 +126,18 @@ class ReportService:
         self.auth_service = auth_service
         self.activity_service = activity_service
         self._report_number_service = None
+        self._version_service = None
+        # "Now" is injectable so a test that simulates a month rollover keeps
+        # one coherent clock across the numbering and report services.
+        self._now = datetime.now
 
     def set_activity_service(self, activity_service):
         """Set activity service (for late binding to avoid circular imports)."""
         self.activity_service = activity_service
+
+    def set_version_service(self, svc):
+        """Set version service (late binding: version_service needs us too)."""
+        self._version_service = svc
 
     def set_report_number_service(self, svc):
         """Set report number service (for late binding to avoid circular imports)."""
@@ -115,6 +204,10 @@ class ReportService:
             for field in required_fields:
                 if field not in report_data or not report_data[field]:
                     return False, None, f"Missing required field: {field}"
+
+            bad = _validate_core_fields(report_data, now=self._now())
+            if bad:
+                return False, None, bad
 
             # Check if report number already exists
             check_query = "SELECT COUNT(*) FROM reports WHERE report_number = ?"
@@ -321,6 +414,15 @@ class ReportService:
                                                     resource_owner=old_report.get('created_by')):
                 return False, "You do not have permission to edit this report"
 
+            # A report under approval must not change underneath its approver,
+            # and a rejected one is final (BRD 04§4, 06§14). Admins keep the
+            # override: the approval panel's review-edit runs as an admin.
+            status = (old_report.get('approval_status') or '').lower()
+            if status in self.LOCKED_STATUSES and current_user.get('role') != 'admin':
+                return False, ("This report is pending approval and cannot be edited"
+                               if status == 'pending_approval'
+                               else "This report was rejected and cannot be edited")
+
             # Reject absurdly long field values (storage/DoS guard)
             for k, v in report_data.items():
                 if isinstance(v, str) and len(v) > self.MAX_FIELD_LEN:
@@ -345,6 +447,21 @@ class ReportService:
             invalid_fields = set(report_data.keys()) - self.ALLOWED_FIELDS
             if invalid_fields:
                 self.logger.warning(f"Ignored invalid fields in update_report: {invalid_fields}")
+
+            bad = _validate_core_fields(report_data, now=self._now())
+            if bad:
+                return False, bad
+
+            # The approval workflow and the version service own these columns.
+            # Accepting them here let an agent mark their OWN report 'approved'
+            # with no approver, and roll a decided report back to 'draft' --
+            # a complete bypass of the review that an STR legally requires.
+            for workflow_field in self.WORKFLOW_OWNED_FIELDS:
+                if workflow_field in allowed_data:
+                    del allowed_data[workflow_field]
+                    self.logger.warning(
+                        f"Refused to let {current_user['username']} set "
+                        f"'{workflow_field}' directly on report {report_id}")
 
             # Only include fields that actually changed
             changed_data = {}
@@ -417,6 +534,21 @@ class ReportService:
                         'field_count': len(fields)
                     }
                 )
+
+            # BRD 01§2: every change is versioned. This lives here, not in the
+            # UI, because the host applies RPC updates that never touch a dialog
+            # -- versioning at the call sites left those edits with no history
+            # at all (proven by tests_warzone).
+            if self._version_service:
+                try:
+                    self._version_service.create_version_snapshot(
+                        report_id, f"Modified by {current_user['username']}")
+                except Exception as e:
+                    # An unversioned edit is a compliance problem, never a
+                    # reason to lose the user's saved work. Record it loudly.
+                    self.logger.error(
+                        f"Report {report_id} updated but version snapshot failed: {e}",
+                        exc_info=True)
 
             return True, "Report updated successfully"
 
@@ -577,15 +709,24 @@ class ReportService:
                 search_pattern = f"%{search_term}%"
                 params.extend([search_pattern, search_pattern, search_pattern])
 
-            if date_from:
-                query += " AND report_date >= ?"
-                count_query += " AND report_date >= ?"
-                params.append(date_from)
+            # Compare on a normalised YYYYMMDD key, never on the raw stored
+            # string (see _date_key). An unparseable bound is ignored rather
+            # than silently filtering everything out.
+            key_from = _date_key(date_from)
+            if key_from:
+                query += f" AND {_DATE_KEY_SQL} >= ?"
+                count_query += f" AND {_DATE_KEY_SQL} >= ?"
+                params.append(key_from)
+            elif date_from:
+                self.logger.warning(f"Ignored unparseable date_from filter: {date_from!r}")
 
-            if date_to:
-                query += " AND report_date <= ?"
-                count_query += " AND report_date <= ?"
-                params.append(date_to)
+            key_to = _date_key(date_to)
+            if key_to:
+                query += f" AND {_DATE_KEY_SQL} <= ?"
+                count_query += f" AND {_DATE_KEY_SQL} <= ?"
+                params.append(key_to)
+            elif date_to:
+                self.logger.warning(f"Ignored unparseable date_to filter: {date_to!r}")
 
             if created_by:
                 query += " AND created_by = ?"

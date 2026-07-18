@@ -59,6 +59,12 @@ class QueueTransport:
                         resp = json.load(f)
                 except (json.JSONDecodeError, FileNotFoundError):
                     time.sleep(poll); continue  # writer mid-rename; retry
+                except PermissionError:
+                    # Windows: the file is mid-replace, or a delete is pending on
+                    # it, so opening it is briefly denied. Transient, exactly
+                    # like the mid-rename case -- retry rather than blowing the
+                    # PermissionError out through the caller's RPC.
+                    time.sleep(poll); continue
                 try:
                     os.remove(path)
                 except OSError:

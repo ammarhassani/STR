@@ -516,12 +516,7 @@ def show_report_dialog(
 
                 success, message = report_service.update_report(report_id, form_data)
 
-                # Create version snapshot AFTER updating (captures new state)
-                if success and version_service:
-                    version_service.create_version_snapshot(
-                        report_id,
-                        f"Modified by {current_user['username']}"
-                    )
+                # (update_report versions the change itself)
             else:
                 form_data.pop('report_number', None)
                 form_data.pop('sn', None)
@@ -577,9 +572,7 @@ def show_report_dialog(
                 if not ok_save:
                     show_error_dialog(f"Couldn't save before submitting: {save_msg}")
                     return
-                if version_service:
-                    version_service.create_version_snapshot(
-                        report_id, f"Submitted by {current_user['username']}")
+                # (update_report versions the change itself)
 
                 if not approval_service:
                     show_error_dialog("Approval service not available")

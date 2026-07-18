@@ -56,11 +56,13 @@ def test_rollover_and_reservation_persistence():
 
     # --- June: reserve 3 ---
     N._now = lambda: datetime.datetime(2026, 6, 15)
+    R._now = lambda: datetime.datetime(2026, 6, 15)
     ok, june, _ = N.reserve_block('agent1', 3)
     check("june reserve opens at 001", ok and june == ['2026/06/001', '2026/06/002', '2026/06/003'], june)
 
     # --- roll to August (grace would have kept July; it must NOT) ---
     N._now = lambda: datetime.datetime(2026, 8, 1)
+    R._now = lambda: datetime.datetime(2026, 8, 1)
     ok2, aug, _ = N.reserve_block('agent1', 2)
     check("new month opens its own sequence at 001", ok2 and aug == ['2026/08/001', '2026/08/002'], aug)
 

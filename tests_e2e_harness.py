@@ -294,9 +294,27 @@ def phase1():
     check(F, 'get_report returns row', rep and rep['report_id'] == rid)
     check(F, 'agent-created report auto-pending',
           rep['approval_status'] == 'pending_approval', rep['approval_status'])
+    # An agent's new report is auto-pending, and a report under approval is
+    # frozen (BRD 04§4 / 06§14) -- the approver must decide on exactly the text
+    # they were shown. Editing only reopens after a rework decision.
+    frozen, fmsg = agent.reports.update_report(rid, {'reported_entity_name': 'Sneaky Edit'})
+    check(F, 'edit blocked while pending approval', not frozen, fmsg)
+    rep = agent.reports.get_report(rid)
+    check(F, 'pending report unchanged by the blocked edit',
+          rep['reported_entity_name'] != 'Sneaky Edit', rep['reported_entity_name'])
+
+    # Send it back for rework, then the author may edit again.
+    sup = Client('t-sup-crud'); sup.login('admin', 'Admin@1234')
+    pend = [p for p in (sup.approvals.get_pending_approvals() or [])
+            if p.get('report_id') == rid]
+    check(F, 'submitted report is in the approval queue', bool(pend))
+    if pend:
+        rw_ok, rw_msg = sup.approvals.reject_report(pend[0]['approval_id'],
+                                                    'please correct the entity name', True)
+        check(F, 'rework decision accepted', rw_ok, rw_msg)
     ok, msg = agent.reports.update_report(rid, {'reported_entity_name': 'Updated Entity',
                                                 'nationality': 'Egyptian'})
-    check(F, 'update_report', ok, msg)
+    check(F, 'update_report after rework', ok, msg)
     rep = agent.reports.get_report(rid)
     check(F, 'update persisted', rep['reported_entity_name'] == 'Updated Entity')
     rows, total = agent.reports.get_reports(search_term='Updated Entity')
@@ -621,7 +639,7 @@ def phase2_stress():
     created_lock = threading.Lock()
     submitted = []
     sub_lock = threading.Lock()
-    op_counts = {'create': 0, 'update': 0, 'submit': 0, 'decide': 0, 'read': 0}
+    op_counts = {'create': 0, 'update': 0, 'submit': 0, 'resubmit': 0, 'decide': 0, 'read': 0}
     op_lock = threading.Lock()
     latencies = []
 
@@ -649,14 +667,29 @@ def phase2_stress():
                 record('create')
                 with created_lock:
                     created_ids.append(rid)
-                # two updates with version snapshots
-                for j in range(2):
+                # A fresh agent report is auto-submitted and therefore frozen
+                # (BRD 04§4), so the realistic edit load is the rework loop:
+                # fix up whatever a reviewer sent back, then resubmit it.
+                # Reviewers are deciding concurrently, so only assert the freeze
+                # while the report is genuinely still pending -- an approved
+                # report is legitimately editable (it just stays approved).
+                snap = c.reports.get_report(rid) or {}
+                blocked, _ = c.reports.update_report(
+                    rid, {'reported_entity_name': f'{username} frozen {i}'})
+                if blocked and snap.get('approval_status') == 'pending_approval':
+                    after = c.reports.get_report(rid) or {}
+                    if after.get('approval_status') == 'pending_approval':
+                        raise RuntimeError('a pending report was editable')
+                rows, _ = c.reports.get_reports(created_by=username, limit=50)
+                for r in [x for x in rows if x.get('approval_status') == 'rework'][:2]:
                     ok, msg = c.reports.update_report(
-                        rid, {'reported_entity_name': f'{username} entity {i}.{j}'})
+                        r['report_id'], {'reported_entity_name': f'{username} reworked {i}'})
                     if not ok:
-                        raise RuntimeError(f'update failed: {msg}')
+                        raise RuntimeError(f'rework edit failed: {msg}')
                     record('update')
-                    c.versions.create_version_snapshot(rid, f'stress v{j}')
+                    ok, _, msg = c.approvals.request_approval(r['report_id'], 'reworked')
+                    if ok:
+                        record('resubmit')
                 # creation auto-submits; count it
                 record('submit')
                 with sub_lock:

@@ -51,6 +51,49 @@ WRITE_COMMANDS = {
 }
 
 
+# SECURITY: commands that take the acting user's identity as an ARGUMENT.
+# The host authenticates the session but then dispatches the client's raw args,
+# so without this a client could simply pass someone else's name: an agent
+# transferred another agent's reserved report numbers to itself, and a reporter
+# reserved numbers in an agent's name (both proven by tests_warzone).
+#
+#   command -> (kind, positional index, kwarg name)
+#   kind 'username' -> bound to the session username
+#   kind 'user_id'  -> bound to the session user_id
+IDENTITY_ARGS = {
+    "report_number_service.reserve_block": ("username", 0, "username"),
+    # transfer_numbers(from_user, to_user, numbers): only the SOURCE is identity.
+    # The recipient is a legitimate free choice.
+    "report_number_service.transfer_numbers": ("username", 0, "from_user"),
+    "settings_service.save_settings": ("user_id", 1, "user_id"),
+    "settings_service.save_setting": ("user_id", 2, "user_id"),
+    "settings_service.reset_to_defaults": ("user_id", 0, "user_id"),
+    "settings_service.delete_settings": ("user_id", 0, "user_id"),
+    "settings_service.set_theme": ("user_id", 1, "user_id"),
+}
+
+
+def bind_identity(name: str, args: list, kwargs: dict, session_user: dict):
+    """Overwrite any identity argument with the authenticated session's own
+    identity. Returns (args, kwargs). Never trust the client for who it is."""
+    spec = IDENTITY_ARGS.get(name)
+    if not spec or not session_user:
+        return args, kwargs
+    kind, index, kwname = spec
+    value = session_user.get("username") if kind == "username" else session_user.get("user_id")
+    if value is None:
+        return args, kwargs
+    args = list(args or [])
+    kwargs = dict(kwargs or {})
+    if kwname in kwargs:
+        kwargs[kwname] = value
+    elif len(args) > index:
+        args[index] = value
+    else:                      # caller relied on the default -> pin it explicitly
+        kwargs[kwname] = value
+    return args, kwargs
+
+
 def is_write_command(name: str) -> bool:
     return name in WRITE_COMMANDS
 

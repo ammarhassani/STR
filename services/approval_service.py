@@ -247,6 +247,15 @@ class ApprovalService:
             if not self.auth_service.has_permission('approve_reports'):
                 return False, "You don't have authority to reject reports"
 
+            # BRD 05§6 / 06§13: a reject or rework decision MUST carry a reason.
+            # The UI asked for one, but the service accepted an empty string, so
+            # any non-UI path sent a report back with no explanation -- the agent
+            # gets work returned and cannot tell what to fix.
+            if not (comment or "").strip():
+                return False, ("A comment is required when requesting rework"
+                               if request_rework else
+                               "A comment is required when rejecting a report")
+
             # Validate reassignment target (rework only, must be an active agent)
             if reassign_to:
                 if not request_rework:

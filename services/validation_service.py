@@ -341,7 +341,7 @@ class ValidationService:
         'account_membership', # Account/Membership number field
     ]
 
-    def __init__(self, db_manager=None, logging_service=None):
+    def __init__(self, db_manager=None, logging_service=None, auth_service=None):
         """
         Initialize the validation service.
 
@@ -351,6 +351,8 @@ class ValidationService:
         """
         self.db_manager = db_manager
         self.logger = logging_service
+        # Optional: when present, admin-only gates on the rule-editing methods.
+        self.auth_service = auth_service
 
     @staticmethod
     def validate_field(value: Any, rules: List[ValidationRule]) -> Tuple[bool, str]:
@@ -500,6 +502,21 @@ class ValidationService:
                 self.logger.error(f"Error getting validation rules for {field_name}: {str(e)}")
             return None
 
+    def _require_admin(self, action: str) -> bool:
+        """Field rules decide what the whole bank may file. Only an admin may
+        change them -- an agent could otherwise relax a rule (or make a required
+        field optional) and file reports the regulator would reject."""
+        if self.auth_service is None:
+            return True          # no session context (CLI/migrations) -> trusted
+        user = self.auth_service.get_current_user() or {}
+        if user.get('role') != 'admin':
+            if self.logger:
+                self.logger.warning(
+                    f"Unauthorized {action} attempt by {user.get('username')} "
+                    f"(role={user.get('role')})")
+            return False
+        return True
+
     def update_validation_rules(self, field_name: str, rules: Dict, username: str) -> Tuple[bool, str]:
         """
         Update validation rules for a field in database.
@@ -512,6 +529,8 @@ class ValidationService:
         Returns:
             Tuple of (success, message)
         """
+        if not self._require_admin("update validation rules"):
+            return False, "Administrator privileges required"
         if not self.db_manager:
             return False, "Database manager not available"
 
@@ -601,6 +620,8 @@ class ValidationService:
         Returns:
             Tuple of (success, message)
         """
+        if not self._require_admin("update required status"):
+            return False, "Administrator privileges required"
         if not self.db_manager:
             return False, "Database manager not available"
 

@@ -121,17 +121,19 @@ class AppState:
 
             # Initialize core services
             self.auth_service = AuthService(self.db_manager, self.logging_service)
+            # clear_logs is admin-only; the logger needs a session to check that
+            self.logging_service.set_auth_service(self.auth_service)
             self.settings_service = SettingsService(self.db_manager, self.auth_service)
             self.report_service = ReportService(
                 self.db_manager, self.logging_service, self.auth_service
             )
             self.dashboard_service = DashboardService(self.db_manager, self.logging_service, self.auth_service)
             self.dropdown_service = DropdownService(self.db_manager, self.logging_service, self.auth_service)
-            self.validation_service = ValidationService(self.db_manager, self.logging_service)
+            self.validation_service = ValidationService(self.db_manager, self.logging_service, self.auth_service)
             from services.intelligence_service import IntelligenceService
             self.intelligence_service = IntelligenceService(self.db_manager, self.logging_service)
             self.report_number_service = ReportNumberService(
-                self.db_manager, self.logging_service
+                self.db_manager, self.logging_service, self.auth_service
             )
 
             # Initialize activity service (GitHub-style changelog)
@@ -163,6 +165,9 @@ class AppState:
             self.version_service.set_activity_service(self.activity_service)
             # Wire the number service so create_report enforces the reservation gate
             self.report_service.set_report_number_service(self.report_number_service)
+            # every edit is versioned inside update_report, so RPC/API edits
+            # get history too -- not only the ones made through a dialog
+            self.report_service.set_version_service(self.version_service)
 
             # Maintenance schedulers: auto-purge (R80) + weekly backup (R107).
             # Client mode reads a throwaway, read-only replica - a local

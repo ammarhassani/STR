@@ -448,6 +448,7 @@ REGISTRY_EXEMPT = {
     # dependency injection, not a DB write
     'report_service.set_activity_service',
     'report_service.set_report_number_service',
+    'report_service.set_version_service',   # wiring setter, not a write op
     'approval_service.set_activity_service',
     'version_service.set_activity_service',
     # pure static factories returning rule objects

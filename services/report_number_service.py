@@ -32,7 +32,7 @@ class ReportNumberService:
     - Calendar-driven monthly numbering (automatic month rollover)
     """
 
-    def __init__(self, db_manager, logging_service):
+    def __init__(self, db_manager, logging_service, auth_service=None):
         """
         Initialize the report number service.
 
@@ -42,6 +42,10 @@ class ReportNumberService:
         """
         self.db_manager = db_manager
         self.logger = logging_service
+        # Optional so the maintenance/CLI paths can build the service without a
+        # session; when present it gates who may consume the official number
+        # sequence (see _may_reserve).
+        self.auth_service = auth_service
         # Numbering month = the current calendar month. Injectable so tests can
         # simulate a month rollover.
         self._now = datetime.now
@@ -151,9 +155,20 @@ class ReportNumberService:
 
     # ---- Owned-block reservation (Phase 2) -----------------------------
 
+    def _may_reserve(self) -> bool:
+        """Reserving burns official FIU report numbers permanently, so only
+        roles that can actually file a report may do it. A reporter has no data
+        entry rights at all -- letting them reserve punched unusable gaps into
+        the regulator-facing sequence."""
+        if self.auth_service is None:
+            return True          # no session context (CLI/maintenance) -> trusted caller
+        return bool(self.auth_service.has_permission('add_report'))
+
     def reserve_block(self, username, count):
         """Allocate the next `count` sequential numbers to `username` as
         'available', in one transaction. count clamped to [1, 100]."""
+        if not self._may_reserve():
+            return False, [], "You do not have permission to reserve report numbers"
         if not _is_username(username):
             return False, [], "Invalid user"
         try:
@@ -221,6 +236,8 @@ class ReportNumberService:
     def transfer_numbers(self, from_user, to_user, report_numbers):
         """Reassign owned_by for the given 'available' numbers (must currently
         be owned by from_user). to_user must be an active user."""
+        if not self._may_reserve():
+            return False, "You do not have permission to transfer report numbers"
         if not _is_username(from_user) or not _is_username(to_user):
             return False, "Invalid user"
         if not report_numbers or not isinstance(report_numbers, (list, tuple, set)):

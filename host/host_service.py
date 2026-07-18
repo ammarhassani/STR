@@ -88,7 +88,12 @@ class HostService:
                     from services import command_registry as cr
                     # set the auth context for THIS command, then dispatch
                     self.auth.current_user = user
-                    result = cr.dispatch(self.services, name, cmd.get("args", []), cmd.get("kwargs", {}))
+                    # Args come straight from the client, so any argument that
+                    # names WHO is acting must be replaced with the session's own
+                    # identity before dispatch (see cr.IDENTITY_ARGS).
+                    args, kwargs = cr.bind_identity(
+                        name, cmd.get("args", []), cmd.get("kwargs", {}), user)
+                    result = cr.dispatch(self.services, name, args, kwargs)
                     resp = {"id": cid, "ok": True, "result": result}
         except Exception as e:
             resp = {"id": cid, "ok": False, "error": f"{type(e).__name__}: {e}"}

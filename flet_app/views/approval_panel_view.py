@@ -388,14 +388,9 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             form_data = get_form_data()
             try:
                 success, message = app_state.report_service.update_report(report_id, form_data)
+                # update_report versions the change itself
                 if success:
                     show_success(page, "Report updated successfully")
-                    # Create version snapshot
-                    if app_state.version_service:
-                        app_state.version_service.create_version_snapshot(
-                            report_id,
-                            f"Modified by admin during approval review"
-                        )
                 else:
                     show_error(page, message)
             except Exception as ex:
@@ -408,14 +403,8 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 form_data = get_form_data()
                 try:
                     success, message = app_state.report_service.update_report(report_id, form_data)
-                    if success:
-                        # Create version snapshot
-                        if app_state.version_service:
-                            app_state.version_service.create_version_snapshot(
-                                report_id,
-                                f"Modified by admin during approval review"
-                            )
-                    else:
+                    # update_report versions the change itself
+                    if not success:
                         show_error(page, f"Failed to save changes: {message}")
                         return
                 except Exception as ex:

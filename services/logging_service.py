@@ -113,7 +113,8 @@ class LoggingService:
     Provides convenient methods for logging throughout the application.
     """
 
-    def __init__(self, db_manager, log_dir: Optional[Path] = None, db_logging: bool = True):
+    def __init__(self, db_manager, log_dir: Optional[Path] = None, db_logging: bool = True,
+                 auth_service=None):
         """
         Initialize the logging service.
 
@@ -123,6 +124,8 @@ class LoggingService:
             db_logging: If False, skip the database log handler (client mode with throwaway replica)
         """
         self.db_manager = db_manager
+        # Optional: when present, gates destructive log operations to admins.
+        self.auth_service = auth_service
         self.log_dir = log_dir or Path.home() / '.fiu_system'
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -167,6 +170,11 @@ class LoggingService:
             self.db_handler = None
 
         self.logger.info("Logging service initialized")
+
+    def set_auth_service(self, auth_service):
+        """Late binding: auth_service is constructed after the logger (it needs
+        one), but clear_logs must still be able to check who is calling."""
+        self.auth_service = auth_service
 
     def set_user_context(self, user_id: int, username: str):
         """
@@ -307,6 +315,19 @@ class LoggingService:
         Returns:
             Number of logs deleted
         """
+        # Wiping the audit trail is the first thing anyone covering their tracks
+        # would do: it must be admin-only, and the deletion must itself be
+        # logged with who did it BEFORE the rows go (an unrecorded wipe of a
+        # regulator-facing log is indistinguishable from tampering).
+        actor = "SYSTEM"
+        if self.auth_service is not None:
+            user = self.auth_service.get_current_user() or {}
+            actor = user.get('username') or 'UNKNOWN'
+            if user.get('role') != 'admin':
+                self.logger.warning(
+                    f"Unauthorized clear_logs attempt by {actor} (role={user.get('role')})")
+                return 0
+
         if older_than_days:
             query = """
                 DELETE FROM system_logs
@@ -316,6 +337,13 @@ class LoggingService:
         else:
             query = "DELETE FROM system_logs"
             params = ()
+
+        scope = f"older than {older_than_days} days" if older_than_days else "ALL logs"
+        try:
+            self.log_user_action("LOGS_CLEARED",
+                                 {"cleared_by": actor, "scope": scope})
+        except Exception as e:          # never let the audit write block the op
+            print(f"[AUDIT][WARN] could not record the log clear: {e}")
 
         self.db_manager.execute_with_retry(query, params)
 
