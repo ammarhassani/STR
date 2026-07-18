@@ -307,6 +307,18 @@ class FletApp:
         self._build_main_layout()
         self.page.update()
 
+    def _relayout_for_language(self, *_):
+        """Live language switch (#3): re-render the whole shell (sidebar, header,
+        current view) in the new language + text direction, keeping the route."""
+        self._apply_language_direction()
+        self.page.controls.clear()
+        self.content_area = ft.Container(
+            content=self._get_content_for_route(self.current_route),
+            expand=True, padding=24,
+        )
+        self._build_main_layout()
+        self.page.update()
+
     def _handle_navigate(self, route: str):
         """Handle navigation to a route."""
         self.current_route = route
@@ -365,6 +377,7 @@ class FletApp:
             on_help=handle_help,
             on_backup=handle_backup,
             on_reservations=handle_reservations,
+            on_language_change=self._relayout_for_language,
         )
 
         # Host-down banner (client mode only; local/host installs have no
@@ -441,22 +454,23 @@ class FletApp:
         return builder()
 
     def _get_page_title(self, route: str) -> str:
-        """Get page title for a route."""
+        """Get page title for a route (localized #3)."""
+        from i18n import t
         titles = {
-            "/dashboard": "Dashboard",
-            "/reports": "Reports",
-            "/my-work": "My Work",
-            "/activity": "Activity Log",
-            "/export": "Export",
-            "/approvals": "Approvals",
-            "/users": "User Management",
-            "/logs": "System Logs",
-            "/settings": "Settings",
-            "/dropdown-management": "Dropdown Management",
-            "/field-management": "Field Management",
-            "/dashboard-widgets": "Dashboard Widgets",
+            "/dashboard": t("nav.dashboard"),
+            "/reports": t("nav.reports"),
+            "/my-work": t("nav.my_work"),
+            "/activity": t("nav.activity"),
+            "/export": t("nav.export"),
+            "/approvals": t("nav.approvals"),
+            "/users": t("nav.users"),
+            "/logs": t("nav.logs"),
+            "/settings": t("nav.settings"),
+            "/dropdown-management": t("nav.dropdowns"),
+            "/field-management": t("nav.fields"),
+            "/dashboard-widgets": t("nav.widgets"),
         }
-        return titles.get(route, "Dashboard")
+        return titles.get(route, t("nav.dashboard"))
 
     def _show_error(self, message: str):
         """Show error dialog."""

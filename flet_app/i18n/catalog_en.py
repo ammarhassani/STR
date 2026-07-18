@@ -47,4 +47,17 @@ STRINGS = {
     "nav.dropdowns": "Dropdowns",
     "nav.fields": "Fields",
     "nav.widgets": "Dashboard Widgets",
+    "nav.activity": "Activity Log",
+
+    # header actions
+    "header.new_report": "New Report",
+    "header.refresh": "Refresh",
+    "header.help": "Help",
+    "header.profile": "My Profile",
+    "header.backup": "Backup & Restore",
+    "header.reservations": "My Numbers",
+    "header.logout": "Logout",
+    "header.notifications": "Notifications",
+    "header.admin_tools": "Admin Tools",
+    "header.reservation_mgmt": "Reservation Management",
 }

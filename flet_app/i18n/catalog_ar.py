@@ -48,4 +48,17 @@ STRINGS = {
     "nav.dropdowns": "القوائم المنسدلة",
     "nav.fields": "الحقول",
     "nav.widgets": "عناصر اللوحة",
+    "nav.activity": "سجل النشاط",
+
+    # header actions
+    "header.new_report": "تقرير جديد",
+    "header.refresh": "تحديث",
+    "header.help": "مساعدة",
+    "header.profile": "ملفي الشخصي",
+    "header.backup": "النسخ الاحتياطي والاستعادة",
+    "header.reservations": "أرقامي",
+    "header.logout": "تسجيل الخروج",
+    "header.notifications": "الإشعارات",
+    "header.admin_tools": "أدوات المشرف",
+    "header.reservation_mgmt": "إدارة الأرقام",
 }

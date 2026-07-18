@@ -7,6 +7,7 @@ from typing import Callable, Optional, Any, List
 
 from theme.theme_manager import theme_manager
 from theme.colors import Colors
+from i18n import t
 
 
 # Note: UserControl was removed in Flet 0.21+
@@ -34,15 +35,15 @@ def create_sidebar(
     def get_nav_items() -> List[dict]:
         """Get navigation items based on user role."""
         items = [
-            {"icon": ft.Icons.DASHBOARD, "label": "Dashboard", "route": "/dashboard"},
-            {"icon": ft.Icons.DESCRIPTION, "label": "Reports", "route": "/reports"},
-            {"icon": ft.Icons.DOWNLOAD, "label": "Export", "route": "/export"},
+            {"icon": ft.Icons.DASHBOARD, "label": t("nav.dashboard"), "route": "/dashboard"},
+            {"icon": ft.Icons.DESCRIPTION, "label": t("nav.reports"), "route": "/reports"},
+            {"icon": ft.Icons.DOWNLOAD, "label": t("nav.export"), "route": "/export"},
         ]
 
         # My Work: a personal queue for anyone who creates reports (agent /
         # supervisor / admin) — drafts, returned-for-rework, pending, approved.
         if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
-            items.insert(2, {"icon": ft.Icons.INBOX, "label": "My Work", "route": "/my-work"})
+            items.insert(2, {"icon": ft.Icons.INBOX, "label": t("nav.my_work"), "route": "/my-work"})
 
         auth = app_state.auth_service
         can_approve = bool(auth and auth.has_permission('approve_reports'))
@@ -51,19 +52,19 @@ def create_sidebar(
         if can_approve:
             items.extend([
                 {"type": "divider"},
-                {"icon": ft.Icons.CHECK_CIRCLE, "label": "Approvals", "route": "/approvals"},
+                {"icon": ft.Icons.CHECK_CIRCLE, "label": t("nav.approvals"), "route": "/approvals"},
             ])
 
         # Admin tools: admins only
         if app_state.is_admin():
             items.extend([
-                {"icon": ft.Icons.PEOPLE, "label": "Users", "route": "/users"},
-                {"icon": ft.Icons.HISTORY, "label": "System Logs", "route": "/logs"},
+                {"icon": ft.Icons.PEOPLE, "label": t("nav.users"), "route": "/users"},
+                {"icon": ft.Icons.HISTORY, "label": t("nav.logs"), "route": "/logs"},
                 {"type": "divider"},
-                {"icon": ft.Icons.SETTINGS, "label": "Settings", "route": "/settings"},
-                {"icon": ft.Icons.LIST, "label": "Dropdowns", "route": "/dropdown-management"},
-                {"icon": ft.Icons.TUNE, "label": "Fields", "route": "/field-management"},
-                {"icon": ft.Icons.DASHBOARD_CUSTOMIZE, "label": "Dashboard Widgets", "route": "/dashboard-widgets"},
+                {"icon": ft.Icons.SETTINGS, "label": t("nav.settings"), "route": "/settings"},
+                {"icon": ft.Icons.LIST, "label": t("nav.dropdowns"), "route": "/dropdown-management"},
+                {"icon": ft.Icons.TUNE, "label": t("nav.fields"), "route": "/field-management"},
+                {"icon": ft.Icons.DASHBOARD_CUSTOMIZE, "label": t("nav.widgets"), "route": "/dashboard-widgets"},
             ])
 
         return items
@@ -156,7 +157,7 @@ def create_sidebar(
                     content=ft.Row(
                         controls=[
                             ft.Icon(ft.Icons.SHIELD, color=colors["accent"], size=28),
-                            ft.Text("FIU System", color=colors["text_primary"], size=16, weight=ft.FontWeight.BOLD),
+                            ft.Text(t("app.title"), color=colors["text_primary"], size=16, weight=ft.FontWeight.BOLD),
                         ],
                         spacing=10,
                     ),

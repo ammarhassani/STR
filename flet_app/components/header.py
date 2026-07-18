@@ -21,6 +21,7 @@ def create_header(
     on_help: Callable[[], None] = None,
     on_backup: Callable[[], None] = None,
     on_reservations: Callable[[], None] = None,
+    on_language_change: Callable[[], None] = None,
 ) -> ft.Container:
     """
     Create the application header.
@@ -41,6 +42,7 @@ def create_header(
         Header container
     """
     colors = theme_manager.get_colors()
+    from i18n import t as _t, set_language, is_rtl, get_language, available_languages
 
     def handle_logout(e):
         """Handle logout click."""
@@ -90,7 +92,7 @@ def create_header(
     if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
         toolbar_buttons.append(
             app_button(
-                "New Report",
+                _t("header.new_report"),
                 icon=ft.Icons.ADD,
                 on_click=handle_new_report,
                 variant="primary",
@@ -102,7 +104,7 @@ def create_header(
         ft.IconButton(
             icon=ft.Icons.REFRESH,
             icon_color=colors["text_secondary"],
-            tooltip="Refresh (F5)",
+            tooltip=_t("header.refresh") + " (F5)",
             on_click=handle_refresh,
         )
     )
@@ -112,7 +114,7 @@ def create_header(
         ft.IconButton(
             icon=ft.Icons.HELP_OUTLINE,
             icon_color=colors["text_secondary"],
-            tooltip="Help (F1)",
+            tooltip=_t("header.help") + " (F1)",
             on_click=handle_help,
         )
     )
@@ -122,13 +124,13 @@ def create_header(
         admin_menu = ft.PopupMenuButton(
             icon=ft.Icons.ADMIN_PANEL_SETTINGS,
             icon_color=colors["text_secondary"],
-            tooltip="Admin Tools",
+            tooltip=_t("header.admin_tools"),
             items=[
                 ft.PopupMenuItem(
                     content=ft.Row(
                         controls=[
                             ft.Icon(ft.Icons.BACKUP, size=18, color=colors["text_secondary"]),
-                            ft.Text("Backup & Restore", color=colors["text_primary"]),
+                            ft.Text(_t("header.backup"), color=colors["text_primary"]),
                             ft.Text("Ctrl+B", size=10, color=colors["text_muted"]),
                         ],
                         spacing=10,
@@ -139,7 +141,7 @@ def create_header(
                     content=ft.Row(
                         controls=[
                             ft.Icon(ft.Icons.NUMBERS, size=18, color=colors["text_secondary"]),
-                            ft.Text("Reservation Management", color=colors["text_primary"]),
+                            ft.Text(_t("header.reservation_mgmt"), color=colors["text_primary"]),
                             ft.Text("Ctrl+R", size=10, color=colors["text_muted"]),
                         ],
                         spacing=10,
@@ -151,18 +153,19 @@ def create_header(
         toolbar_buttons.append(admin_menu)
 
     # Language toggle (#3): per-user, available to everyone from the header.
-    from i18n import t as _t, set_language, is_rtl, get_language, available_languages
-
     def _change_language(code):
         try:
+            if code == get_language():
+                return
             if app_state.auth_service:
                 app_state.auth_service.set_user_language(code)
             set_language(code)
             page.rtl = is_rtl()
-            page.snack_bar = ft.SnackBar(content=ft.Text(_t("settings.language.saved")),
-                                         bgcolor=colors["success"])
-            page.snack_bar.open = True
-            page.update()
+            # live re-render of the whole shell in the new language
+            if on_language_change:
+                on_language_change()
+            else:
+                page.update()
         except Exception:
             pass
 
@@ -182,7 +185,7 @@ def create_header(
     notification_button = ft.IconButton(
         icon=ft.Icons.NOTIFICATIONS_OUTLINED,
         icon_color=colors["text_secondary"],
-        tooltip="Notifications",
+        tooltip=_t("header.notifications"),
         on_click=lambda e: None,  # TODO: Implement notifications
     )
 
@@ -216,7 +219,7 @@ def create_header(
                 content=ft.Row(
                     controls=[
                         ft.Icon(ft.Icons.PERSON, size=18, color=colors["text_secondary"]),
-                        ft.Text("My Profile", color=colors["text_primary"]),
+                        ft.Text(_t("header.profile"), color=colors["text_primary"]),
                     ],
                     spacing=10,
                 ),
@@ -227,7 +230,7 @@ def create_header(
                 content=ft.Row(
                     controls=[
                         ft.Icon(ft.Icons.LOGOUT, size=18, color=colors["danger"]),
-                        ft.Text("Logout", color=colors["danger"]),
+                        ft.Text(_t("header.logout"), color=colors["danger"]),
                     ],
                     spacing=10,
                 ),
