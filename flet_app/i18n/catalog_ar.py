@@ -183,6 +183,24 @@ STRINGS = {
     "act.action_type": "نوع الإجراء",
     "act.date_filter": "مرشح التاريخ",
 
+    # dashboard widgets management
+    "wm.title": "عناصر اللوحة",
+    "wm.none": "لا توجد عناصر بعد. أضف واحداً.",
+    "wm.add": "إضافة عنصر",
+    "wm.delete_widget": "حذف العنصر",
+    "wm.confirm_delete": "حذف '{title}'؟ لا يمكن التراجع.",
+    "wm.edit_widget": "تعديل العنصر",
+    "wm.add_widget": "إضافة عنصر",
+    "wm.type": "نوع العنصر",
+    "wm.field_title": "العنوان",
+    "wm.sql": "استعلام SQL (قراءة فقط SELECT)",
+    "wm.test": "اختبار الاستعلام",
+    "wm.color": "اللون (#hex)",
+    "wm.icon": "الأيقونة (لبطاقات KPI فقط)",
+    "wm.order": "الترتيب",
+    "wm.roles": "مرئي للأدوار:",
+    "wm.active": "نشط",
+
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",
     "mywork.lane.draft": "المسودّات",

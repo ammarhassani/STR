@@ -182,6 +182,24 @@ STRINGS = {
     "act.action_type": "Action Type",
     "act.date_filter": "Date Filter",
 
+    # dashboard widgets management
+    "wm.title": "Dashboard Widgets",
+    "wm.none": "No widgets yet. Add one.",
+    "wm.add": "Add Widget",
+    "wm.delete_widget": "Delete widget",
+    "wm.confirm_delete": "Delete '{title}'? This cannot be undone.",
+    "wm.edit_widget": "Edit widget",
+    "wm.add_widget": "Add widget",
+    "wm.type": "Widget type",
+    "wm.field_title": "Title",
+    "wm.sql": "SQL query (read-only SELECT)",
+    "wm.test": "Test query",
+    "wm.color": "Color (#hex)",
+    "wm.icon": "Icon (kpi only)",
+    "wm.order": "Order",
+    "wm.roles": "Visible to roles:",
+    "wm.active": "Active",
+
     # My Work
     "mywork.lane.rework": "Returned for Rework",
     "mywork.lane.draft": "Drafts",

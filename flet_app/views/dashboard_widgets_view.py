@@ -6,6 +6,7 @@ import flet as ft
 from typing import Any, Dict, Optional
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.toast import show_success, show_error
 
 WIDGET_TYPES = ['kpi_card', 'metric', 'bar_chart', 'line_chart', 'pie_chart', 'table']
@@ -21,7 +22,7 @@ def build_dashboard_widgets_view(page: ft.Page, app_state: Any) -> ft.Control:
         body.controls.clear()
         widgets = dash.list_all_widgets()
         if not widgets:
-            body.controls.append(ft.Text("No widgets yet. Add one.", color=colors["text_muted"]))
+            body.controls.append(ft.Text(t("wm.none"), color=colors["text_muted"]))
         for w in widgets:
             body.controls.append(_row_card(w))
         try:
@@ -41,10 +42,10 @@ def build_dashboard_widgets_view(page: ft.Page, app_state: Any) -> ft.Control:
                         ft.Text(f"{w['widget_type']} · {status} · roles: {w.get('visible_to_roles') or '-'}",
                                 size=11, color=colors["text_muted"]),
                     ], spacing=1, expand=True),
-                    ft.IconButton(ft.Icons.EDIT, icon_size=18, tooltip="Edit",
+                    ft.IconButton(ft.Icons.EDIT, icon_size=18, tooltip=t("common.edit"),
                                   on_click=lambda e, wid=w: open_editor(wid)),
                     ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=18, icon_color=colors["danger"],
-                                  tooltip="Delete", on_click=lambda e, wid=w: confirm_delete(wid)),
+                                  tooltip=t("common.delete"), on_click=lambda e, wid=w: confirm_delete(wid)),
                 ],
                 spacing=10,
             ),
@@ -61,10 +62,10 @@ def build_dashboard_widgets_view(page: ft.Page, app_state: Any) -> ft.Control:
             if ok:
                 refresh()
         dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("Delete widget"),
-            content=ft.Text(f"Delete '{w['title']}'? This cannot be undone."),
-            actions=[ft.TextButton("Cancel", on_click=lambda e: _close(dlg)),
-                     ft.ElevatedButton("Delete", bgcolor=colors["danger"], color=ft.Colors.WHITE, on_click=do)],
+            modal=True, title=ft.Text(t("wm.delete_widget")),
+            content=ft.Text(t("wm.confirm_delete", title=w["title"])),
+            actions=[ft.TextButton(t("common.cancel"), on_click=lambda e: _close(dlg)),
+                     ft.ElevatedButton(t("common.delete"), bgcolor=colors["danger"], color=ft.Colors.WHITE, on_click=do)],
         )
         page.overlay.append(dlg); dlg.open = True; page.update()
 
@@ -121,42 +122,42 @@ def build_dashboard_widgets_view(page: ft.Page, app_state: Any) -> ft.Control:
 
         form = ft.Column(
             controls=[
-                ft.Dropdown(ref=type_ref, label="Widget type", value=(w['widget_type'] if is_edit else 'kpi_card'),
+                ft.Dropdown(ref=type_ref, label=t("wm.type"), value=(w['widget_type'] if is_edit else 'kpi_card'),
                             options=[ft.dropdown.Option(t) for t in WIDGET_TYPES], text_size=13),
-                ft.TextField(ref=title_ref, label="Title", value=(w['title'] if is_edit else ''), text_size=13),
-                ft.TextField(ref=sql_ref, label="SQL query (read-only SELECT)",
+                ft.TextField(ref=title_ref, label=t("wm.field_title"), value=(w['title'] if is_edit else ''), text_size=13),
+                ft.TextField(ref=sql_ref, label=t("wm.sql"),
                              value=(w['sql_query'] if is_edit else 'SELECT COUNT(*) AS value FROM reports WHERE is_deleted = 0'),
                              multiline=True, min_lines=3, max_lines=8, text_size=12),
-                ft.Row([ft.TextButton("Test query", icon=ft.Icons.PLAY_ARROW, on_click=test_query)]),
+                ft.Row([ft.TextButton(t("wm.test"), icon=ft.Icons.PLAY_ARROW, on_click=test_query)]),
                 test_result,
                 ft.Row([
-                    ft.TextField(ref=color_ref, label="Color (#hex)", value=(w.get('color') if is_edit else '#3b82f6'),
+                    ft.TextField(ref=color_ref, label=t("wm.color"), value=(w.get('color') if is_edit else '#3b82f6'),
                                  width=140, text_size=13),
-                    ft.TextField(ref=icon_ref, label="Icon (kpi only)", value=(w.get('icon') or '' if is_edit else ''),
+                    ft.TextField(ref=icon_ref, label=t("wm.icon"), value=(w.get('icon') or '' if is_edit else ''),
                                  width=160, text_size=13),
-                    ft.TextField(ref=order_ref, label="Order", value=str(w.get('display_order', 0) if is_edit else 0),
+                    ft.TextField(ref=order_ref, label=t("wm.order"), value=str(w.get('display_order', 0) if is_edit else 0),
                                  width=90, text_size=13, keyboard_type=ft.KeyboardType.NUMBER),
                 ], spacing=10, wrap=True),
-                ft.Text("Visible to roles:", size=12, color=colors["text_secondary"]),
+                ft.Text(t("wm.roles"), size=12, color=colors["text_secondary"]),
                 ft.Row(list(role_boxes.values()), spacing=8, wrap=True),
-                ft.Checkbox(ref=active_ref, label="Active", value=(bool(w.get('is_active', 1)) if is_edit else True)),
+                ft.Checkbox(ref=active_ref, label=t("wm.active"), value=(bool(w.get('is_active', 1)) if is_edit else True)),
             ],
             spacing=10, scroll=ft.ScrollMode.AUTO, tight=True,
         )
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Edit widget" if is_edit else "Add widget"),
+            title=ft.Text(t("wm.edit_widget") if is_edit else t("wm.add_widget")),
             content=ft.Container(content=form, width=560, height=560),
-            actions=[ft.TextButton("Cancel", on_click=lambda e: _close(dlg)),
-                     ft.ElevatedButton("Save", bgcolor=colors["primary"], color=ft.Colors.WHITE, on_click=save)],
+            actions=[ft.TextButton(t("common.cancel"), on_click=lambda e: _close(dlg)),
+                     ft.ElevatedButton(t("common.save"), bgcolor=colors["primary"], color=ft.Colors.WHITE, on_click=save)],
         )
         page.overlay.append(dlg); dlg.open = True; page.update()
 
     header = ft.Row(
         controls=[
-            ft.Text("Dashboard Widgets", size=18, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+            ft.Text(t("wm.title"), size=18, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
             ft.Container(expand=True),
-            ft.ElevatedButton("Add Widget", icon=ft.Icons.ADD, bgcolor=colors["primary"],
+            ft.ElevatedButton(t("wm.add"), icon=ft.Icons.ADD, bgcolor=colors["primary"],
                               color=ft.Colors.WHITE, on_click=lambda e: open_editor(None)),
         ],
     )
