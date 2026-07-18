@@ -173,7 +173,8 @@ CREATE INDEX idx_dashboard_config_type ON dashboard_config(widget_type);
 CREATE TABLE IF NOT EXISTS system_config (
     config_id INTEGER PRIMARY KEY AUTOINCREMENT,
     config_key TEXT UNIQUE NOT NULL,
-    config_value TEXT NOT NULL,
+    config_value TEXT NOT NULL,       -- English label (dropdowns) / value (settings)
+    config_value_ar TEXT,             -- Arabic label for dropdown values (#3 i18n)
     config_type TEXT CHECK(config_type IN ('dropdown', 'setting', 'column', 'path')),
     config_category TEXT,
     display_order INTEGER DEFAULT 0,

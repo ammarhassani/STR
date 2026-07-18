@@ -62,9 +62,28 @@ be called "done" until the content is real.
   because catalogs are seeded for the login/onboarding pattern only. No mixed data.
 
 ### Phase 1 — Dropdown / field data → codes  (NEEDS content set #1)
-- New dropdown schema (code + label_en + label_ar); migration assigns codes and
-  maps existing report values (stored labels) → codes.
-- Services + forms bind codes, render labels per language.
+**Phase 1a — bilingual labels + resolution (additive, non-breaking) — ✅ DONE**
+- ✅ `system_config.config_value_ar` column (schema + migration). `config_key` is
+  the language-neutral CODE; `config_value` = English label, `config_value_ar` =
+  Arabic label.
+- ✅ Drafted Arabic for all 7 active categories (gender, nationality,
+  report_classification, report_source, reporting_entity, fiu_feedback,
+  type_of_suspected_transaction — 71 values). `arb_staff` skipped (its EN/AR
+  divergence is a separate semantic question); `second_reason_for_suspicion` is
+  now free text (#13) so its old 157 dropdown values are dead/ignored.
+- ✅ `dropdown_service.get_active_options(category, lang)` → `[(code, label)]` and
+  `resolve_label(category, code_or_value, lang)` (accepts a code OR a legacy stored
+  label; unknown values pass through). Existing `get_active_dropdown_values`
+  unchanged — nothing breaks. `tests_dropdown_i18n.py`.
+- **Owner review point:** the drafted Arabic labels in migration `ar_pairs`.
+
+**Phase 1b — flip storage to codes (BREAKING, deliberate) — TODO**
+- Forms bind `code` (option key), show `label` per language, store the code.
+- Migration converts existing report field values (stored labels) → codes (safe
+  now: pre-go-live data will be hard-reset anyway).
+- Every consumer resolves codes → labels: report detail/edit, approval panel,
+  reports list, **export** (must emit labels, not codes), and **BI widgets**
+  (group-by on these columns now yields codes — chart labels must resolve).
 - **Deliverable:** dropdowns + stored data are language-neutral; switching language
   re-localizes them. "No mixed values in the DB" achieved for data.
 

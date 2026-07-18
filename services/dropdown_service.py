@@ -126,6 +126,43 @@ class DropdownService:
             self.logger.error(f"Error getting active dropdown values for {category}: {str(e)}")
             return []
 
+    def get_active_options(self, category: str, lang: str = "en") -> List[tuple]:
+        """Active dropdown options as (code, label) for the given language (#3).
+        `code` is the language-neutral config_key stored on reports; `label` is
+        the English or Arabic text (Arabic falls back to English if undrafted)."""
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT config_key, config_value, COALESCE(NULLIF(config_value_ar,''), config_value) "
+                "FROM system_config WHERE config_type='dropdown' AND config_category=? AND is_active=1 "
+                "ORDER BY display_order, config_value", (category,))
+            out = []
+            for code, en, ar in (rows or []):
+                out.append((code, ar if lang == "ar" else en))
+            return out
+        except Exception as e:
+            self.logger.error(f"Error getting options for {category}: {str(e)}")
+            return []
+
+    def resolve_label(self, category: str, code_or_value: str, lang: str = "en") -> str:
+        """Render a stored dropdown value for display. Accepts either a code
+        (config_key) or a legacy stored label; returns the label in `lang`.
+        Unknown values pass through verbatim (legacy free text)."""
+        if not code_or_value:
+            return ""
+        try:
+            row = self.db_manager.execute_with_retry(
+                "SELECT config_value, COALESCE(NULLIF(config_value_ar,''), config_value) "
+                "FROM system_config WHERE config_type='dropdown' AND config_category=? "
+                "AND (config_key=? OR config_value=? OR config_value_ar=?) LIMIT 1",
+                (category, code_or_value, code_or_value, code_or_value))
+            if row:
+                en, ar = row[0]
+                return ar if lang == "ar" else en
+            return code_or_value
+        except Exception as e:
+            self.logger.error(f"Error resolving label for {category}/{code_or_value}: {str(e)}")
+            return code_or_value
+
     def get_all_categories(self) -> Dict[str, List[str]]:
         """
         Get all dropdown categories with their value counts.

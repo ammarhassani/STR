@@ -1385,6 +1385,72 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Gender normalization skipped: {str(e)}")
 
+        # Bilingual dropdown labels (#3 Phase 1): add an Arabic label alongside the
+        # English config_value. config_key stays the language-neutral CODE; the two
+        # label columns render per active language. Additive + idempotent; drafted
+        # Arabic pending owner review of FIU terminology.
+        try:
+            cursor.execute("PRAGMA table_info(system_config)")
+            if 'config_value_ar' not in [r[1] for r in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE system_config ADD COLUMN config_value_ar TEXT")
+                conn.commit()
+                messages.append("Added config_value_ar column to system_config")
+
+            ar_pairs = {
+                'gender': {
+                    'Male': 'ذكر', 'Female': 'أنثى', 'Other': 'آخر', 'Not Specified': 'غير محدد'},
+                'nationality': {
+                    'Saudi Arabian': 'سعودي', 'Emirati': 'إماراتي', 'Qatari': 'قطري',
+                    'Bahraini': 'بحريني', 'Kuwaiti': 'كويتي', 'Omani': 'عُماني',
+                    'Egyptian': 'مصري', 'Jordanian': 'أردني', 'Lebanese': 'لبناني',
+                    'Syrian': 'سوري', 'Iraqi': 'عراقي', 'Palestinian': 'فلسطيني',
+                    'Yemeni': 'يمني', 'Sudanese': 'سوداني', 'Moroccan': 'مغربي',
+                    'Algerian': 'جزائري', 'Tunisian': 'تونسي', 'Libyan': 'ليبي',
+                    'Pakistani': 'باكستاني', 'Indian': 'هندي', 'Bangladeshi': 'بنغلاديشي',
+                    'Filipino': 'فلبيني', 'Indonesian': 'إندونيسي', 'American': 'أمريكي',
+                    'British': 'بريطاني', 'French': 'فرنسي', 'German': 'ألماني', 'Other': 'أخرى'},
+                'report_classification': {
+                    'Money Laundering': 'غسل الأموال', 'Terrorist Financing': 'تمويل الإرهاب',
+                    'Fraud': 'احتيال', 'Tax Evasion': 'التهرّب الضريبي', 'Corruption': 'فساد',
+                    'Sanctions Violation': 'مخالفة العقوبات', 'Other Financial Crime': 'جريمة مالية أخرى'},
+                'report_source': {
+                    'Internal monitoring': 'مراقبة داخلية',
+                    'Customer due diligence': 'العناية الواجبة تجاه العميل',
+                    'Transaction monitoring': 'مراقبة المعاملات', 'External tip': 'بلاغ خارجي',
+                    'Law enforcement request': 'طلب من جهة إنفاذ القانون',
+                    'Media report': 'تقرير إعلامي', 'Other': 'أخرى'},
+                'reporting_entity': {
+                    'Bank': 'بنك', 'Exchange company': 'شركة صرافة', 'Insurance company': 'شركة تأمين',
+                    'Securities firm': 'شركة أوراق مالية', 'Money service business': 'مؤسسة خدمات مالية',
+                    'Real estate': 'عقارات', 'Precious metals dealer': 'تاجر معادن ثمينة',
+                    'Other financial institution': 'مؤسسة مالية أخرى'},
+                'fiu_feedback': {
+                    'Under investigation': 'قيد التحقيق', 'No action required': 'لا يتطلّب إجراءً',
+                    'Referred to law enforcement': 'محال إلى جهة إنفاذ القانون',
+                    'Request for additional information': 'طلب معلومات إضافية',
+                    'Case closed': 'أُغلقت الحالة', 'Ongoing monitoring': 'مراقبة مستمرة', 'Other': 'أخرى'},
+                'type_of_suspected_transaction': {
+                    'Cash deposit': 'إيداع نقدي', 'Cash withdrawal': 'سحب نقدي',
+                    'Wire transfer': 'تحويل برقي', 'Check deposit': 'إيداع شيك',
+                    'Foreign exchange': 'صرف عملات أجنبية', 'Investment transaction': 'معاملة استثمارية',
+                    'Loan transaction': 'معاملة قرض', 'Trade finance': 'تمويل تجاري',
+                    'Multiple transactions': 'معاملات متعددة', 'Other': 'أخرى'},
+            }
+            filled = 0
+            for cat, pairs in ar_pairs.items():
+                for en, ar in pairs.items():
+                    cursor.execute(
+                        "UPDATE system_config SET config_value_ar = ? "
+                        "WHERE config_type='dropdown' AND config_category=? AND config_value=? "
+                        "AND (config_value_ar IS NULL OR config_value_ar='')",
+                        (ar, cat, en))
+                    filled += cursor.rowcount or 0
+            conn.commit()
+            if filled:
+                messages.append(f"Filled Arabic labels for {filled} dropdown values")
+        except Exception as e:
+            messages.append(f"Arabic dropdown labels skipped: {str(e)}")
+
         # Enhanced BI widgets (#17/#4): seed the analyst/management chart set.
         # Idempotent by title. All queries are read-only SELECTs (the dashboard
         # runs them on a read-only connection regardless).
