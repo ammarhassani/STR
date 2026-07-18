@@ -1141,52 +1141,26 @@ def show_report_dialog(
         expand=True,
     )
 
-    # Build action buttons
-    action_buttons = []
-
-    # Left side buttons
+    # Action buttons FLOAT over the form (Stack) — no reserved footer band / no
+    # island background behind them, so the form gets that vertical space back.
+    left_buttons = []
     if is_edit_mode and report_data:
-        action_buttons.append(
-            ft.TextButton(
-                "View History",
-                icon=ft.Icons.HISTORY,
-                on_click=view_history,
-            )
+        left_buttons.append(
+            ft.TextButton("View History", icon=ft.Icons.HISTORY, on_click=view_history)
         )
 
-    action_buttons.append(ft.Container(expand=True))
-
-    # Right side buttons
-    action_buttons.append(
-        ft.TextButton(
-            "Cancel",
-            icon=ft.Icons.CLOSE,
-            on_click=close_dialog,
-        )
-    )
-
-    action_buttons.append(
-        app_button(
-            "Save Report",
-            icon=ft.Icons.SAVE,
-            on_click=save_report,
-            variant="ghost",
-        )
-    )
-
-    # Submit for approval button (only for non-admin users)
-    # Admins don't need approval - their changes are auto-trusted
+    right_buttons = [
+        ft.TextButton("Cancel", icon=ft.Icons.CLOSE, on_click=close_dialog),
+        app_button("Save Report", icon=ft.Icons.SAVE, on_click=save_report, variant="ghost"),
+    ]
+    # Submit for approval (non-admin, editable states only)
     if is_edit_mode and report_data:
         approval_status = report_data.get('approval_status', 'draft')
         is_admin = current_user and current_user.get('role') == 'admin'
         if not is_admin and approval_status not in ['pending_approval', 'approved']:
-            action_buttons.append(
-                app_button(
-                    "Submit for Approval",
-                    icon=ft.Icons.CHECK_CIRCLE,
-                    on_click=submit_for_approval,
-                    variant="ghost",
-                )
+            right_buttons.append(
+                app_button("Submit for Approval", icon=ft.Icons.CHECK_CIRCLE,
+                           on_click=submit_for_approval, variant="ghost")
             )
 
     # Inline error message — no background box, just red text (shown on validation fail)
@@ -1208,26 +1182,40 @@ def show_report_dialog(
         visible=False,
     )
 
-    # Compact, flat, content-first dialog. Header thin, form content prominent,
-    # inline (bg-less) error + a plain button row at the bottom.
-    # Clean solid full-bleed form surface. Big enough to read as a page (not a
-    # small box floating on the dashboard); the app chrome behind is fully
-    # covered by an opaque barrier, so nothing bleeds through. Buttons/header
-    # sit directly on the one flat white surface — no separate header/footer bars.
-    dialog_content = ft.Container(
+    # The form fills the whole surface; the bottom padding reserves a thin strip
+    # so the last field never hides under the floating buttons.
+    form_area = ft.Container(
         content=ft.Column(
             controls=[
                 ft.Row(controls=header_controls, spacing=8),
                 tabs,
                 error_banner,
-                ft.Row(controls=action_buttons, spacing=8),
             ],
             spacing=14,
-            tight=True,
+            expand=True,
         ),
+        padding=ft.padding.only(left=28, right=28, top=24, bottom=58),
+        expand=True,
+    )
+
+    stack_controls = [
+        form_area,
+        # right-aligned buttons floating at the bottom, transparent background
+        ft.Container(
+            content=ft.Row(controls=right_buttons, spacing=8, tight=True),
+            right=24, bottom=14,
+        ),
+    ]
+    if left_buttons:
+        stack_controls.append(
+            ft.Container(content=ft.Row(controls=left_buttons, spacing=8, tight=True),
+                         left=24, bottom=14)
+        )
+
+    dialog_content = ft.Container(
+        content=ft.Stack(controls=stack_controls, expand=True),
         width=1080,
-        height=740,
-        padding=28,
+        height=720,
         bgcolor=colors["bg_secondary"],
         border_radius=6,
     )

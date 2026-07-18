@@ -79,7 +79,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     *Do:* surface the rework comment on the report inside the agent's queue (#2)
     and on the report view.
 
-12. **Kill the "-- Select --" placeholder trap** — ☐
+12. **Kill the "-- Select --" placeholder trap** — ☑ (baked into SD: empty-key options dropped, hint instead)
     *Ask:* users pick the empty placeholder; app then reads a bad value.
     *Do:* no selectable empty option — use non-committable hint text; required
     dropdowns enforce a real choice; edit-mode defaults to the current value
@@ -158,7 +158,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
 
 ## Extra foundational item (not in the original 20 but required)
 
-**SD. Custom searchable dropdown** — ☐
+**SD. Custom searchable dropdown** — ☑ (confirmed: search + collapse + fit-content)
 Flet 0.27+ `enable_filter` does NOT render searchable on the desktop client
 (0.28.3) — confirmed on the real client. Build a custom component (text field +
 live-filtered list) that is a **drop-in for `ft.Dropdown`** (same `.value`,
