@@ -1507,6 +1507,46 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"BI widget seed skipped: {str(e)}")
 
+        # Arabic field labels (#3): column_settings.display_name_ar shipped as
+        # mojibake (double-encoded UTF-8). Replace with clean, reviewed Arabic.
+        try:
+            field_labels_ar = {
+                'sn': 'الرقم التسلسلي',
+                'report_number': 'رقم التقرير',
+                'report_date': 'تاريخ التقرير',
+                'outgoing_letter_number': 'رقم الخطاب الصادر',
+                'reported_entity_name': 'اسم الجهة المُبلَّغ عنها',
+                'legal_entity_owner': 'مالك الكيان القانوني',
+                'gender': 'الجنس',
+                'nationality': 'الجنسية',
+                'id_cr': 'رقم الهوية/السجل التجاري',
+                'account_membership': 'رقم الحساب/العضوية',
+                'branch_id': 'رقم الفرع',
+                'cic': 'رقم CIC',
+                'first_reason_for_suspicion': 'السبب الأول للاشتباه',
+                'second_reason_for_suspicion': 'السبب الثاني للاشتباه',
+                'type_of_suspected_transaction': 'نوع المعاملة المشتبه بها',
+                'arb_staff': 'موظف المصرف',
+                'total_transaction': 'إجمالي المعاملة',
+                'report_classification': 'تصنيف التقرير',
+                'report_source': 'مصدر التقرير',
+                'reporting_entity': 'الجهة المُبلِّغة',
+                'reporter_initials': 'الأحرف الأولى للمُبلِّغ',
+                'sending_date': 'تاريخ الإرسال',
+                'original_copy_confirmation': 'تأكيد النسخة الأصلية',
+                'fiu_number': 'رقم وحدة التحريات المالية',
+                'fiu_letter_receive_date': 'تاريخ استلام خطاب الوحدة',
+                'fiu_feedback': 'ملاحظات الوحدة',
+                'fiu_letter_number': 'رقم خطاب الوحدة',
+                'fiu_date': 'تاريخ الوحدة',
+            }
+            for col, ar in field_labels_ar.items():
+                cursor.execute("UPDATE column_settings SET display_name_ar = ? WHERE column_name = ?",
+                               (ar, col))
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Arabic field labels skipped: {str(e)}")
+
         # Arabic dashboard-widget titles (#3): title_ar rendered when lang=ar.
         # Covers the enhanced BI set + refreshes the original seed titles.
         try:
