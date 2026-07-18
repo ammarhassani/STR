@@ -52,6 +52,12 @@ def show_report_dialog(
         from components.toast import show_error
         show_error(page, "Please log in first.")
         return
+    # #7: only users who may add reports can open the create form. Refuse cleanly
+    # (a reporter, e.g.) instead of showing a misleading "reserve numbers" message.
+    if not is_edit_mode and not app_state.auth_service.has_permission('add_report'):
+        from components.toast import show_error
+        show_error(page, "Your role can't create reports.")
+        return
 
     # State
     reservation_info = {"value": None}

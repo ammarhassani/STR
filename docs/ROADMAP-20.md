@@ -53,7 +53,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    *Ask:* fix it.
    *Do:* diagnose + fix the log-export handler so it actually writes the file.
 
-7. **Reporter sees an Add-Report button it can't use (misleading)** — ☐
+7. **Reporter sees an Add-Report button it can't use (misleading)** — ☑ (dialog refuses on add_report; Ctrl+N + reports-view + header all gated; reporter gets a clean message, not the form)
    *Ask:* honest affordances.
    *Do:* with the role rework (#8), reporter = read/export only; hide Add-Report
    and any action a reporter can't perform.

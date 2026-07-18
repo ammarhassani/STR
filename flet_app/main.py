@@ -120,10 +120,9 @@ class FletApp:
         elif key == "F5":
             self._update_content(self.current_route)
 
-        # Ctrl+N - New Report
+        # Ctrl+N - New Report (only if the role may add reports)
         elif ctrl and key.lower() == "n":
-            current_user = app_state.auth_service.get_current_user()
-            if current_user and current_user.get('role') in ['admin', 'creator']:
+            if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
                 show_report_dialog(self.page, app_state, on_save=lambda: self._update_content(self.current_route))
 
         # Ctrl+B - Backup/Restore (Admin only)

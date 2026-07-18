@@ -216,6 +216,16 @@ def run():
     finding(E, 'settings lost the numbering-month display',
             'get_active_numbering_month' not in set_src)
     rd_src = open(os.path.join(REPO, 'flet_app/dialogs/report_dialog.py')).read()
+    rv_src = open(os.path.join(REPO, 'flet_app/views/reports_view.py')).read()
+    main_src2 = open(os.path.join(REPO, 'flet_app/main.py')).read()
+    # #7: every Add-Report affordance must be gated on the add_report permission,
+    # so a reporter never sees / can't trigger a create it can't do.
+    finding(E, 'report dialog does not gate create on add_report permission',
+            "has_permission('add_report')" not in rd_src)
+    finding(E, 'reports view Add button not gated on add_report permission',
+            "has_permission('add_report')" not in rv_src)
+    finding(E, "Ctrl+N still gated on the bogus 'creator' role instead of add_report",
+            "'creator'" in main_src2)
     finding(E, 'report dialog missing edit-lock acquire/release',
             'acquire_edit_lock' not in rd_src or 'release_edit_lock' not in rd_src)
     hdr_src = open(os.path.join(REPO, 'flet_app/components/header.py')).read()

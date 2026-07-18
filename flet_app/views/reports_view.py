@@ -1045,6 +1045,7 @@ def build_reports_view(
                     color=ft.Colors.WHITE if state["my_reports_only"] else colors["text_primary"],
                 ),
             ) if not is_admin else ft.Container(),
+            # #7: only roles that may add reports see the button (reporters don't)
             ft.ElevatedButton(
                 "Add New Report",
                 icon=ft.Icons.ADD,
@@ -1053,7 +1054,8 @@ def build_reports_view(
                     bgcolor=colors["primary"],
                     color=ft.Colors.WHITE,
                 ),
-            ),
+            ) if (app_state.auth_service and app_state.auth_service.has_permission('add_report'))
+            else ft.Container(),
         ],
         spacing=12,
     )
