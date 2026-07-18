@@ -17,13 +17,21 @@ def build_host_banner(app_state):
             online = app_state.host_status.online() if app_state.host_status else True
         except Exception:
             online = True
-        if online:
-            container.visible = False
-        else:
-            n = app_state.pending_writes()
-            from i18n import t
+        from i18n import t
+        n = app_state.pending_writes()
+        if not online:
             text.value = t("hostbanner.offline", n=n)
+            container.bgcolor = ft.Colors.ORANGE_800
             container.visible = True
+        elif n:
+            # Host is back but the writes are still queued — they carry the token
+            # of the session that died with the old host, so only a fresh login
+            # can drain them. Saying nothing here reads as "everything synced".
+            text.value = t("hostbanner.stuck", n=n)
+            container.bgcolor = ft.Colors.AMBER_900
+            container.visible = True
+        else:
+            container.visible = False
 
     container.refresh = refresh
     refresh()

@@ -228,6 +228,10 @@ def test_outbox_drain_exactly_once():
                 time.sleep(0.02)
     th = threading.Thread(target=run, daemon=True); th.start()
     try:
+        # 0.3s was only to make the host-DOWN path time out fast. The host is up
+        # now but still in startup() (integrity check + backup + first publish),
+        # which on Windows outlasts 0.3s — give the live calls a real timeout.
+        gw.timeout = 15.0
         ok, _u, _m = gw.login("admin", "Admin@1234")
         check("login once host is up", ok)
         # the queued create_user carries no token; drain resends verbatim. Give it the token:

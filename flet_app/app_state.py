@@ -240,6 +240,15 @@ class AppState:
                 user.get('username')
             )
 
+        # A host restart (reboot, failover) invalidates every client's session
+        # token, and queued writes carry that dead token — the host rejects them
+        # with "Not authenticated (re-login)" and the outbox keeps them forever.
+        # A fresh login is exactly when they become drainable, so drain here.
+        try:
+            self.drain_outbox()
+        except Exception:
+            pass  # never block a login on the outbox
+
         # Notify listeners
         self._notify_auth_listeners()
 

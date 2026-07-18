@@ -195,9 +195,41 @@ read access to the repo, the repo cloned to the same folder (e.g. `C:\STR`).
   RTL layout, the bilingual field/dropdown text, the onboarding dialog, the
   host-down banner. An agent captures a screenshot at each 👁 and diffs/OCRs it.
 
+---
+
+## Layer 1.5 — Single-Windows-PC lab (run 2026-07-18)
+
+Between the two layers there is a middle run that needs no VMs: three clones of
+the repo on ONE Windows PC (HOST, C1, C2) plus a local folder standing in for the
+share, each started through its REAL launcher. It cannot prove SMB or the GUI,
+but it exercises the actual multi-process launch path — and it found four
+Windows-only defects the headless suites could not:
+
+| Found | Defect |
+|-------|--------|
+| A4 | `deploy\*.vbs` launched the app **exactly once per PC**: in a cmd chain `if not exist logs mkdir logs & <rest>` swallows `<rest>`, so once `logs\` existed nothing ran and the host silently never started again |
+| E/G | `QueueTransport._atomic_write` raised `PermissionError` (WinError 5) publishing a response while the client polled that path — the response was dropped and the client waited out its full timeout |
+| G3 | a queued write never drained: it carried the token of the session that died with the old host, and the client then read the **stale response file** from that failed attempt on every later attempt |
+| A4 | `--host` with a missing DB died on `AttributeError` deep in `read_lease` instead of saying the database is missing |
+
+Proven on that lab after the fixes: A4, A5, C-equivalent client bring-up, D/E
+data sharing across two client installs, G1–G3 offline→queue→drain, I2 updater
+publish to the share, K1 backups — plus exactly-once apply across a real host
+restart (2 reports, 1 duplicate-free resubmit).
+
+Still Layer-2-only: real SMB locking/latency, the GUI, the taskbar icon, RTL
+rendering, and the 👁 checks below.
+
+> Note: `tests_e2e_harness.py` check 17 asserts create p95 < 2s. On a busy
+> workstation this fails on load alone (measured 1.3s idle, 3.0s under load on
+> the same commit) — re-run it on an otherwise idle machine before treating it
+> as a regression.
+
+---
+
 ## Sign-off
 
 - [ ] Layer 1: every suite green (paste the summary lines).
 - [ ] Layer 2: every ✅ box ticked, 👁 screenshots attached.
-- [ ] Known residuals accepted: Arabic FIU-term review, help-guide prose still
-      English, macOS dock icon (irrelevant on Windows).
+- [ ] Known residuals accepted: Arabic FIU-term review (catalogs + `help.body.*`),
+      macOS dock icon (irrelevant on Windows).

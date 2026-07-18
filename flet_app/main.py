@@ -538,6 +538,16 @@ if __name__ == "__main__":
 
         Config.load()
         app_state.initialize_services(Config.DATABASE_PATH, mode="host")
+        # The host is started headless from a Startup shortcut, so a missing or
+        # unreadable DB otherwise surfaces as an AttributeError on a None
+        # db_manager deep inside read_lease. Never auto-create one here: an empty
+        # DB would be published as the replica and every client would see a bank
+        # with no reports. Say what is wrong and stop.
+        if app_state.db_manager is None:
+            print(f"[HOST][FATAL] cannot open the database at {Config.DATABASE_PATH!r}. "
+                  "Run the setup wizard on this PC (python flet_app/main.py) or restore "
+                  "a backup before starting the host.")
+            sys.exit(2)
         host_services = {a: getattr(app_state, a) for a in (
             "auth_service", "settings_service", "report_service", "dashboard_service",
             "dropdown_service", "validation_service", "report_number_service",

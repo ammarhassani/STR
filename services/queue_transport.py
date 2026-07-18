@@ -6,6 +6,8 @@ import json
 import time
 import uuid
 
+from utils.atomic_replace import replace_with_retry
+
 SUBDIRS = ["queue/pending", "queue/processing", "queue/done",
            "responses", "replica", "host", "backups", ".tmp"]
 
@@ -23,11 +25,25 @@ class QueueTransport:
         tmp = self._p(".tmp", uuid.uuid4().hex)
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, default=str)
-        os.replace(tmp, dest_path)  # atomic within the same filesystem
+        # Atomic within the same filesystem. Retry on Windows: a client polling
+        # for this exact response path (open/remove in await_response) makes the
+        # rename fail with PermissionError, which would drop the response and
+        # leave the client waiting out its full timeout.
+        replace_with_retry(tmp, dest_path)
 
     # ---- client side ----
     def submit(self, command: dict) -> str:
         cid = command["id"]
+        # Drop any response left over from an earlier attempt at this same id.
+        # A queued write keeps its stable id, so a timed-out call can leave the
+        # host's answer on disk; without this, the next attempt reads THAT answer
+        # (typically the "Not authenticated" one from before the re-login) and
+        # concludes it failed, so the outbox never drains even though the host
+        # goes on to apply the write.
+        try:
+            os.remove(self._p("responses", f"{cid}.json"))
+        except OSError:
+            pass
         # sortable, unique: <ms>_<id>.json
         name = f"{int(time.time() * 1000):013d}_{cid}.json"
         self._atomic_write(self._p("queue", "pending", name), command)
@@ -59,7 +75,7 @@ class QueueTransport:
             src = os.path.join(pend, name)
             dst = self._p("queue", "processing", name)
             try:
-                os.replace(src, dst)  # atomic claim
+                replace_with_retry(src, dst, timeout=1.0)  # atomic claim
             except (FileNotFoundError, OSError):
                 continue  # another pass grabbed it / mid-write; skip
             try:

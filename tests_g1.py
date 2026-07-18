@@ -218,6 +218,103 @@ def test_client_roundtrip():
         stop.set(); th.join(timeout=2.0); shutil.rmtree(d, ignore_errors=True)
 
 
+def test_outbox_drains_after_host_restart():
+    """A write queued while the host was down carries the token of the session
+    that died with it. A NEW host instance rejects that token, so the queued
+    write only becomes drainable after a fresh login — which is why
+    app_state.login() drains. Proven here without the UI."""
+    import tempfile, sqlite3, threading, bcrypt
+    from database.init_db import initialize_database
+    from database.db_manager import DatabaseManager
+    from database.migrations import migrate_database
+    from services.logging_service import LoggingService
+    from services.auth_service import AuthService
+    from services.report_service import ReportService
+    from services.report_number_service import ReportNumberService
+    from services.activity_service import ActivityService
+    from host.host_service import HostService
+    from services.queue_transport import QueueTransport
+    from services.remote_gateway import RemoteGateway, HostOfflineError
+    from services.outbox import Outbox
+
+    d = tempfile.mkdtemp()
+    db = os.path.join(d, "h.db"); initialize_database(db); migrate_database(db)
+    dbm = DatabaseManager(db)
+    pw = bcrypt.hashpw(b"Admin@1234", bcrypt.gensalt()).decode()
+    c = sqlite3.connect(db)
+    c.execute("UPDATE users SET password=?, must_change_password=0 WHERE username='admin'", (pw,))
+    c.commit(); c.close()
+    log = LoggingService(dbm, None, db_logging=False)
+    auth = AuthService(dbm, log)
+    act = ActivityService(dbm, log, auth)
+    nums = ReportNumberService(dbm, log)
+    reports = ReportService(dbm, log, auth)
+    reports.set_activity_service(act); reports.set_report_number_service(nums)
+    services = {"auth_service": auth, "report_service": reports,
+                "report_number_service": nums, "activity_service": act}
+    bus = os.path.join(d, "bus")
+    for sub in ("", "replica", ".tmp"):
+        os.makedirs(os.path.join(bus, sub), exist_ok=True)
+
+    def serve(host, stop):
+        host.publish_replica()
+        while not stop.is_set():
+            if not host.run_once():
+                time.sleep(0.02)
+
+    # --- host #1: log in, reserve a number, then the host dies
+    host1 = HostService(services, dbm, QueueTransport(bus), bus)
+    stop1 = threading.Event()
+    th1 = threading.Thread(target=serve, args=(host1, stop1), daemon=True); th1.start()
+    outbox = Outbox(os.path.join(d, "outbox"))
+    gw = RemoteGateway(QueueTransport(bus), timeout=5.0, outbox=outbox)
+    ok, user, _ = gw.login("admin", "Admin@1234")
+    check("restart: logged in against host #1", ok)
+    gw.call("report_number_service.reserve_block", ["admin", 1], {})
+    stop1.set(); th1.join(timeout=2.0)
+
+    # --- host down: the write queues instead of failing
+    try:
+        gw.call("report_service.create_report",
+                [{"report_date": "04/11/2025", "reported_entity_name": "Queued"}], {})
+        check("restart: write queued while host down", False, "write unexpectedly succeeded")
+    except HostOfflineError:
+        check("restart: write queued while host down", len(outbox.pending()) == 1)
+
+    # --- host #2 (a restart): the OLD token is unknown to it
+    host2 = HostService(services, dbm, QueueTransport(bus), bus)
+    stop2 = threading.Event()
+    th2 = threading.Thread(target=serve, args=(host2, stop2), daemon=True); th2.start()
+    try:
+        gw.drain()
+        check("restart: stale-token drain leaves the write queued", len(outbox.pending()) == 1,
+              outbox.pending())
+        # a fresh login is what makes it drainable (app_state.login drains here)
+        ok2, _, _ = gw.login("admin", "Admin@1234")
+        sent, left = gw.drain()
+        check("restart: fresh login drains the queued write", ok2 and sent == 1 and left == 0,
+              (sent, left))
+        n = dbm.execute_with_retry(
+            "SELECT COUNT(*) FROM reports WHERE reported_entity_name='Queued'")[0][0]
+        check("restart: queued write applied exactly once", n == 1, n)
+    finally:
+        stop2.set(); th2.join(timeout=2.0); shutil.rmtree(d, ignore_errors=True)
+
+
+def test_launchers_survive_a_second_run():
+    """deploy\*.vbs must not gate the launch behind a bare one-line IF: in a cmd
+    chain `if not exist logs mkdir logs & <rest>` swallows <rest>, so once logs\
+    exists NOTHING runs and the app silently never starts again."""
+    import re
+    root = os.path.dirname(os.path.abspath(__file__))
+    for name in ("start_host.vbs", "start_client.vbs"):
+        src = open(os.path.join(root, "deploy", name), encoding="utf-8").read()
+        cmd_line = " ".join(l for l in src.splitlines() if not l.strip().startswith("'"))
+        check(f"{name} has no launch-swallowing IF",
+              not re.search(r'if\s+not\s+exist\s+logs\s+mkdir', cmd_line, re.I), cmd_line[:120])
+        check(f"{name} still starts the app", "main.py" in cmd_line)
+
+
 if __name__ == "__main__":
     test_config_mode()
     test_host_login_returns_user()
@@ -225,5 +322,7 @@ if __name__ == "__main__":
     test_client_replica_readonly()
     test_logging_no_db_handler_client()
     test_client_roundtrip()
+    test_outbox_drains_after_host_restart()
+    test_launchers_survive_a_second_run()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

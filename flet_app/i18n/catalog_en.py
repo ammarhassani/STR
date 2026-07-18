@@ -491,6 +491,7 @@ Only users with Admin role can approve reports.
     "prof.loading_activity": "Loading recent activity...",
 
     # host-down banner (client mode)
+    "hostbanner.stuck": "{n} entr(y/ies) still waiting to sync — sign out and sign in again to send them.",
     "hostbanner.offline": "Host offline — read-only. New entries are queued and will sync when the host returns ({n} pending).",
 
     # setup wizard
