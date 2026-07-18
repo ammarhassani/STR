@@ -106,9 +106,55 @@ def test_cic_summary_signals():
     check("days since last report", s['days_since_last'] == 5, s['days_since_last'])
 
 
+def test_customer_profile_lookup():
+    """The CIC is the customer code the analyst starts from: typing it must
+    bring back what the bank already recorded for that customer, so nobody
+    retypes (or mistypes) the name/ID/branch on every new report."""
+    dbm, intel = _svc()
+    dbm.execute_with_retry(
+        "INSERT INTO reports (report_number, sn, report_date, reported_entity_name, cic, "
+        "nationality, gender, id_cr, branch_id, account_membership, approval_status, "
+        "created_by, is_deleted, created_at) "
+        "VALUES ('R-10',10,'01/07/2026','Falcon Trading Est','1234567890123456',"
+        "'Saudi Arabian','Male','7012345678','045','12345678','approved','ag1',0,'2026-07-01')")
+
+    prof = intel.customer_profile('1234567890123456')
+    check("known CIC returns a profile", prof is not None)
+    check("profile carries the entity name",
+          (prof or {}).get('reported_entity_name') == 'Falcon Trading Est', prof)
+    check("profile carries nationality, branch and ID",
+          (prof or {}).get('nationality') == 'Saudi Arabian'
+          and (prof or {}).get('branch_id') == '045'
+          and (prof or {}).get('id_cr') == '7012345678', prof)
+    check("unknown CIC returns nothing", intel.customer_profile('9999999999999999') is None)
+    check("blank CIC returns nothing", intel.customer_profile('') is None)
+
+    rid = dbm.execute_with_retry(
+        "SELECT report_id FROM reports WHERE report_number='R-10'")[0][0]
+    check("the report being edited is not its own source",
+          intel.customer_profile('1234567890123456', exclude_report_id=rid) is None)
+
+    # a newer report for the same customer supersedes the older details
+    dbm.execute_with_retry(
+        "INSERT INTO reports (report_number, sn, report_date, reported_entity_name, cic, "
+        "nationality, approval_status, created_by, is_deleted, created_at) "
+        "VALUES ('R-11',11,'05/07/2026','Falcon Trading LLC','1234567890123456',"
+        "'Saudi Arabian','approved','ag1',0,'2026-07-05')")
+    check("most recent report wins",
+          (intel.customer_profile('1234567890123456') or {}).get('reported_entity_name')
+          == 'Falcon Trading LLC')
+
+    # a soft-deleted report must never be used as a source of customer details
+    dbm.execute_with_retry("UPDATE reports SET is_deleted=1 WHERE report_number='R-11'")
+    check("deleted reports are not used as a profile source",
+          (intel.customer_profile('1234567890123456') or {}).get('reported_entity_name')
+          == 'Falcon Trading Est')
+
+
 if __name__ == "__main__":
     test_cic_history()
     test_cic_summary_signals()
     test_account_rapid_repeat()
+    test_customer_profile_lookup()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

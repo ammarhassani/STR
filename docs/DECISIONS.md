@@ -239,3 +239,57 @@ maintenance in one place for a solo builder. Codeberg is a free, no-IT git host.
 
 **Consequences:** The launcher selects mode by flag; `app_state` wires host-local vs
 client-proxy accordingly.
+
+---
+
+## The FIU round-trip (owner's working philosophy, 2026-07-18)
+
+**Not implemented as described. Recorded because it is how the work actually
+happens, and it explains why the agent must keep write access to a report long
+after they first save it.**
+
+The real lifecycle of an STR is not "fill it in once, get it approved, done".
+It has a gap in the middle where the report leaves the bank and comes back:
+
+1. **Draft** — the agent enters what the bank knows: the customer (found from
+   the CIC), the transaction, the reason for suspicion.
+2. **Version 1** — the report is complete as far as the bank can complete it,
+   and goes through internal review.
+3. **FIU phase** — the report is submitted on the FIU's own web portal. That is
+   an external system: nothing comes back at submission time. Later the FIU
+   issues a number (and letter/date/feedback).
+4. **Back to the same report** — the agent who filed it returns to that exact
+   report and fills in the FIU details that did not exist when they wrote it:
+   `fiu_number`, `fiu_letter_number`, `fiu_letter_receive_date`, `fiu_date`,
+   `fiu_feedback`.
+5. **Second approval phase** — the now-complete record, FIU details included, is
+   confirmed and stored.
+
+**The agent owns step 4.** They are responsible for the FIU details on their own
+report. Any rule that permanently freezes a report after its first approval
+would break the actual job — the FIU fields are, by their nature, filled in
+after the fact.
+
+### What the code does today, and how it lines up
+
+- A report is frozen for its author only while `pending_approval` (someone is
+  reviewing it right now, and they must decide on the text they were shown) or
+  `rejected` (terminal).
+- An **approved** report stays editable by its author. That is the state a
+  report is in when the FIU number comes back, so step 4 works.
+- Every edit is versioned inside `update_report`, so the FIU refill shows up as
+  its own version rather than silently overwriting version 1.
+
+There is no separate "FIU phase" status and no distinct second approval gate;
+step 5 is an ordinary edit of an approved report. If the round-trip should
+become an explicit state (with its own queue and its own approval), that is a
+real feature, not a tweak — it needs a status beyond the current five, a way to
+tell "waiting for the FIU" apart from "finished", and a decision about who
+confirms step 5.
+
+### Open question for the owner
+
+If the FIU number can arrive while the report is still `pending_approval`
+(rather than after approval), the current freeze blocks the refill. Say so and
+the FIU fields become editable in that state too, while the rest of the report
+stays frozen.

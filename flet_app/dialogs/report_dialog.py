@@ -183,20 +183,95 @@ def show_report_dialog(
         return (f"{r.get('report_number') or '—'} · {r.get('reported_entity_name') or '(no entity)'} "
                 f"· {r.get('report_date') or ''} · {(r.get('approval_status') or '').replace('_',' ')}")
 
+    def prefill_from_cic(e=None):
+        """Fetch the customer's known entity details for this CIC and fill them in.
+
+        The CIC is the customer code the analyst starts from: the bank has
+        already recorded who this customer is on an earlier report, so retyping
+        (and mistyping) name / ID / nationality / branch is pure risk. Only
+        EMPTY fields are filled -- whatever the analyst typed always wins, and
+        every filled value stays editable.
+        """
+        if not intelligence_service or not cic_ref.current:
+            return []
+        cic = (cic_ref.current.value or "").replace(' ', '').replace('-', '').strip()
+        if len(cic) != 16 or not cic.isdigit():
+            return []
+        profile = intelligence_service.customer_profile(cic, exclude_report_id=_edit_report_id)
+        if not profile:
+            return []
+
+        filled = []
+
+        def fill_text(ref, key, label):
+            value = profile.get(key)
+            if not ref.current or not value:
+                return
+            if (ref.current.value or "").strip():
+                return                      # analyst already typed something
+            ref.current.value = str(value)
+            filled.append(label)
+
+        def fill_choice(ref, key, label):
+            value = profile.get(key)
+            if not ref.current or not value:
+                return
+            if (getattr(ref.current, "value", "") or ""):
+                return
+            ref.current.value = str(value)
+            filled.append(label)
+
+        def fill_check(ref, key, label):
+            value = profile.get(key)
+            if not ref.current or value in (None, ""):
+                return
+            new = bool(int(value)) if str(value).isdigit() else bool(value)
+            if ref.current.value == new:
+                return
+            ref.current.value = new
+            filled.append(label)
+
+        fill_text(entity_name_ref, "reported_entity_name", "entity name")
+        fill_choice(gender_ref, "gender", "gender")
+        fill_choice(nationality_ref, "nationality", "nationality")
+        fill_text(id_cr_ref, "id_cr", "ID/CR")
+        fill_text(account_ref, "account_membership", "account/membership")
+        fill_text(branch_ref, "branch_id", "branch")
+        fill_check(legal_owner_ref, "legal_entity_owner_checkbox", "legal owner")
+        fill_check(acc_membership_ref, "acc_membership_checkbox", "account type")
+        fill_check(id_type_checkbox_ref, "id_type", "ID type")
+
+        # keep the two derived display fields in step with their checkboxes
+        if id_type_display_ref.current and id_type_checkbox_ref.current:
+            id_type_display_ref.current.value = "CR" if id_type_checkbox_ref.current.value else "ID"
+        if relationship_ref.current and acc_membership_ref.current:
+            relationship_ref.current.value = (
+                "Membership" if acc_membership_ref.current.value else "Current Account")
+
+        if filled:
+            try:
+                page.update()
+            except Exception:
+                pass
+        return filled
+
     def update_cic_intel(e=None):
         """#5: a duplicate CIC is INFORMATION, never a blocker — show the subject's
         prior filings so the analyst sees the fuller picture."""
         finalize_cic(e)
         if not intelligence_service or not cic_ref.current:
             return
+        prefilled = prefill_from_cic(e)
         cic = (cic_ref.current.value or "").strip()
         empty = {"count": 0, "reports": [], "summary": {}}
         h = intelligence_service.cic_history(cic, exclude_report_id=_edit_report_id) if cic else empty
         if h["count"] == 0:
             _fill_intel_banner(cic_intel_ref, None, colors["info"], "", [])
             return
+        lead = ([f"Filled from the last report for this customer: {', '.join(prefilled)}"]
+                if prefilled else [])
         s = h.get("summary", {}) or {}
-        lines = []
+        lines = list(lead)
         if s.get("entities"):
             lines.append("Entities: " + ", ".join(s["entities"][:4])
                          + (" …" if len(s["entities"]) > 4 else ""))
@@ -845,6 +920,23 @@ def show_report_dialog(
                 controls=[
                     ft.Column(
                         controls=[
+                            ft.Text(_flabel("cic"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                            ft.TextField(
+                                ref=cic_ref,
+                                hint_text=t("form.hint.cic"),
+                                max_length=16,
+                                text_size=13,
+                                border_radius=4,
+                                on_change=validate_cic_live,
+                                on_blur=update_cic_intel,
+                            ),
+                            ft.Container(ref=cic_intel_ref, visible=False,
+                                         border_radius=4, padding=8),
+                        ],
+                        spacing=4,
+                    ),
+                    ft.Column(
+                        controls=[
                             ft.Text(_flabel("reported_entity_name", required=True), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             ft.TextField(
                                 ref=entity_name_ref,
@@ -961,23 +1053,6 @@ def show_report_dialog(
                                 text_size=13,
                                 border_radius=4,
                             ),
-                        ],
-                        spacing=4,
-                    ),
-                    ft.Column(
-                        controls=[
-                            ft.Text(_flabel("cic"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
-                            ft.TextField(
-                                ref=cic_ref,
-                                hint_text=t("form.hint.cic"),
-                                max_length=16,
-                                text_size=13,
-                                border_radius=4,
-                                on_change=validate_cic_live,
-                                on_blur=update_cic_intel,
-                            ),
-                            ft.Container(ref=cic_intel_ref, visible=False,
-                                         border_radius=4, padding=8),
                         ],
                         spacing=4,
                     ),

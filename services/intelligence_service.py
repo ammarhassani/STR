@@ -100,6 +100,46 @@ class IntelligenceService:
         rows = self._rows(where, params)
         return {"count": len(rows), "reports": rows, "summary": self._summarize(rows)}
 
+    # Entity/customer fields that describe WHO the customer is. These are
+    # properties of the CIC, not of any one report, so the most recent report
+    # carrying that CIC is the best local record of them.
+    PROFILE_FIELDS = (
+        "reported_entity_name", "gender", "nationality", "id_cr", "id_type",
+        "account_membership", "branch_id", "legal_entity_owner",
+        "legal_entity_owner_checkbox", "acc_membership_checkbox", "relationship",
+    )
+
+    def customer_profile(self, cic: str, exclude_report_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """The known entity details for a CIC, taken from the most recent report
+        filed against it.
+
+        The CIC is the customer code the analyst starts from: they type it,
+        and whatever the bank already recorded for that customer should come
+        back rather than being retyped (and mistyped) every time. Returns None
+        when this CIC has never been reported.
+        """
+        cic = (cic or "").strip()
+        if not cic:
+            return None
+        try:
+            cols = ", ".join(self.PROFILE_FIELDS)
+            q = (f"SELECT report_id, report_number, report_date, {cols} "
+                 "FROM reports WHERE is_deleted = 0 AND cic = ?")
+            params: List[Any] = [cic]
+            if exclude_report_id:
+                q += " AND report_id != ?"
+                params.append(exclude_report_id)
+            q += " ORDER BY created_at DESC LIMIT 1"
+            res = self.db_manager.execute_with_retry(q, params)
+            if not res:
+                return None
+            row = res[0]
+            return {k: row[k] for k in row.keys()}
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"customer_profile lookup failed for CIC {cic}: {e}")
+            return None
+
     def account_rapid_repeat(self, account: str, report_date: str,
                              within_days: int = 2,
                              exclude_report_id: Optional[int] = None) -> Dict[str, Any]:
