@@ -118,6 +118,20 @@ STRINGS = {
     "set.reset": "Reset to Defaults",
     "set.save": "Save Settings",
 
+    # reservation dialog
+    "res.title": "My Report Numbers",
+    "res.count": "Count",
+    "res.select_all": "Select all",
+    "res.transfer_to": "Transfer To",
+    "res.none": "No available numbers. Reserve some above.",
+    "res.have": "You have {n} available number(s).",
+    "res.received_from": "received from {user}",
+    "res.transfer_selected": "Transfer Selected Numbers",
+    "res.reserve": "Reserve",
+    "res.transfer": "Transfer",
+    "res.err_recipient": "Select a recipient.",
+    "res.err_select": "Select at least one number to transfer.",
+
     # My Work
     "mywork.lane.rework": "Returned for Rework",
     "mywork.lane.draft": "Drafts",

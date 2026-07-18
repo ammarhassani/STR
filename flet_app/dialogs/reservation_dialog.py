@@ -13,6 +13,7 @@ from typing import Any
 from theme.theme_manager import theme_manager
 from components.app_button import app_button
 from components.toast import show_success, show_error
+from i18n import t
 
 
 def show_reservation_dialog(page: ft.Page, app_state: Any):
@@ -28,7 +29,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
     approval_service = app_state.approval_service
     current_user = app_state.current_user
     if not current_user:            # no session -> nothing to reserve against
-        show_error(page, "Please log in first.")
+        show_error(page, t("form.err.login_first"))
         return
     username = current_user['username']
 
@@ -38,7 +39,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
 
     # Controls
     reserve_count_input = ft.TextField(
-        label="Count",
+        label=t("res.count"),
         value="10",
         keyboard_type=ft.KeyboardType.NUMBER,
         width=100,
@@ -49,10 +50,10 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
     numbers_list = ft.Column(spacing=4, scroll=ft.ScrollMode.AUTO)
 
     # #1: select-all — checking each of many numbers for a transfer is tedious.
-    select_all_cb = ft.Checkbox(label="Select all", value=False, visible=False)
+    select_all_cb = ft.Checkbox(label=t("res.select_all"), value=False, visible=False)
 
     target_dropdown = searchable_dropdown(
-        label="Transfer To",
+        label=t("res.transfer_to"),
         width=260,
         options=[],
     )
@@ -68,12 +69,12 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
         numbers_data = report_number_service.get_available_numbers(username)
         available_rns = {n['report_number'] for n in numbers_data}
         selected_numbers &= available_rns
-        count_text.value = f"You have {len(numbers_data)} available number(s)."
+        count_text.value = t("res.have", n=len(numbers_data))
 
         numbers_list.controls.clear()
         if not numbers_data:
             numbers_list.controls.append(
-                ft.Text("No available numbers. Reserve some above.", size=12, color=colors["text_muted"])
+                ft.Text(t("res.none"), size=12, color=colors["text_muted"])
             )
         for n in numbers_data:
             rn = n['report_number']
@@ -88,7 +89,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
 
             label = f"{rn}   (SN {n['serial_number']})"
             if n.get('transferred_from'):
-                label += f"   — received from {n['transferred_from']}"
+                label += "   — " + t("res.received_from", user=n["transferred_from"])
 
             numbers_list.controls.append(
                 ft.Row(
@@ -135,10 +136,10 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
     def do_transfer(e):
         target = target_dropdown.value
         if not target:
-            show_error(page, "Select a recipient.")
+            show_error(page, t("res.err_recipient"))
             return
         if not selected_numbers:
-            show_error(page, "Select at least one number to transfer.")
+            show_error(page, t("res.err_select"))
             return
 
         success, message = report_number_service.transfer_numbers(
@@ -164,7 +165,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
         title=ft.Row(
             controls=[
                 ft.Icon(ft.Icons.NUMBERS, color=colors["primary"]),
-                ft.Text("My Report Numbers", weight=ft.FontWeight.BOLD),
+                ft.Text(t("res.title"), weight=ft.FontWeight.BOLD),
             ],
             spacing=12,
         ),
@@ -174,7 +175,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                     ft.Row(
                         controls=[
                             reserve_count_input,
-                            app_button("Reserve", icon=ft.Icons.ADD, on_click=do_reserve, variant="primary"),
+                            app_button(t("res.reserve"), icon=ft.Icons.ADD, on_click=do_reserve, variant="primary"),
                         ],
                         spacing=12,
                     ),
@@ -191,11 +192,11 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
                         padding=8,
                     ),
                     ft.Divider(height=1, color=colors["border"]),
-                    ft.Text("Transfer Selected Numbers", size=13, weight=ft.FontWeight.BOLD),
+                    ft.Text(t("res.transfer_selected"), size=13, weight=ft.FontWeight.BOLD),
                     ft.Row(
                         controls=[
                             target_dropdown,
-                            app_button("Transfer", icon=ft.Icons.SEND, on_click=do_transfer, variant="secondary"),
+                            app_button(t("res.transfer"), icon=ft.Icons.SEND, on_click=do_transfer, variant="secondary"),
                         ],
                         spacing=12,
                     ),
@@ -207,7 +208,7 @@ def show_reservation_dialog(page: ft.Page, app_state: Any):
             padding=8,
         ),
         actions=[
-            ft.TextButton("Close", on_click=close_dialog),
+            ft.TextButton(t("common.close"), on_click=close_dialog),
         ],
     )
 

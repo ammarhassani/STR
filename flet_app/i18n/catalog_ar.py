@@ -119,6 +119,20 @@ STRINGS = {
     "set.reset": "إعادة للافتراضي",
     "set.save": "حفظ الإعدادات",
 
+    # reservation dialog
+    "res.title": "أرقام تقاريري",
+    "res.count": "العدد",
+    "res.select_all": "تحديد الكل",
+    "res.transfer_to": "نقل إلى",
+    "res.none": "لا توجد أرقام متاحة. احجز بعضها أعلاه.",
+    "res.have": "لديك {n} رقم متاح.",
+    "res.received_from": "مستلَم من {user}",
+    "res.transfer_selected": "نقل الأرقام المحددة",
+    "res.reserve": "حجز",
+    "res.transfer": "نقل",
+    "res.err_recipient": "اختر مستلِماً.",
+    "res.err_select": "اختر رقماً واحداً على الأقل للنقل.",
+
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",
     "mywork.lane.draft": "المسودّات",
