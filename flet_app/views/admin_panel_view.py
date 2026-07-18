@@ -28,6 +28,12 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         Admin panel column
     """
     colors = theme_manager.get_colors()
+    from i18n import t
+    def _role_opt(r):
+        return t("filter.all_roles") if r == "All Roles" else t(f"role.{r}")
+    def _status_opt(s):
+        return {"All": t("filter.all"), "Active": t("users.status.active"),
+                "Inactive": t("users.status.inactive")}.get(s, s)
 
     # State
     users_data = []
@@ -109,7 +115,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         """Update table with current data."""
         # Update stats
         if stats_ref.current:
-            stats_ref.current.value = f"{len(users_data)} user(s)"
+            stats_ref.current.value = t("users.count", n=len(users_data))
 
         # Rebuild table
         if table_ref.current:
@@ -124,7 +130,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 content=ft.Column(
                     controls=[
                         ft.Icon(ft.Icons.PEOPLE, size=48, color=colors["text_muted"]),
-                        ft.Text("No users found", color=colors["text_muted"]),
+                        ft.Text(t("users.none"), color=colors["text_muted"]),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -140,27 +146,27 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             # is called out so the admin knows they're awaiting first-login setup.
             if user.get('onboarding_pending'):
                 status_color = colors["warning"]
-                status_text = "Pending registration"
+                status_text = t("users.status.pending")
             elif user['is_active']:
                 status_color = colors["success"]
-                status_text = "Active"
+                status_text = t("users.status.active")
             else:
                 status_color = colors["danger"]
-                status_text = "Inactive"
+                status_text = t("users.status.inactive")
 
             # Last login
             last_login = user.get('last_login', '')
             if last_login:
                 last_login = str(last_login)[:19]  # Remove microseconds
             else:
-                last_login = "Never"
+                last_login = t("users.never")
 
             # Build action buttons
             action_buttons = [
                 ft.IconButton(
                     icon=ft.Icons.EDIT,
                     icon_color=colors["primary"],
-                    tooltip="Edit user",
+                    tooltip=t("users.edit_tip"),
                     on_click=lambda e, u=user: handle_edit_user(u),
                 ),
             ]
@@ -171,7 +177,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                     ft.IconButton(
                         icon=ft.Icons.DELETE,
                         icon_color=colors["danger"],
-                        tooltip="Delete user",
+                        tooltip=t("users.delete_tip"),
                         on_click=lambda e, u=user: handle_delete_user(u),
                     )
                 )
@@ -185,7 +191,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ft.DataCell(
                             ft.Container(
                                 content=ft.Text(
-                                    user['role'].capitalize(),
+                                    t(f"role.{user['role']}") if t(f"role.{user['role']}") != f"role.{user['role']}" else user['role'].capitalize(),
                                     size=11,
                                     color=ft.Colors.WHITE,
                                 ),
@@ -202,13 +208,13 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             )
 
         columns = [
-            ft.DataColumn(ft.Text("ID", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Username", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Full Name", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Role", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Last Login", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
-            ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.id"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.username"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.fullname"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.role"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.status"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("users.col.last_login"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
+            ft.DataColumn(ft.Text(t("common.actions"), weight=ft.FontWeight.BOLD, size=12, color=colors["text_primary"])),
         ]
 
         return ft.DataTable(
@@ -280,15 +286,15 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
 
         confirm_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Confirm Deletion"),
+            title=ft.Text(t("users.confirm_delete")),
             content=ft.Text(
                 f"Are you sure you want to delete user '{user['username']}'?\n\n"
                 "This will permanently remove the user from the system."
             ),
             actions=[
-                ft.TextButton("Cancel", on_click=cancel_delete),
+                ft.TextButton(t("common.cancel"), on_click=cancel_delete),
                 ft.ElevatedButton(
-                    "Delete",
+                    t("common.delete"),
                     bgcolor=colors["danger"],
                     color=ft.Colors.WHITE,
                     on_click=confirm_delete,
@@ -307,14 +313,14 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
     header_row = ft.Row(
         controls=[
             ft.Text(
-                "User Management",
+                t("users.title"),
                 size=18,
                 weight=ft.FontWeight.BOLD,
                 color=colors["text_primary"],
             ),
             ft.Container(expand=True),
             ft.ElevatedButton(
-                "Add New User",
+                t("users.add"),
                 icon=ft.Icons.PERSON_ADD,
                 on_click=handle_add_user,
                 bgcolor=colors["primary"],
@@ -327,20 +333,20 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
     # Filter row
     filter_row = ft.Row(
         controls=[
-            ft.Text("Role:", color=colors["text_secondary"]),
+            ft.Text(t("filter.role"), color=colors["text_secondary"]),
             searchable_dropdown(
                 ref=role_filter_ref,
                 value="All Roles",
-                options=[ft.dropdown.Option(key=r, text=r) for r in ROLE_OPTIONS],
+                options=[ft.dropdown.Option(key=r, text=_role_opt(r)) for r in ROLE_OPTIONS],
                 width=150,
                 text_size=13,
                 on_change=handle_role_filter_change,
             ),
-            ft.Text("Status:", color=colors["text_secondary"]),
+            ft.Text(t("filter.status"), color=colors["text_secondary"]),
             searchable_dropdown(
                 ref=status_filter_ref,
                 value="All",
-                options=[ft.dropdown.Option(key=s, text=s) for s in STATUS_OPTIONS],
+                options=[ft.dropdown.Option(key=s, text=_status_opt(s)) for s in STATUS_OPTIONS],
                 width=120,
                 text_size=13,
                 on_change=handle_status_filter_change,
@@ -348,7 +354,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
             ft.IconButton(
                 icon=ft.Icons.REFRESH,
                 icon_color=colors["text_secondary"],
-                tooltip="Refresh",
+                tooltip=t("common.refresh"),
                 on_click=handle_refresh,
             ),
         ],
@@ -361,7 +367,7 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         controls=[
             ft.Text(
                 ref=stats_ref,
-                value="0 user(s)",
+                value=t("users.count", n=0),
                 size=13,
                 color=colors["text_secondary"],
             ),

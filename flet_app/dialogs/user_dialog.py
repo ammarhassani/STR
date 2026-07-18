@@ -11,6 +11,7 @@ from components.searchable_dropdown import searchable_dropdown
 from typing import Optional, Any, Callable
 
 from theme.theme_manager import theme_manager
+from i18n import t
 from components.app_button import app_button
 
 
@@ -57,7 +58,7 @@ def show_user_dialog(
             else:
                 username = username_ref.current.value.strip() if username_ref.current else ""
                 if not username:
-                    show_error("User ID is required"); return
+                    show_error(t("udlg.err_userid")); return
                 # ID + role only — the user self-registers name + password
                 ok, msg = auth_service.create_pending_user(username, role)
                 if ok and not is_active:
@@ -92,16 +93,16 @@ def show_user_dialog(
 
     # ---- form fields ----
     fields = [
-        ft.Text("Edit User" if is_edit_mode else "Add New User",
+        ft.Text(t("udlg.edit") if is_edit_mode else t("udlg.add"),
                 size=18, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
         ft.Divider(color=colors["border"]),
         ft.Column(
             controls=[
-                ft.Text("User ID *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                ft.Text(t("udlg.user_id"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                 ft.TextField(
                     ref=username_ref,
                     value=user_data.get('username', '') if is_edit_mode else "",
-                    hint_text="e.g. reporter7 (the user logs in with this)",
+                    hint_text=t("udlg.user_id_hint"),
                     read_only=is_edit_mode,
                     text_size=13, border_radius=4,
                 ),
@@ -115,7 +116,7 @@ def show_user_dialog(
         fields.append(
             ft.Column(
                 controls=[
-                    ft.Text("Full Name (set by the user)", size=12, weight=ft.FontWeight.W_500,
+                    ft.Text(t("udlg.fullname"), size=12, weight=ft.FontWeight.W_500,
                             color=colors["text_secondary"]),
                     ft.TextField(value=user_data.get('full_name') or "—", read_only=True,
                                  text_size=13, border_radius=4, bgcolor=colors.get("bg_tertiary")),
@@ -128,8 +129,8 @@ def show_user_dialog(
                 content=ft.Row([
                     ft.Icon(ft.Icons.INFO_OUTLINE, size=14,
                             color=colors["warning"] if is_pending else colors["success"]),
-                    ft.Text("Awaiting first-login registration" if is_pending
-                            else "Registered — password is set by the user",
+                    ft.Text(t("udlg.awaiting") if is_pending
+                            else t("udlg.registered"),
                             size=12, color=colors["text_secondary"]),
                 ], spacing=6),
                 padding=ft.padding.symmetric(6, 8), border_radius=4,
@@ -140,15 +141,15 @@ def show_user_dialog(
     fields.append(
         ft.Column(
             controls=[
-                ft.Text("Role *", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                ft.Text(t("udlg.role"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                 searchable_dropdown(
                     ref=role_ref,
                     value=user_data.get('role', 'reporter') if is_edit_mode else "reporter",
                     options=[
-                        ft.dropdown.Option(key="admin", text="admin"),
-                        ft.dropdown.Option(key="supervisor", text="supervisor"),
-                        ft.dropdown.Option(key="agent", text="agent"),
-                        ft.dropdown.Option(key="reporter", text="reporter"),
+                        ft.dropdown.Option(key="admin", text=t("role.admin")),
+                        ft.dropdown.Option(key="supervisor", text=t("role.supervisor")),
+                        ft.dropdown.Option(key="agent", text=t("role.agent")),
+                        ft.dropdown.Option(key="reporter", text=t("role.reporter")),
                     ],
                     text_size=13, border_radius=4,
                 ),
@@ -159,13 +160,13 @@ def show_user_dialog(
     fields.append(
         ft.Column(
             controls=[
-                ft.Text("Status", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
+                ft.Text(t("udlg.status"), size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                 searchable_dropdown(
                     ref=status_ref,
                     value="Active" if (not is_edit_mode or user_data.get('is_active', 1)) else "Inactive",
                     options=[
-                        ft.dropdown.Option(key="Active", text="Active"),
-                        ft.dropdown.Option(key="Inactive", text="Inactive"),
+                        ft.dropdown.Option(key="Active", text=t("users.status.active")),
+                        ft.dropdown.Option(key="Inactive", text=t("users.status.inactive")),
                     ],
                     text_size=13, border_radius=4,
                 ),
@@ -179,7 +180,7 @@ def show_user_dialog(
             ft.Container(
                 content=ft.Row([
                     ft.Icon(ft.Icons.HANDSHAKE, size=16, color=colors["primary"]),
-                    ft.Text("The user sets their own name and password at first login.",
+                    ft.Text(t("udlg.handshake_note"),
                             size=12, color=colors["text_secondary"], expand=True),
                 ], spacing=8),
                 padding=ft.padding.symmetric(8, 10), border_radius=4,
@@ -191,10 +192,10 @@ def show_user_dialog(
     button_row = [ft.Container(expand=True)]
     if is_edit_mode and not is_pending:
         button_row.append(
-            ft.TextButton("Reset password", icon=ft.Icons.LOCK_RESET, on_click=reset_password))
+            ft.TextButton(t("udlg.reset_pw"), icon=ft.Icons.LOCK_RESET, on_click=reset_password))
     button_row += [
-        ft.TextButton("Cancel", on_click=close_dialog),
-        app_button("Save", icon=ft.Icons.SAVE, on_click=save_user, variant="primary"),
+        ft.TextButton(t("common.cancel"), on_click=close_dialog),
+        app_button(t("common.save"), icon=ft.Icons.SAVE, on_click=save_user, variant="primary"),
     ]
     fields.append(ft.Row(controls=button_row, spacing=8))
 
