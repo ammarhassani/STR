@@ -97,9 +97,9 @@ class ApprovalService:
                 (report_id, version_id, current_user['username'], comment)
             )
 
-            # Notify all admins
-            admins = self.get_admin_users()
-            for admin in admins:
+            # Notify everyone who can approve (supervisors + admins)
+            approvers = self.get_approver_users()
+            for admin in approvers:
                 self.create_notification(
                     admin['user_id'],
                     "New Approval Request",
@@ -135,9 +135,9 @@ class ApprovalService:
             if not current_user:
                 return False, "User not authenticated"
 
-            # Check if user is admin
-            if current_user.get('role') != 'admin':
-                return False, "Only administrators can approve reports"
+            # Only users with approval authority (supervisor / admin) may approve
+            if not self.auth_service.has_permission('approve_reports'):
+                return False, "You don't have authority to approve reports"
 
             # Get approval request
             approval_query = """
@@ -243,9 +243,9 @@ class ApprovalService:
             if not current_user:
                 return False, "User not authenticated"
 
-            # Check if user is admin
-            if current_user.get('role') != 'admin':
-                return False, "Only administrators can reject reports"
+            # Only users with approval authority (supervisor / admin) may reject
+            if not self.auth_service.has_permission('approve_reports'):
+                return False, "You don't have authority to reject reports"
 
             # Validate reassignment target (rework only, must be an active agent)
             if reassign_to:
@@ -369,6 +369,9 @@ class ApprovalService:
             List of pending approval dictionaries with report details
         """
         try:
+            # Only approvers (supervisor / admin) see the approval queue
+            if not self.auth_service.has_permission('approve_reports'):
+                return []
             query = """
                 SELECT
                     ra.approval_id,
@@ -484,8 +487,8 @@ class ApprovalService:
             if not current_user:
                 return [], 0
 
-            # Check if user is admin
-            if current_user.get('role') != 'admin':
+            # Approval queue is visible to approvers (supervisor / admin)
+            if not self.auth_service.has_permission('approve_reports'):
                 return [], 0
 
             # Build query with optional status filter
@@ -684,6 +687,18 @@ class ApprovalService:
             return 0
 
     # ==================== Helper Methods ====================
+
+    def get_approver_users(self) -> List[Dict]:
+        """Users who can approve reports (supervisors + admins). These are who a
+        submit-for-approval notifies."""
+        try:
+            rows = self.db_manager.execute_with_retry(
+                "SELECT user_id, username, full_name FROM users "
+                "WHERE role IN ('admin', 'supervisor') AND is_active = 1")
+            return [{'user_id': r[0], 'username': r[1], 'full_name': r[2]} for r in (rows or [])]
+        except Exception as e:
+            self.logger.error(f"Error getting approver users: {str(e)}")
+            return []
 
     def get_admin_users(self) -> List[Dict]:
         """

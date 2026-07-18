@@ -206,6 +206,7 @@ def show_user_dialog(
                             value=user_data.get('role', 'reporter') if is_edit_mode else "reporter",
                             options=[
                                 ft.dropdown.Option(key="admin", text="admin"),
+                                ft.dropdown.Option(key="supervisor", text="supervisor"),
                                 ft.dropdown.Option(key="agent", text="agent"),
                                 ft.dropdown.Option(key="reporter", text="reporter"),
                             ],

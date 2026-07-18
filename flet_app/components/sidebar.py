@@ -39,10 +39,19 @@ def create_sidebar(
             {"icon": ft.Icons.DOWNLOAD, "label": "Export", "route": "/export"},
         ]
 
-        if app_state.is_admin():
+        auth = app_state.auth_service
+        can_approve = bool(auth and auth.has_permission('approve_reports'))
+
+        # Approvals: anyone with approval authority (supervisor OR admin)
+        if can_approve:
             items.extend([
                 {"type": "divider"},
                 {"icon": ft.Icons.CHECK_CIRCLE, "label": "Approvals", "route": "/approvals"},
+            ])
+
+        # Admin tools: admins only
+        if app_state.is_admin():
+            items.extend([
                 {"icon": ft.Icons.PEOPLE, "label": "Users", "route": "/users"},
                 {"icon": ft.Icons.HISTORY, "label": "System Logs", "route": "/logs"},
                 {"type": "divider"},

@@ -58,7 +58,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
    *Do:* with the role rework (#8), reporter = read/export only; hide Add-Report
    and any action a reporter can't perform.
 
-8. **Agents reserve their own numbers + new `supervisor` role** — ☐
+8. **Agents reserve their own numbers + new `supervisor` role** — ☑ (role+RBAC+approval routing+SoD+migration all tested in tests_roles.py; nav+role-picker wired)
    *Ask:* agent keeps reservation; move approvals to a supervisor = agent +
    approval.
    *Do:* add the `supervisor` role (migration + RBAC), route approvals/rework to

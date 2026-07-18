@@ -217,7 +217,8 @@ def phase1():
     check(F, 'agent edits ownerless report (arg-swap regression)',
           has_permission('agent', 'edit_report', resource_owner=None, current_user='a'))
     check(F, 'unknown role denied', not has_permission('ghost', 'view_reports'))
-    check(F, 'get_user_permissions matrix size', len(get_user_permissions('agent')) == 12)
+    check(F, 'permission matrix consistent across all roles',
+          len({frozenset(get_user_permissions(r)) for r in ('admin', 'supervisor', 'agent', 'reporter')}) == 1)
     check(F, 'route guard: reporter blocked from add_report',
           not can_access_route('reporter', 'add_report'))
     check(F, 'route guard: admin panel admin-only',

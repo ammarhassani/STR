@@ -238,7 +238,7 @@ class AuthService:
                 return False, why
 
             # Validate role
-            if role not in ['admin', 'agent', 'reporter']:
+            if role not in ['admin', 'supervisor', 'agent', 'reporter']:
                 return False, "Invalid role"
 
             # Check if username already exists

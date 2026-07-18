@@ -13,10 +13,29 @@ PERMISSIONS = {
         'view_history': True,
         'rollback': True,
         'export': True,
+        'approve_reports': True,
         'access_admin_panel': True,
         'manage_users': True,
         'configure_dashboard': True,
         'configure_system': True,
+    },
+    # supervisor = an agent PLUS the approval/rework authority. Everything an
+    # agent can do (create, reserve, submit, edit own) + approve/reject/rework
+    # other agents' submissions with a message.
+    'supervisor': {
+        'view_dashboard': True,
+        'view_reports': True,
+        'add_report': True,
+        'edit_report': True,  # own reports only (same as agent)
+        'delete_report': False,
+        'view_history': True,
+        'rollback': False,
+        'export': True,
+        'approve_reports': True,
+        'access_admin_panel': False,
+        'manage_users': False,
+        'configure_dashboard': False,
+        'configure_system': False,
     },
     'agent': {
         'view_dashboard': True,
@@ -27,6 +46,7 @@ PERMISSIONS = {
         'view_history': True,
         'rollback': False,
         'export': True,
+        'approve_reports': False,
         'access_admin_panel': False,
         'manage_users': False,
         'configure_dashboard': False,
@@ -41,12 +61,16 @@ PERMISSIONS = {
         'view_history': True,
         'rollback': False,
         'export': True,
+        'approve_reports': False,
         'access_admin_panel': False,
         'manage_users': False,
         'configure_dashboard': False,
         'configure_system': False,
     },
 }
+
+# Roles that may exist in the system (used for validation + role pickers).
+ROLES = ['admin', 'supervisor', 'agent', 'reporter']
 
 
 def has_permission(
@@ -72,8 +96,8 @@ def has_permission(
     
     has_perm = PERMISSIONS[user_role].get(permission, False)
     
-    # Special case: agents can only edit their own reports
-    if permission == 'edit_report' and user_role == 'agent':
+    # Special case: agents AND supervisors can only edit their OWN reports
+    if permission == 'edit_report' and user_role in ('agent', 'supervisor'):
         return has_perm and (resource_owner == current_user or resource_owner is None)
     
     return has_perm

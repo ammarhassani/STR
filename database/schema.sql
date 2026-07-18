@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL COLLATE NOCASE,
     password TEXT NOT NULL, -- bcrypt hash (never plaintext)
     full_name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('admin', 'agent', 'reporter')),
+    role TEXT NOT NULL CHECK(role IN ('admin', 'supervisor', 'agent', 'reporter')),
     is_active INTEGER DEFAULT 1,
     must_change_password INTEGER DEFAULT 0, -- 1 = force a password change at next login
     failed_login_attempts INTEGER DEFAULT 0,

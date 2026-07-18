@@ -1268,6 +1268,53 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"host_lease table skipped: {str(e)}")
 
+        # Allow the 'supervisor' role (#8). SQLite can't ALTER a CHECK, so rebuild
+        # the users table with the widened CHECK — idempotent (only when the
+        # current CHECK doesn't already permit 'supervisor'). The migration
+        # connection has foreign_keys OFF (SQLite default), so the table swap is
+        # safe; data is copied by the columns both tables share.
+        try:
+            row = cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
+            if row and row[0] and "'supervisor'" not in row[0]:
+                old_cols = [r[1] for r in cursor.execute("PRAGMA table_info(users)").fetchall()]
+                # legacy_alter_table=ON so the final RENAME does NOT rewrite the
+                # views/triggers that reference `users` — they keep the name and
+                # resolve to the new table once it's renamed back to `users`.
+                conn.commit()
+                cursor.execute("PRAGMA legacy_alter_table=ON")
+                cursor.execute("""
+                    CREATE TABLE users_new (
+                        user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                        password TEXT NOT NULL,
+                        full_name TEXT NOT NULL,
+                        role TEXT NOT NULL CHECK(role IN ('admin', 'supervisor', 'agent', 'reporter')),
+                        is_active INTEGER DEFAULT 1,
+                        must_change_password INTEGER DEFAULT 0,
+                        failed_login_attempts INTEGER DEFAULT 0,
+                        last_login TEXT,
+                        theme_preference TEXT DEFAULT 'light' CHECK(theme_preference IN ('light', 'dark')),
+                        created_at TEXT DEFAULT (datetime('now')),
+                        created_by TEXT,
+                        updated_at TEXT,
+                        updated_by TEXT
+                    )
+                """)
+                new_cols = [r[1] for r in cursor.execute("PRAGMA table_info(users_new)").fetchall()]
+                common = ", ".join(c for c in old_cols if c in new_cols)
+                cursor.execute(f"INSERT INTO users_new ({common}) SELECT {common} FROM users")
+                cursor.execute("DROP TABLE users")
+                cursor.execute("ALTER TABLE users_new RENAME TO users")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active)")
+                conn.commit()
+                cursor.execute("PRAGMA legacy_alter_table=OFF")
+                messages.append("Rebuilt users table to allow the 'supervisor' role")
+        except Exception as e:
+            messages.append(f"supervisor-role migration skipped: {str(e)}")
+
         # Numbering is calendar-driven now (#15): drop the dead month grace-period config.
         try:
             cursor.execute("DELETE FROM system_config WHERE config_key = 'month_grace_period'")
