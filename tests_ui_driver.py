@@ -280,6 +280,11 @@ def run():
     finding(E, "second reason still saved via get_dropdown_value",
             "'second_reason_for_suspicion': get_dropdown_value" in rd_src)
 
+    # #3 Phase 1b: report form binds localized options (English-canonical value +
+    # localized label) so the DB stays single-language while the user sees theirs.
+    finding(E, "report form not using localized dropdown options",
+            'get_active_options' not in rd_src or 'for _v, _l in genders' not in rd_src)
+
     # #18: help/documentation tabs must scroll (content exceeds the dialog height)
     help_src = open(os.path.join(REPO, 'flet_app/dialogs/help_dialog.py')).read()
     finding(E, "help dialog tabs are not scrollable",

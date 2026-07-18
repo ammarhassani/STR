@@ -77,15 +77,25 @@ be called "done" until the content is real.
   unchanged — nothing breaks. `tests_dropdown_i18n.py`.
 - **Owner review point:** the drafted Arabic labels in migration `ar_pairs`.
 
-**Phase 1b — flip storage to codes (BREAKING, deliberate) — TODO**
-- Forms bind `code` (option key), show `label` per language, store the code.
-- Migration converts existing report field values (stored labels) → codes (safe
-  now: pre-go-live data will be hard-reset anyway).
-- Every consumer resolves codes → labels: report detail/edit, approval panel,
-  reports list, **export** (must emit labels, not codes), and **BI widgets**
-  (group-by on these columns now yields codes — chart labels must resolve).
-- **Deliverable:** dropdowns + stored data are language-neutral; switching language
-  re-localizes them. "No mixed values in the DB" achieved for data.
+**Phase 1b — canonical storage + localized form input — ✅ DONE (core)**
+Revised model: with **per-user language + one shared DB**, storage MUST be
+canonical (a report entered by an Arabic user is read by an English user). Chose
+**English-canonical** (the English label IS the stable value) over opaque codes —
+a missed localization degrades to readable English, never a broken `gender_1`, and
+export/BI keep working on readable values.
+- ✅ `get_active_options(cat, lang)` returns `(english_value, localized_label)`.
+- ✅ report form binds all 7 dropdowns to it: stores the English canonical, shows
+  the localized label; the custom SD renders the option's localized text for a
+  stored English value, so edit-load localizes automatically.
+- ✅ **No report-data migration needed** — dropdown columns already store English
+  labels (the one Arabic column, gender, was normalized earlier). The DB is
+  already single-language (un-mixed) — the owner's core "no mixed in DB" concern
+  is met.
+- **Folded into Phase 2:** read-only DISPLAY localization (reports list, approval
+  panel, export) — resolving stored English → the viewer's language. Doing it
+  before Phase 2 would show Arabic values under English headers/nav (its own
+  mixed state), so it lands with the full-screen translation. `resolve_label()`
+  is ready for it. Export stays English-canonical by default (canonical extract).
 
 ### Phase 2 — UI string translation  (NEEDS content set #2)
 - Replace hardcoded strings with `t()` keys across every view; fill

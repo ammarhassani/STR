@@ -40,26 +40,24 @@ def test_get_active_options():
     dbm, svc = _svc()
     en = dict(svc.get_active_options('gender', 'en'))
     ar = dict(svc.get_active_options('gender', 'ar'))
-    # codes are config_keys (language-neutral), same set in both languages
-    check("same codes regardless of language", set(en) == set(ar), (set(en), set(ar)))
-    check("English labels", 'Male' in en.values(), en)
-    check("Arabic labels", 'ذكر' in ar.values(), ar)
-    # a code maps to different text per language
-    code = [k for k, v in en.items() if v == 'Male'][0]
-    check("code -> Male (en)", en[code] == 'Male')
-    check("same code -> ذكر (ar)", ar[code] == 'ذكر', ar[code])
+    # the STORED value is the English canonical, identical in both languages
+    check("stored value is English-canonical in both langs", set(en) == set(ar), (set(en), set(ar)))
+    check("value 'Male' present", 'Male' in en, en)
+    check("English user sees English", en['Male'] == 'Male')
+    check("Arabic user sees Arabic for the same value", ar['Male'] == 'ذكر', ar['Male'])
+    check("Arabic user still STORES English 'Male'", 'Male' in ar, ar)
 
 
 def test_resolve_label():
     dbm, svc = _svc()
-    # resolve by code
-    code = svc.get_active_options('gender', 'en')[0][0]
-    check("resolve code in en", svc.resolve_label('gender', code, 'en') in
+    # stored value is the English canonical
+    val = svc.get_active_options('gender', 'en')[0][0]
+    check("resolve value in en", svc.resolve_label('gender', val, 'en') in
           ['Male', 'Female', 'Other', 'Not Specified'])
-    check("resolve code in ar", svc.resolve_label('gender', code, 'ar') in
+    check("resolve value in ar", svc.resolve_label('gender', val, 'ar') in
           ['ذكر', 'أنثى', 'آخر', 'غير محدد'])
-    # resolve by legacy stored English label -> Arabic
-    check("legacy 'Male' resolves to Arabic", svc.resolve_label('gender', 'Male', 'ar') == 'ذكر')
+    # stored English label -> Arabic for display
+    check("stored 'Male' resolves to Arabic", svc.resolve_label('gender', 'Male', 'ar') == 'ذكر')
     check("legacy 'Male' resolves to English", svc.resolve_label('gender', 'Male', 'en') == 'Male')
     # resolve by Arabic value
     check("Arabic value resolves to English", svc.resolve_label('gender', 'ذكر', 'en') == 'Male')

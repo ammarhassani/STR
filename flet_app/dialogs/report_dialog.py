@@ -72,14 +72,20 @@ def show_report_dialog(
     _edit_report_id = (report_data.get('report_id') or report_data.get('id')) if is_edit_mode else None
 
     # Load dropdown values
-    genders = dropdown_service.get_active_dropdown_values('gender') if dropdown_service else []
-    nationalities = dropdown_service.get_active_dropdown_values('nationality') if dropdown_service else []
-    transaction_types = dropdown_service.get_active_dropdown_values('type_of_suspected_transaction') if dropdown_service else []
+    # #3: options are (english_value, localized_label) — store the English
+    # canonical, show the label in the user's language.
+    from i18n import get_language
+    _lang = get_language()
+    def _opts(cat):
+        return dropdown_service.get_active_options(cat, _lang) if dropdown_service else []
+    genders = _opts('gender')
+    nationalities = _opts('nationality')
+    transaction_types = _opts('type_of_suspected_transaction')
     arb_staff_values = dropdown_service.get_active_dropdown_values('arb_staff') if dropdown_service else []
-    classifications = dropdown_service.get_active_dropdown_values('report_classification') if dropdown_service else []
-    report_sources = dropdown_service.get_active_dropdown_values('report_source') if dropdown_service else []
-    reporting_entities = dropdown_service.get_active_dropdown_values('reporting_entity') if dropdown_service else []
-    fiu_feedbacks = dropdown_service.get_active_dropdown_values('fiu_feedback') if dropdown_service else []
+    classifications = _opts('report_classification')
+    report_sources = _opts('report_source')
+    reporting_entities = _opts('reporting_entity')
+    fiu_feedbacks = _opts('fiu_feedback')
 
     # Form field references
     sn_ref = ft.Ref[ft.TextField]()
@@ -852,7 +858,7 @@ def show_report_dialog(
                             ft.Text("Gender", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=gender_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=g, text=g) for g in genders],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in genders],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -864,7 +870,7 @@ def show_report_dialog(
                             ft.Text("Nationality", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=nationality_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=n, text=n) for n in nationalities],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in nationalities],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1017,7 +1023,7 @@ def show_report_dialog(
                             ft.Text("Type of Suspected Transaction", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=transaction_type_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=t, text=t) for t in transaction_types],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in transaction_types],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1065,7 +1071,7 @@ def show_report_dialog(
                             ft.Text("Report Classification", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=classification_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=c, text=c) for c in classifications],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in classifications],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1077,7 +1083,7 @@ def show_report_dialog(
                             ft.Text("Report Source", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=report_source_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=s, text=s) for s in report_sources],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in report_sources],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1089,7 +1095,7 @@ def show_report_dialog(
                             ft.Text("Reporting Entity", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=reporting_entity_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=val, text=val) for val in reporting_entities],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in reporting_entities],
                                 text_size=13,
                                 border_radius=4,
                             ),
@@ -1163,7 +1169,7 @@ def show_report_dialog(
                             ft.Text("FIU Feedback", size=12, weight=ft.FontWeight.W_500, color=colors["text_secondary"]),
                             searchable_dropdown(
                                 ref=fiu_feedback_ref,
-                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=f, text=f) for f in fiu_feedbacks],
+                                options=[ft.dropdown.Option(key="", text="-- Select --")] + [ft.dropdown.Option(key=_v, text=_l) for _v, _l in fiu_feedbacks],
                                 text_size=13,
                                 border_radius=4,
                             ),

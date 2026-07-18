@@ -127,18 +127,20 @@ class DropdownService:
             return []
 
     def get_active_options(self, category: str, lang: str = "en") -> List[tuple]:
-        """Active dropdown options as (code, label) for the given language (#3).
-        `code` is the language-neutral config_key stored on reports; `label` is
-        the English or Arabic text (Arabic falls back to English if undrafted)."""
+        """Active dropdown options as (value, label) for the given language (#3).
+
+        `value` is the ENGLISH label — the canonical value STORED on reports, so
+        one shared DB stays single-language (never mixed) and a report entered by
+        an Arabic user still reads correctly for an English user. `label` is what
+        the current user SEES (English, or the Arabic draft, falling back to
+        English). A form binds `value` and shows `label`; a missed localization
+        degrades to readable English, never an opaque code."""
         try:
             rows = self.db_manager.execute_with_retry(
-                "SELECT config_key, config_value, COALESCE(NULLIF(config_value_ar,''), config_value) "
+                "SELECT config_value, COALESCE(NULLIF(config_value_ar,''), config_value) "
                 "FROM system_config WHERE config_type='dropdown' AND config_category=? AND is_active=1 "
                 "ORDER BY display_order, config_value", (category,))
-            out = []
-            for code, en, ar in (rows or []):
-                out.append((code, ar if lang == "ar" else en))
-            return out
+            return [(en, (ar if lang == "ar" else en)) for en, ar in (rows or [])]
         except Exception as e:
             self.logger.error(f"Error getting options for {category}: {str(e)}")
             return []
