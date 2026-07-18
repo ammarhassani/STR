@@ -274,6 +274,13 @@ def run():
     finding(E, "log export does not call export_logs",
             'export_logs' not in log_src)
 
+    # #10: the review dialog must be roomy, not the cramped 650x520 / 280px form
+    ap_src2 = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
+    finding(E, "review dialog is still the cramped 650x520",
+            'width=650' in ap_src2 and 'height=520' in ap_src2)
+    finding(E, "review form viewport is still the cramped 280px",
+            'height=280' in ap_src2)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]

@@ -280,16 +280,16 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                     opts = review_field_options(live, value)
                     display = ft.TextField(
                         label=label, value=value, read_only=True, text_size=12,
-                        width=280, bgcolor=colors["bg_tertiary"],
+                        width=300, bgcolor=colors["bg_tertiary"],
                     )
                     editor = searchable_dropdown(
                         label=label,
                         value=value if value in opts else '',
                         options=[ft.dropdown.Option(o) for o in opts],
-                        text_size=12, width=280,
+                        text_size=12, width=300,
                     )
                     editor.visible = False   # locked by default; shown in edit mode
-                    control = ft.Column(controls=[display, editor], spacing=0, tight=True, width=280)
+                    control = ft.Column(controls=[display, editor], spacing=0, tight=True, width=300)
                     field_refs[key] = {'control': control, 'display': display, 'editor': editor,
                                        'always_readonly': always_readonly, 'type': 'dropdown'}
                 else:
@@ -298,7 +298,7 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         value=value,
                         read_only=True,  # Start readonly
                         text_size=12,
-                        width=280,
+                        width=300,
                         bgcolor=colors["bg_tertiary"],
                     )
                     field_refs[key] = {'control': control, 'always_readonly': always_readonly, 'type': field_type}
@@ -569,10 +569,12 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                         ),
 
                         # Form container (populated after load)
+                        # #10: a review needs room — 31 fields in a 280px box is
+                        # unreviewable; give it a tall viewport (form scrolls inside).
                         ft.Container(
                             ref=form_container_ref,
                             content=ft.Text("Loading..."),
-                            height=280,
+                            height=480,
                         ),
 
                         ft.Divider(height=1, color=colors["border"]),
@@ -621,8 +623,8 @@ def build_approval_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                     spacing=10,
                     scroll=ft.ScrollMode.AUTO,
                 ),
-                width=650,
-                height=520,
+                width=920,
+                height=760,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=cancel_review),
