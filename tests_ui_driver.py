@@ -252,6 +252,16 @@ def run():
     finding(E, "report dialog does not surface the rework/review comment (#11)",
             'get_review_comment' not in rd_src)
 
+    # #13: second reason for suspicion is a narrative (schema TEXT) — must be a
+    # free-text field like the first reason, NOT a constrained dropdown.
+    _sr = rd_src.split('Second Reason for Suspicion')[-1][:700]
+    finding(E, "second reason for suspicion is still a dropdown (not editable free text)",
+            'searchable_dropdown' in _sr or 'dropdown.Option' in _sr)
+    finding(E, "second reason for suspicion is not a multiline text field",
+            'second_reason_ref' not in _sr or 'multiline=True' not in _sr)
+    finding(E, "second reason still saved via get_dropdown_value",
+            "'second_reason_for_suspicion': get_dropdown_value" in rd_src)
+
     # ---- report
     print('\n' + '='*70); print('UI PROSECUTION — failures')
     fails = [f for f in FINDINGS if f[2]]

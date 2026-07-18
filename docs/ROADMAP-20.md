@@ -83,9 +83,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     dropdowns enforce a real choice; edit-mode defaults to the current value
     ("keep current"). Baked into the custom searchable dropdown (#SD).
 
-13. **Second reason of suspicion not editable** — ☐
-    *Ask:* it should be editable.
-    *Do:* fix so the field/dropdown accepts input.
+13. **Second reason of suspicion not editable** — ☑ (root cause: rendered as a constrained dropdown while the schema declares it TEXT and the column is TEXT — a narrative like the first reason; now a free-text multiline field identical to the first reason, saved via get_value; dead second_reasons fetch removed; ui_driver structural guards)
 
 14. **Rapid-repeat account banner (multiple entries on one account, 0–2 days)** — ☐
     *Ask:* flag likely structuring.
