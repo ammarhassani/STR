@@ -23,6 +23,7 @@ STRINGS = {
     "status.approved": "Approved",
     "status.rejected": "Rejected",
     "status.rework": "Rework",
+    "status.pending_fiu": "Pending FIU Details",
 
     # reports list
     "reports.add_new": "Add New Report",
@@ -277,10 +278,22 @@ Only users with Admin role can approve reports.
 
     # My Work
     "mywork.lane.rework": "Returned for Rework",
+    "mywork.lane.pending_fiu": "Waiting for FIU Details",
     "mywork.lane.draft": "Drafts",
     "mywork.lane.pending": "Pending Approval",
     "mywork.lane.approved": "Approved",
     "mywork.nothing": "Nothing here.",
+
+    # pending-FIU basket (shared queue)
+    "nav.fiu_basket": "Pending FIU",
+    "fiu.title": "Reports waiting for FIU details",
+    "fiu.subtitle": "Saved reports that still need the number the FIU issues. File the report on the FIU portal, then add its details here and submit it for approval.",
+    "fiu.empty": "Nothing is waiting for FIU details.",
+    "fiu.count": "{n} report(s) waiting",
+    "fiu.owner": "Filed by",
+    "fiu.waiting_days": "waiting {n} day(s)",
+    "fiu.open": "Add FIU details",
+    "fiu.missing": "Missing: {fields}",
 
     # report field labels not in column_settings (derived/special)
     "field.case_id": "Case ID",

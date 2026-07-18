@@ -1612,6 +1612,25 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Widget Arabic titles skipped: {str(e)}")
 
+        # Pending-FIU phase: a saved report now waits for the FIU's number before
+        # it can be submitted, so the "open work" tile must count that state or
+        # the dashboard shows zero while the basket is full. Only the exact
+        # SYSTEM-seeded SQL is rewritten, so customised widgets are untouched.
+        try:
+            cursor.execute(
+                "UPDATE dashboard_config SET sql_query = ?, title = ?, title_ar = ? "
+                "WHERE sql_query = ?",
+                ("SELECT COUNT(*) as value FROM reports WHERE approval_status "
+                 "IN ('draft', 'rework', 'pending_fiu') AND is_deleted = 0",
+                 "Open Work", "قيد العمل",
+                 "SELECT COUNT(*) as value FROM reports WHERE approval_status "
+                 "IN ('draft', 'rework') AND is_deleted = 0"))
+            if cursor.rowcount:
+                messages.append("Open-work widget now counts pending-FIU reports")
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Pending-FIU widget update skipped: {str(e)}")
+
         conn.close()
 
         if messages:

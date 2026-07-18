@@ -24,6 +24,7 @@ STRINGS = {
     "status.approved": "معتمد",
     "status.rejected": "مرفوض",
     "status.rework": "إعادة عمل",
+    "status.pending_fiu": "بانتظار بيانات وحدة التحرّيات",
 
     # reports list
     "reports.add_new": "إضافة تقرير جديد",
@@ -279,10 +280,22 @@ STRINGS = {
 
     # My Work
     "mywork.lane.rework": "أُعيدت لإعادة العمل",
+    "mywork.lane.pending_fiu": "بانتظار بيانات وحدة التحرّيات",
     "mywork.lane.draft": "المسودّات",
     "mywork.lane.pending": "قيد الاعتماد",
     "mywork.lane.approved": "معتمدة",
     "mywork.nothing": "لا يوجد شيء هنا.",
+
+    # سلة بانتظار بيانات وحدة التحرّيات (قائمة مشتركة)
+    "nav.fiu_basket": "بانتظار الوحدة",
+    "fiu.title": "تقارير بانتظار بيانات وحدة التحرّيات",
+    "fiu.subtitle": "تقارير محفوظة ما زالت بحاجة إلى الرقم الصادر من وحدة التحرّيات المالية. ارفع التقرير على بوابة الوحدة، ثم أضف بياناته هنا وأرسله للاعتماد.",
+    "fiu.empty": "لا توجد تقارير بانتظار بيانات وحدة التحرّيات.",
+    "fiu.count": "{n} تقرير بالانتظار",
+    "fiu.owner": "أنشأه",
+    "fiu.waiting_days": "بالانتظار منذ {n} يوم",
+    "fiu.open": "إضافة بيانات الوحدة",
+    "fiu.missing": "الناقص: {fields}",
 
     # report field labels not in column_settings (derived/special)
     "field.case_id": "رقم الحالة",

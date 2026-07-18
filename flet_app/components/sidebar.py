@@ -46,6 +46,11 @@ def create_sidebar(
         if app_state.auth_service and app_state.auth_service.has_permission('add_report'):
             items.insert(2, {"icon": ft.Icons.INBOX, "label": t("nav.my_work"), "route": "/my-work"})
 
+        # Pending FIU is a SHARED queue: everyone can see what is still waiting
+        # for an FIU number, so nothing sits forgotten while someone is away.
+        items.insert(3, {"icon": ft.Icons.PENDING_ACTIONS, "label": t("nav.fiu_basket"),
+                         "route": "/fiu-basket"})
+
         auth = app_state.auth_service
         can_approve = bool(auth and auth.has_permission('approve_reports'))
 

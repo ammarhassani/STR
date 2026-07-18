@@ -32,6 +32,7 @@ from views.login_view import LoginView
 from views.dashboard_view import build_dashboard_content
 from views.reports_view import build_reports_view
 from views.my_work_view import build_my_work_view
+from views.fiu_basket_view import build_fiu_basket_view
 from views.admin_panel_view import build_admin_panel_view
 from views.approval_panel_view import build_approval_panel_view
 from views.log_management_view import build_log_management_view
@@ -445,6 +446,7 @@ class FletApp:
             "/dashboard": lambda: build_dashboard_content(self.page, app_state, self._handle_navigate),
             "/reports": lambda: build_reports_view(self.page, app_state),
             "/my-work": lambda: build_my_work_view(self.page, app_state),
+            "/fiu-basket": lambda: build_fiu_basket_view(self.page, app_state),
             "/activity": lambda: build_activity_view(self.page, app_state),
             "/export": lambda: build_export_view(self.page, app_state),
             "/approvals": lambda: build_approval_panel_view(self.page, app_state),
@@ -466,6 +468,7 @@ class FletApp:
             "/dashboard": t("nav.dashboard"),
             "/reports": t("nav.reports"),
             "/my-work": t("nav.my_work"),
+            "/fiu-basket": t("nav.fiu_basket"),
             "/activity": t("nav.activity"),
             "/export": t("nav.export"),
             "/approvals": t("nav.approvals"),

@@ -67,6 +67,22 @@ class ApprovalService:
                 # the workflow. Only 'rework' can be resubmitted.
                 return False, None, "This report was rejected and cannot be resubmitted"
 
+            # A report reaches a supervisor only once it has been filed on the
+            # FIU portal and the FIU's number typed back in. Submitting without
+            # those details is refused here rather than in the dialog, so no
+            # path can push an incomplete report into someone's approval queue.
+            missing = [f for f in self.report_service.REQUIRED_FIU_FIELDS
+                       if not str(report.get(f) or '').strip()]
+            if missing:
+                pretty = {'fiu_number': 'FIU number', 'fiu_date': 'FIU date',
+                          'fiu_letter_number': 'FIU letter number',
+                          'fiu_letter_receive_date': 'FIU letter receive date'}
+                names = ", ".join(pretty.get(f, f) for f in missing)
+                return False, None, (
+                    f"FIU details are missing ({names}). File the report on the FIU "
+                    f"portal first, then add the FIU details and submit. Your work "
+                    f"is saved and the report is waiting in the Pending FIU basket.")
+
             # Create version snapshot before submitting for approval
             success, version_id, msg = self.version_service.create_version_snapshot(
                 report_id,

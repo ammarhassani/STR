@@ -15,6 +15,7 @@ from i18n import t
 def _lanes(colors):
     return [
         ('rework', t("mywork.lane.rework"), ft.Icons.REPLAY, colors['danger']),
+        ('pending_fiu', t("mywork.lane.pending_fiu"), ft.Icons.PENDING_ACTIONS, colors['warning']),
         ('draft', t("mywork.lane.draft"), ft.Icons.EDIT_NOTE, colors['text_secondary']),
         ('pending_approval', t("mywork.lane.pending"), ft.Icons.HOURGLASS_TOP, colors['warning']),
         ('approved', t("mywork.lane.approved"), ft.Icons.CHECK_CIRCLE, colors['success']),

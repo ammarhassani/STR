@@ -276,6 +276,9 @@ def child_main():
         if outcome != "ok":
             return
         rid = val[1]
+        attempt("add FIU details", R.update_report, rid,
+                {"fiu_number": f"FIU-{username}-lock",
+                 "fiu_date": datetime.now().strftime("%d/%m/%Y")})
         sub, _ = attempt("submit for approval", A.request_approval, rid, "review please")
         refresh()
         rep = R.get_report(rid) or {}
@@ -447,16 +450,36 @@ def child_main():
                 "report_date": datetime.now().strftime("%d/%m/%Y"),
                 "reported_entity_name": f"{username} Entity {i}",
                 "cic": str(1000000000000000 + random.randint(0, 10 ** 6)),
-                "amount": str(random.randint(10_000, 5_000_000)),
+                "total_transaction": str(random.randint(10_000, 5_000_000)),
             }
+            # half the reports are filed with the FIU up front, half are saved
+            # and completed from the basket -- both are legal agent behaviour
+            if i % 2 == 0:
+                payload["fiu_number"] = f"FIU-{username}-{i}"
+                payload["fiu_date"] = datetime.now().strftime("%d/%m/%Y")
             outcome, val = attempt("create own report", R.create_report, payload)
             if outcome == "ok":
                 rid = val[1]
                 made.append(rid)
-                # submit it for approval
+                # a saved report must wait for its FIU details before it can go
+                # anywhere near a supervisor
                 sub, sval = attempt("submit own report", A.request_approval, rid, "please review")
-                if sub == "refused":
-                    defect("WORKFLOW", "agent could not submit their own report", sval)
+                refresh()
+                fresh = R.get_report(rid) or {}
+                has_fiu = bool(str(fresh.get("fiu_number") or "").strip()
+                               and str(fresh.get("fiu_date") or "").strip())
+                if sub == "ok" and not has_fiu:
+                    defect("WORKFLOW",
+                           "a report with NO FIU details was submitted for approval", rid)
+                if sub == "refused" and has_fiu:
+                    defect("WORKFLOW",
+                           "a report WITH its FIU details could not be submitted", sval)
+                if sub == "refused" and not has_fiu:
+                    # expected: complete it the way the basket flow does
+                    attempt("add FIU details", R.update_report, rid,
+                            {"fiu_number": f"FIU-{username}-{i}b",
+                             "fiu_date": datetime.now().strftime("%d/%m/%Y")})
+                    attempt("submit after adding FIU details", A.request_approval, rid, "filed")
                 # editing while pending approval — BRD: locked until decided
                 edit, eval_ = attempt("edit while pending",
                                       R.update_report, rid, {"reported_entity_name": "EDITED WHILE PENDING"})

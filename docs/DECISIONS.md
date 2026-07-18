@@ -244,9 +244,8 @@ client-proxy accordingly.
 
 ## The FIU round-trip (owner's working philosophy, 2026-07-18)
 
-**Not implemented as described. Recorded because it is how the work actually
-happens, and it explains why the agent must keep write access to a report long
-after they first save it.**
+**Implemented 2026-07-18 as the `pending_fiu` phase — see "What the code does"
+below. Recorded here because it is how the work actually happens.**
 
 The real lifecycle of an STR is not "fill it in once, get it approved, done".
 It has a gap in the middle where the report leaves the bank and comes back:
@@ -269,6 +268,39 @@ It has a gap in the middle where the report leaves the bank and comes back:
 report. Any rule that permanently freezes a report after its first approval
 would break the actual job — the FIU fields are, by their nature, filled in
 after the fact.
+
+### The phase as built
+
+`pending_fiu` is where a saved report waits. The order is the owner's:
+
+1. The agent fills in a new report and **saves** it. Saving does NOT submit it —
+   it lands in the **Pending FIU** basket.
+2. The agent files the report on the FIU portal (outside this app) and the FIU
+   issues a number.
+3. The agent opens the basket, adds the FIU details, and submits for approval.
+   Submitting is the moment the report counts as filed with the FIU.
+4. A supervisor sees it for the first time here. **A report with no FIU details
+   never reaches an approval queue** — the FIU number is part of what is being
+   approved.
+
+The agent chooses the pace: fill the FIU details during initial entry and submit
+in one sitting, or save now and complete it from the basket later.
+
+`request_approval` refuses a report whose `fiu_number` or `fiu_date` is empty,
+names what is missing, and says the work is saved and waiting in the basket.
+The refusal lives in the service, not the dialog, so no path can push an
+incomplete report into someone's queue.
+
+**The basket is shared.** Everyone sees every report waiting for FIU details, so
+one does not sit forgotten because the agent who filed it is away. It is sorted
+oldest-first and shows who filed each report, how long it has waited, and which
+FIU fields are still missing.
+
+Which fields gate submission is one constant, `ReportService.REQUIRED_FIU_FIELDS`
+(currently `fiu_number` and `fiu_date`). The FIU letter number, its receive date
+and the FIU's feedback arrive later and stay optional.
+
+Admin-created reports are still auto-approved and skip the basket entirely.
 
 ### What the code does today, and how it lines up
 

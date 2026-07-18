@@ -41,14 +41,20 @@ def _services():
     return dbm, auth, numbers, reports, approvals
 
 
-def _make_and_submit(dbm, auth, numbers, reports, username):
-    """Log in as `username`, reserve + create a report (auto-submits for approval
-    for non-admin roles). Returns (report_id, approval_id)."""
+def _make_and_submit(dbm, auth, numbers, reports, username, approvals=None):
+    """Log in as `username`, reserve + create a report, then walk it through the
+    real working order: a saved report waits in the pending-FIU basket until the
+    FIU number is typed back in, and only then can it be submitted.
+    Returns (ok, report_id, approval_id, message)."""
     auth.authenticate(username, 'Pass@123')
     numbers.reserve_block(username, 2)
     ok, rid, msg = reports.create_report({
         'report_date': '01/07/2026', 'reported_entity_name': f'E {username}',
-        'nationality': 'Saudi Arabian', 'total_transaction': '1000'})
+        'nationality': 'Saudi Arabian', 'total_transaction': '1000',
+        # filed on the FIU portal in the same sitting -- the agent's choice
+        'fiu_number': f'FIU-{username}-001', 'fiu_date': '02/07/2026'})
+    if ok and approvals is not None:
+        approvals.request_approval(rid, 'submitted for review')
     ap = dbm.execute_with_retry(
         "SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending' "
         "ORDER BY approval_id DESC LIMIT 1", (rid,)) if ok else None
@@ -78,8 +84,8 @@ def test_role_creation_and_routing():
     check("invalid role rejected", not auth.create_user('bad', 'x', 'x', 'wizard')[0])
 
     # agent submits -> supervisor approves
-    ok, rid, apid, msg = _make_and_submit(dbm, auth, numbers, reports, 'ag1')
-    check("agent report auto-submitted for approval", ok and apid, msg)
+    ok, rid, apid, msg = _make_and_submit(dbm, auth, numbers, reports, 'ag1', approvals)
+    check("agent report reaches approval once its FIU details are in", ok and apid, msg)
     auth.authenticate('sup1', 'Pass@123')
     pend_ids = [p['approval_id'] for p in approvals.get_pending_approvals()]
     check("supervisor sees the pending approval", apid in pend_ids, pend_ids)
@@ -87,7 +93,7 @@ def test_role_creation_and_routing():
     check("supervisor approves the agent's report", oka, msga)
 
     # agent cannot approve
-    ok2, rid2, apid2, _ = _make_and_submit(dbm, auth, numbers, reports, 'ag1')
+    ok2, rid2, apid2, _ = _make_and_submit(dbm, auth, numbers, reports, 'ag1', approvals)
     auth.authenticate('ag1', 'Pass@123')
     check("agent sees no approval queue", approvals.get_pending_approvals() == [])
     okd, _ = approvals.approve_report(apid2, 'x')
@@ -101,8 +107,8 @@ def test_role_creation_and_routing():
     check("reporter CANNOT approve", not okr)
 
     # SoD: a supervisor cannot approve their OWN submission; another approver can
-    oks, rids, apids, _ = _make_and_submit(dbm, auth, numbers, reports, 'sup1')
-    check("supervisor's own report auto-submitted", oks and apids)
+    oks, rids, apids, _ = _make_and_submit(dbm, auth, numbers, reports, 'sup1', approvals)
+    check("supervisor's own report reaches approval too", oks and apids)
     auth.authenticate('sup1', 'Pass@123')
     okself, msgself = approvals.approve_report(apids, 'self')
     check("supervisor CANNOT approve own report (SoD)", not okself, msgself)
@@ -169,7 +175,7 @@ def test_submit_autosaves():
     auth.authenticate('admin', 'Admin@1234')
     auth.create_user('ag9', 'Pass@123', 'Ag9', 'agent')
     auth.create_user('sup9', 'Pass@123', 'Sup9', 'supervisor')
-    ok, rid, apid, _ = _make_and_submit(dbm, auth, numbers, reports, 'ag9')
+    ok, rid, apid, _ = _make_and_submit(dbm, auth, numbers, reports, 'ag9', approvals)
     check("setup: agent report is pending", ok and apid)
     auth.authenticate('sup9', 'Pass@123')
     okr, msgr = approvals.reject_report(apid, 'fix the entity name', request_rework=True)
@@ -199,11 +205,11 @@ def test_my_work_lanes_and_review_comment():
     auth.create_user('msup', 'Pass@123', 'MSup', 'supervisor')
 
     # ma submits two reports; msup returns ONE for rework
-    ok1, rid1, apid1, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma')
-    ok2, rid2, apid2, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma')
+    ok1, rid1, apid1, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma', approvals)
+    ok2, rid2, apid2, _ = _make_and_submit(dbm, auth, numbers, reports, 'ma', approvals)
     check("setup: two ma reports pending", ok1 and ok2 and apid1 and apid2)
     # a different agent's report must NOT leak into ma's lanes
-    okb, ridb, apidb, _ = _make_and_submit(dbm, auth, numbers, reports, 'mb')
+    okb, ridb, apidb, _ = _make_and_submit(dbm, auth, numbers, reports, 'mb', approvals)
     auth.authenticate('msup', 'Pass@123')
     okr, _ = approvals.reject_report(apid1, 'Fix the nationality field please', request_rework=True)
     check("supervisor returns rid1 for rework", okr)

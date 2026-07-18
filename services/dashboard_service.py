@@ -92,7 +92,7 @@ class DashboardService:
             query = """
                 SELECT
                     COUNT(*) FILTER (WHERE r.is_deleted = 0) as total_reports,
-                    COUNT(*) FILTER (WHERE r.approval_status IN ('draft', 'rework') AND r.is_deleted = 0) as open_reports,
+                    COUNT(*) FILTER (WHERE r.approval_status IN ('draft', 'rework', 'pending_fiu') AND r.is_deleted = 0) as open_reports,
                     COUNT(*) FILTER (WHERE r.approval_status = 'pending_approval' AND r.is_deleted = 0) as under_investigation,
                     COUNT(*) FILTER (WHERE r.approval_status = 'approved' AND r.is_deleted = 0) as closed_cases,
                     COUNT(*) FILTER (WHERE strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now') AND r.is_deleted = 0) as reports_this_month,
@@ -139,6 +139,7 @@ class DashboardService:
             # Human-readable labels for approval workflow states
             labels = {
                 'draft': 'Draft',
+                'pending_fiu': 'Pending FIU Details',
                 'pending_approval': 'Pending Approval',
                 'approved': 'Approved',
                 'rejected': 'Rejected',

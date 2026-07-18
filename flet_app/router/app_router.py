@@ -22,6 +22,7 @@ class AppRouter:
         "/export": "export",
         "/activity": "activity",
         "/approvals": "approvals",
+        "/fiu-basket": "fiu_basket",
         "/users": "users",
         "/logs": "logs",
         "/settings": "settings",
@@ -33,6 +34,7 @@ class AppRouter:
     # Routes that require admin role
     ADMIN_ROUTES = [
         "/approvals",
+        "/fiu-basket",
         "/users",
         "/logs",
         "/settings",

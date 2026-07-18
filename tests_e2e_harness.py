@@ -126,6 +126,11 @@ class Client:
             'reported_entity_name': f'Entity {u} {time.time()}',
             'nationality': 'Saudi Arabian',
             'total_transaction': '1000',
+            # A saved report waits in the pending-FIU basket until the FIU number
+            # is typed back in; the harness models a report already filed on the
+            # FIU portal so it can move through the approval workflow.
+            'fiu_number': f'FIU-{u}-{int(time.time() * 1000) % 10 ** 8}',
+            'fiu_date': datetime.now().strftime('%d/%m/%Y'),
         }
         if extra:
             data.update(extra)
@@ -292,7 +297,13 @@ def phase1():
     check(F, 'missing required fields rejected', not miss[0], miss[2])
     rep = agent.reports.get_report(rid)
     check(F, 'get_report returns row', rep and rep['report_id'] == rid)
-    check(F, 'agent-created report auto-pending',
+    check(F, 'a saved report waits for FIU details, it is not auto-submitted',
+          rep['approval_status'] in ('pending_fiu', 'pending_approval'), rep['approval_status'])
+    if rep['approval_status'] == 'pending_fiu':
+        oks, _aid, msgs = agent.approvals.request_approval(rid, 'filed with the FIU')
+        check(F, 'submitting a report that HAS its FIU details', oks, msgs)
+        rep = agent.reports.get_report(rid)
+    check(F, 'submitted report is pending approval',
           rep['approval_status'] == 'pending_approval', rep['approval_status'])
     # An agent's new report is auto-pending, and a report under approval is
     # frozen (BRD 04§4 / 06§14) -- the approver must decide on exactly the text
@@ -330,6 +341,9 @@ def phase1():
     # pending reports cannot be deleted (business rule); use an admin report
     # which is auto-approved, so it is deletable
     ok, rid_del, _, _ = admin_c.make_report()
+    # rid2 only becomes undeletable once it is actually pending approval, which
+    # now takes an explicit submit
+    agent.approvals.request_approval(rid2, 'filed with the FIU')
     check(F, 'pending report delete blocked', not admin_c.reports.delete_report(rid2)[0],
           'agent report is pending')
     ok, msg = admin_c.reports.delete_report(rid_del)
@@ -405,7 +419,12 @@ def phase1():
     ok, rid3, _, msg = agent.make_report()
     check(F, 'setup report for approval', ok, msg)
     rep = agent.reports.get_report(rid3)
-    check(F, 'agent create auto-submits (pending_approval)',
+    check(F, 'a saved report waits for its FIU details',
+          rep['approval_status'] == 'pending_fiu', rep['approval_status'])
+    ok, _aid, msg = agent.approvals.request_approval(rid3, 'filed with the FIU')
+    check(F, 'submitting a report with FIU details in place', ok, msg)
+    rep = agent.reports.get_report(rid3)
+    check(F, 'now it is pending approval',
           rep['approval_status'] == 'pending_approval', rep['approval_status'])
     ok, _, msg = agent.approvals.request_approval(rid3, 'again')
     check(F, 'double-submit blocked', not ok and 'pending' in msg.lower(), msg)
@@ -419,6 +438,7 @@ def phase1():
     check(F, 'status -> approved', rep['approval_status'] == 'approved', rep['approval_status'])
     # reject + rework path
     ok, rid4, _, msg = agent.make_report()
+    agent.approvals.request_approval(rid4, 'filed with the FIU')
     pend = admin_c.approvals.get_pending_approvals()
     appr2 = [p for p in pend if p['report_id'] == rid4][0]['approval_id']
     ok, msg = admin_c.approvals.reject_report(appr2, 'fix entity name', request_rework=True)
@@ -505,7 +525,8 @@ def phase1():
               "SELECT COUNT(*) FROM reports WHERE approval_status='approved' AND is_deleted=0")[0][0])
     bys = d.get_reports_by_status()
     check(F, 'by-status uses approval labels',
-          bys and all(x['status'] in ('Draft', 'Pending Approval', 'Approved', 'Rejected', 'Rework', 'Unknown')
+          bys and all(x['status'] in ('Draft', 'Pending FIU Details', 'Pending Approval',
+                                      'Approved', 'Rejected', 'Rework', 'Unknown')
                       for x in bys), bys)
     bym = d.get_reports_by_month(12)
     check(F, 'by-month returns current month', any(x for x in bym), bym[:2])
@@ -774,7 +795,7 @@ def phase2_stress():
           n_created)
     orphans = db.execute_with_retry("""
         SELECT COUNT(*) FROM reports
-        WHERE approval_status NOT IN ('draft','pending_approval','approved','rejected','rework')
+        WHERE approval_status NOT IN ('draft','pending_fiu','pending_approval','approved','rejected','rework')
     """)[0][0]
     check(F, 'no report in invalid approval state', orphans == 0, orphans)
     decided = db.execute_with_retry("""

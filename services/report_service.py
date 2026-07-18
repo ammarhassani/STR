@@ -102,6 +102,17 @@ class ReportService:
     # internally.
     WORKFLOW_OWNED_FIELDS = {'approval_status', 'current_version'}
 
+    # A saved report waits here until the agent has filed it on the FIU portal
+    # and typed back the number the FIU issued. It is the agent's own basket:
+    # nothing reaches a supervisor before the FIU details exist, because the FIU
+    # number is part of what the supervisor is approving.
+    STATUS_PENDING_FIU = 'pending_fiu'
+
+    # The FIU details that must be present before a report can be submitted.
+    # fiu_number is what the FIU issues; fiu_date is when they issued it. The
+    # letter fields and the FIU's feedback arrive later and stay optional.
+    REQUIRED_FIU_FIELDS = ('fiu_number', 'fiu_date')
+
     # The ONLY frozen state: someone is reviewing the report right now, and the
     # approver must decide on exactly the text they were shown. Everything else
     # stays editable by its author -- an FIU report keeps growing after it is
@@ -318,7 +329,6 @@ class ReportService:
 
             # Handle approval workflow based on user role
             user_role = current_user.get('role', '')
-            print(f"[DEBUG] Report {report_id} created by '{current_user['username']}' with role: '{user_role}'")
             self.logger.info(f"Report {report_id} approval workflow - user role: '{user_role}'")
 
             if user_role == 'admin':
@@ -335,29 +345,24 @@ class ReportService:
                 self.logger.info(f"Report {report_id} auto-approved (created by admin)")
 
             else:
-                # Non-admin reports: auto-submit for approval
-                # Set report status to pending_approval
-                approval_query = """
+                # Saving a report does NOT submit it. The agent still has to file
+                # it on the FIU portal and bring back the FIU number, so it waits
+                # in the pending-FIU basket until they do. An agent who already
+                # has the FIU details can fill them in and submit immediately;
+                # one who does not can save now and come back to the basket.
+                status = (report_data.get('approval_status')
+                          or self.STATUS_PENDING_FIU)
+                self.db_manager.execute_with_retry(
+                    """
                     UPDATE reports
-                    SET approval_status = 'pending_approval', updated_by = ?, updated_at = ?
+                    SET approval_status = ?, updated_by = ?, updated_at = ?
                     WHERE report_id = ?
-                """
-                self.db_manager.execute_with_retry(
-                    approval_query,
-                    (current_user['username'], datetime.now().isoformat(), report_id)
+                    """,
+                    (status, current_user['username'], datetime.now().isoformat(), report_id)
                 )
-
-                # Create approval request in report_approvals table
-                insert_approval = """
-                    INSERT INTO report_approvals (report_id, version_id, approval_status, requested_by, approval_comment, requested_at)
-                    VALUES (?, NULL, 'pending', ?, 'Auto-submitted on creation', datetime('now'))
-                """
-                self.db_manager.execute_with_retry(
-                    insert_approval,
-                    (report_id, current_user['username'])
-                )
-
-                self.logger.info(f"Report {report_id} auto-submitted for approval (created by {user_role})")
+                self.logger.info(
+                    f"Report {report_id} saved as '{status}' by {user_role} "
+                    f"(awaiting FIU details before it can be submitted)")
 
             # Create initial version snapshot (v1) for the newly created report
             try:
