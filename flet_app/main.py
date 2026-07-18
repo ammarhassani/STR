@@ -583,11 +583,40 @@ if __name__ == "__main__":
         with zipfile.ZipFile(vendored) as z:
             z.extractall(dest)
 
+    def _brand_desktop_client():
+        """Brand the local Flet desktop client's icon with the bank logo. On
+        macOS the dock icon is the Flet.app bundle's .icns (page.window.icon
+        cannot change it), so copy ours over it — only when different, so the
+        one-time Dock refresh doesn't repeat every launch. Windows taskbar icon
+        is handled by page.window.icon at runtime."""
+        if sys.platform != "darwin":
+            return
+        try:
+            import glob, shutil, subprocess
+            src = project_root / "flet_app" / "assets" / "AppIcon.icns"
+            if not src.exists():
+                return
+            data = src.read_bytes()
+            pattern = str(Path.home() / ".flet" / "bin" / "flet-*" / "Flet.app" /
+                          "Contents" / "Resources" / "AppIcon.icns")
+            for icns in glob.glob(pattern):
+                try:
+                    if Path(icns).read_bytes() == data:
+                        continue
+                    shutil.copy2(src, icns)
+                    subprocess.run(["touch", str(Path(icns).parents[2])], check=False)
+                    subprocess.run(["killall", "Dock"], check=False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     forced = os.environ.get("STR_VIEW", "").lower()
     use_web = forced in ("web", "browser")
     if not use_web:
         try:
             _ensure_desktop_client()
+            _brand_desktop_client()
         except Exception as e:
             print(f"[VIEW] desktop client unavailable ({e}); falling back to web")
             use_web = True
