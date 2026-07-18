@@ -84,17 +84,18 @@ def export_reports(
     # Convert to list of lists
     data = [list(row) for row in results]
     
-    # Generate filename
+    # Generate filename (#16: xlsx, not csv)
+    from utils.xlsx_writer import write_xlsx
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"fiu_reports_{timestamp}.csv"
-    
+    filename = f"fiu_reports_{timestamp}.xlsx"
+
     if output_dir:
         filepath = Path(output_dir) / filename
     else:
         filepath = Path(filename)
-    
+
     # Export
-    return export_to_csv(data, headers, str(filepath))
+    return write_xlsx(str(filepath), headers, data, sheet_name="Reports")
 
 
 def export_logs(
@@ -124,8 +125,9 @@ def export_logs(
 
     data = [[row.get(h, '') for h in headers] for row in logs]
 
+    from utils.xlsx_writer import write_xlsx
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"fiu_logs_{timestamp}.csv"
+    filename = f"fiu_logs_{timestamp}.xlsx"
     filepath = Path(output_dir) / filename if output_dir else Path(filename)
 
-    return export_to_csv(data, headers, str(filepath))
+    return write_xlsx(str(filepath), headers, data, sheet_name="Logs")

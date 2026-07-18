@@ -551,22 +551,24 @@ def phase1():
     check(F, 'audit hash stable', S.hash_for_audit('x') == S.hash_for_audit('x'))
 
     # ------------------------------------------------------------ export
-    F = '14 CSV export'
+    F = '14 xlsx export'
     from utils.export import export_reports
+    from utils.xlsx_writer import read_xlsx_rows
     path = export_reports(admin_c.db, filters=None, output_dir=EXPORT_DIR)
     check(F, 'full export file created', path and os.path.exists(path), path)
+    check(F, 'export is an xlsx file', str(path).endswith('.xlsx'), path)
     if path and os.path.exists(path):
-        rows = sum(1 for _ in open(path, encoding='utf-8-sig')) - 1
+        rows = len(read_xlsx_rows(path)) - 1
         check(F, 'row count matches non-deleted reports', rows == actual_total, (rows, actual_total))
     path2 = export_reports(admin_c.db, filters={'status': 'approved'}, output_dir=EXPORT_DIR)
     if path2 and os.path.exists(path2):
-        rows2 = sum(1 for _ in open(path2, encoding='utf-8-sig')) - 1
+        rows2 = len(read_xlsx_rows(path2)) - 1
         approved = admin_c.db.execute_with_retry(
             "SELECT COUNT(*) FROM reports WHERE approval_status='approved' AND is_deleted=0")[0][0]
         check(F, 'status-filtered export (approval_status)', rows2 == approved, (rows2, approved))
     path3 = export_reports(admin_c.db, filters={'search_term': 'ZZZ_NO_MATCH'}, output_dir=EXPORT_DIR)
     if path3 and os.path.exists(path3):
-        rows3 = sum(1 for _ in open(path3, encoding='utf-8-sig')) - 1
+        rows3 = len(read_xlsx_rows(path3)) - 1
         check(F, 'no-match export empty', rows3 == 0, rows3)
 
     # ------------------------------------------------------------ restore svc

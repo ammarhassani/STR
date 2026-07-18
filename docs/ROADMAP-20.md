@@ -88,7 +88,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done+tested
     already-reserved numbers keep their reservation-month prefix + owner until
     acted on. Reservation itself untouched.
 
-16. **Export must be xlsx** — ☐
+16. **Export must be xlsx** — ☑ (zero-dependency stdlib xlsx writer utils/xlsx_writer.py — zip of XML, all cells inline strings so 16-digit CICs / account+report numbers keep leading zeros and never go scientific; reports AND logs export now .xlsx; export_view copy updated; read_xlsx_rows for verification; tests_xlsx.py + tests_log_export.py; e2e counts xlsx rows now 184/184)
     *Ask:* xlsx, not the current format.
     *Do:* report export → xlsx via openpyxl (already a dependency).
 

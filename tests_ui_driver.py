@@ -292,6 +292,14 @@ def run():
     finding(E, "log export does not call export_logs",
             'export_logs' not in log_src)
 
+    # #16: exports must be xlsx, not csv
+    exp_src = open(os.path.join(REPO, 'utils/export.py')).read()
+    finding(E, "report export is not xlsx",
+            'write_xlsx' not in exp_src or '.xlsx' not in exp_src)
+    ev_src = open(os.path.join(REPO, 'flet_app/views/export_view.py')).read()
+    finding(E, "export view UI still says CSV",
+            'CSV' in ev_src or 'to CSV' in ev_src or '.csv' in ev_src)
+
     # #10: the review dialog must be roomy, not the cramped 650x520 / 280px form
     ap_src2 = open(os.path.join(REPO, 'flet_app/views/approval_panel_view.py')).read()
     finding(E, "review dialog is still the cramped 650x520",

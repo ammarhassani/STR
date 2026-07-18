@@ -1,6 +1,6 @@
 """
 Export View for FIU Report Management System.
-Export reports to CSV with filtering and customization options.
+Export reports to Excel (.xlsx) with filtering and customization options.
 """
 import flet as ft
 from components.searchable_dropdown import searchable_dropdown
@@ -284,7 +284,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
     header_row = ft.Row(
         controls=[
             ft.Text(
-                "Export Reports to CSV",
+                "Export Reports to Excel",
                 size=18,
                 weight=ft.FontWeight.BOLD,
                 color=colors["text_primary"],
@@ -294,7 +294,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
 
     # Description
     description = ft.Text(
-        "Export your reports to CSV format for analysis in Excel or other tools. "
+        "Export your reports to Excel (.xlsx) format for analysis in Excel or other tools. "
         "Apply filters to export only specific reports.",
         size=13,
         color=colors["text_secondary"],
@@ -420,7 +420,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ),
                 ft.Container(height=4),
                 ft.Text(
-                    "File will be automatically named: fiu_reports_YYYYMMDD_HHMMSS.csv",
+                    "File will be automatically named: fiu_reports_YYYYMMDD_HHMMSS.xlsx",
                     size=11,
                     color=colors["text_muted"],
                     italic=True,
@@ -495,7 +495,7 @@ def build_export_view(page: ft.Page, app_state: Any) -> ft.Column:
             ft.Container(expand=True),
             ft.ElevatedButton(
                 ref=export_btn_ref,
-                text="Export to CSV",
+                text="Export to Excel",
                 icon=ft.Icons.DOWNLOAD,
                 bgcolor=colors["primary"],
                 color=ft.Colors.WHITE,
