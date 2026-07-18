@@ -42,7 +42,8 @@ class AuthService:
                 SELECT user_id, username, password, full_name, role, is_active,
                        failed_login_attempts,
                        COALESCE(must_change_password, 0),
-                       COALESCE(onboarding_pending, 0)
+                       COALESCE(onboarding_pending, 0),
+                       COALESCE(language, 'en')
                 FROM users
                 WHERE username = ? COLLATE NOCASE
             """
@@ -54,7 +55,7 @@ class AuthService:
 
             user = result[0]
             (user_id, db_username, db_password, full_name, role, is_active,
-             failed_attempts, must_change_password, onboarding_pending) = user
+             failed_attempts, must_change_password, onboarding_pending, language) = user
 
             # Onboarding handshake (#1): a pending user has no password yet — never
             # let them "log in" (an empty stored password would otherwise match an
@@ -139,6 +140,7 @@ class AuthService:
                 'role': role,
                 'last_login': datetime.now().isoformat(),
                 'must_change_password': bool(must_change_password),
+                'language': language or 'en',
             }
 
             # Update logging service user context
@@ -379,6 +381,22 @@ class AuthService:
             return True, f"'{username}' must re-register (name + password) at next login."
         except Exception as e:
             self.logger.error(f"Error resetting onboarding: {str(e)}", exc_info=True)
+            return False, f"Error: {str(e)}"
+
+    def set_user_language(self, language: str) -> Tuple[bool, str]:
+        """A user sets their OWN UI language (#3). Self-service — not admin-gated."""
+        if not self.current_user:
+            return False, "Not authenticated"
+        if language not in ('en', 'ar'):
+            return False, "Unsupported language"
+        try:
+            self.db_manager.execute_with_retry(
+                "UPDATE users SET language = ?, updated_at = datetime('now') WHERE user_id = ?",
+                (language, self.current_user['user_id']))
+            self.current_user['language'] = language
+            return True, "Language updated"
+        except Exception as e:
+            self.logger.error(f"Error setting language: {str(e)}")
             return False, f"Error: {str(e)}"
 
     def update_user(self, user_id: int, **kwargs) -> Tuple[bool, str]:

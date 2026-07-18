@@ -218,6 +218,13 @@ class AppState:
         self.current_user = user
         self.current_session_id = session_id
 
+        # Apply the user's UI language (#3 i18n)
+        try:
+            from i18n import set_language
+            set_language(user.get('language', 'en'))
+        except Exception:
+            pass
+
         # In client mode auth_service is a proxy; set current_user on the real
         # local service so has_permission()/RBAC reads work against the replica.
         try:

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
     failed_login_attempts INTEGER DEFAULT 0,
     last_login TEXT,
     theme_preference TEXT DEFAULT 'light' CHECK(theme_preference IN ('light', 'dark')),
+    language TEXT DEFAULT 'en' CHECK(language IN ('en', 'ar')), -- per-user UI language (#3)
     created_at TEXT DEFAULT (datetime('now')),
     created_by TEXT,
     updated_at TEXT,

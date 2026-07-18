@@ -298,6 +298,21 @@ def run():
     ap_users = open(os.path.join(REPO, 'flet_app/views/admin_panel_view.py')).read()
     finding(E, "admin panel does not surface pending-registration users",
             'onboarding_pending' not in ap_users)
+    # the onboarding UI must live in the LIVE LoginView class, not a dead function
+    finding(E, "login onboarding wiring is not in the live LoginView class",
+            'class LoginView' not in lv_src or '_show_registration_dialog' not in lv_src.split('class LoginView')[-1])
+    finding(E, "dead build_login_view function still present (two login impls)",
+            'def build_login_view' in lv_src)
+
+    # #3 Phase 0: i18n machinery wired
+    finding(E, "login screen not using the i18n catalog",
+            'from i18n import' not in lv_src or 't(' not in lv_src)
+    hdr_i18n = open(os.path.join(REPO, 'flet_app/components/header.py')).read()
+    finding(E, "no per-user language toggle in the header",
+            'set_user_language' not in hdr_i18n or 'language_menu' not in hdr_i18n)
+    as_src = open(os.path.join(REPO, 'flet_app/app_state.py')).read()
+    finding(E, "user language not applied on login",
+            'set_language' not in as_src)
 
     # #6: log export must actually write a file, not stub a toast
     log_src = open(os.path.join(REPO, 'flet_app/views/log_management_view.py')).read()

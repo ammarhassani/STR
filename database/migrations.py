@@ -1343,6 +1343,16 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"onboarding_pending column skipped: {str(e)}")
 
+        # per-user UI language (#3 i18n): 'en' | 'ar'
+        try:
+            cursor.execute("PRAGMA table_info(users)")
+            if 'language' not in [r[1] for r in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'en'")
+                conn.commit()
+                messages.append("Added language column to users")
+        except Exception as e:
+            messages.append(f"language column skipped: {str(e)}")
+
         # Gender values: reconcile the one anomaly in an otherwise-English seed.
         # Migration 12 historically seeded gender in Arabic (ذكر/أنثى) while every
         # other category + the app (English-only per BRD) used English. Normalize

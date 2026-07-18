@@ -246,6 +246,18 @@ class FletApp:
 
     def _show_login(self):
         """Show the login view."""
+        # Pre-login screen uses the deployment default language (#3) until a
+        # specific user logs in and their own language takes over.
+        try:
+            from i18n import set_language
+            default_lang = 'en'
+            if app_state.settings_service:
+                default_lang = app_state.settings_service.get_setting('default_language', 'en') or 'en'
+            set_language(default_lang)
+            self._apply_language_direction()
+        except Exception:
+            pass
+
         self.page.controls.clear()
 
         login_view = LoginView(
@@ -257,9 +269,18 @@ class FletApp:
         self.page.add(login_view.build().controls[0])
         self.page.update()
 
+    def _apply_language_direction(self):
+        """Set page text direction from the active UI language (#3)."""
+        try:
+            from i18n import is_rtl
+            self.page.rtl = is_rtl()
+        except Exception:
+            pass
+
     def _on_login_success(self, user: dict):
         """Handle successful login."""
         app_state.logging_service.info(f"User logged in: {user['username']}")
+        self._apply_language_direction()   # honor the user's language (LTR/RTL)
         self._show_main_app()
         # Force the default/reset account to set a new password immediately.
         if user.get('must_change_password'):

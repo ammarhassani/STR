@@ -39,6 +39,7 @@ WRITE_COMMANDS = {
     "auth_service.reset_password": ("auth_service", "reset_password"),
     "auth_service.change_password": ("auth_service", "change_password"),
     "auth_service.unlock_account": ("auth_service", "unlock_account"),
+    "auth_service.set_user_language": ("auth_service", "set_user_language"),
     "settings_service.save_settings": ("settings_service", "save_settings"),
     "settings_service.save_setting": ("settings_service", "save_setting"),
 }

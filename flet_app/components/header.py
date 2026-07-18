@@ -150,6 +150,34 @@ def create_header(
         )
         toolbar_buttons.append(admin_menu)
 
+    # Language toggle (#3): per-user, available to everyone from the header.
+    from i18n import t as _t, set_language, is_rtl, get_language, available_languages
+
+    def _change_language(code):
+        try:
+            if app_state.auth_service:
+                app_state.auth_service.set_user_language(code)
+            set_language(code)
+            page.rtl = is_rtl()
+            page.snack_bar = ft.SnackBar(content=ft.Text(_t("settings.language.saved")),
+                                         bgcolor=colors["success"])
+            page.snack_bar.open = True
+            page.update()
+        except Exception:
+            pass
+
+    language_menu = ft.PopupMenuButton(
+        icon=ft.Icons.LANGUAGE,
+        tooltip=_t("settings.language"),
+        items=[
+            ft.PopupMenuItem(
+                text=("● " if get_language() == code else "   ") + name,
+                on_click=lambda e, c=code: _change_language(c),
+            )
+            for code, name in available_languages()
+        ],
+    )
+
     # Notification button (placeholder)
     notification_button = ft.IconButton(
         icon=ft.Icons.NOTIFICATIONS_OUTLINED,
@@ -231,6 +259,7 @@ def create_header(
                 # Actions
                 ft.Row(
                     controls=[
+                        language_menu,
                         notification_button,
                         ft.VerticalDivider(width=1, color=colors["border"]),
                         user_menu,

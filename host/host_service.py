@@ -70,7 +70,8 @@ class HostService:
                 resp = {"id": cid, "ok": ok,
                         "result": {"token": token, "message": msg,
                                    "user": {"user_id": user["user_id"], "username": user["username"],
-                                            "full_name": user.get("full_name"), "role": user["role"]}}} if ok \
+                                            "full_name": user.get("full_name"), "role": user["role"],
+                                            "language": user.get("language", "en")}}} if ok \
                     else {"id": cid, "ok": False, "error": msg}
             elif name == "complete_onboarding":
                 # pre-auth write (two-way handshake #1): the user self-registers
