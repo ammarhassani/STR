@@ -97,14 +97,24 @@ export/BI keep working on readable values.
   mixed state), so it lands with the full-screen translation. `resolve_label()`
   is ready for it. Export stays English-canonical by default (canonical extract).
 
-### Phase 2 — UI string translation  (NEEDS content set #2)
-- Replace hardcoded strings with `t()` keys across every view; fill
-  `catalog_ar.py`.
-- **Deliverable:** the entire UI flips language.
+### Phase 2 — UI string translation — ✅ DONE
+- Every view + every dialog wired to `t()` with drafted Arabic:
+  shell/nav/header, dashboard + widget titles, reports list (+ dropdown value &
+  status resolution), report form (35 fields/tabs/buttons/hints), My Work,
+  approval panel, users mgmt + user dialog, settings, dropdown mgmt, field mgmt,
+  dashboard-widgets mgmt, export, activity, reservation, change-password, help
+  (chrome), backup/restore, version-history, profile, setup wizard, host banner.
+- Live language switch re-renders the whole shell; `field_label` resolves report
+  field labels from column_settings (clean Arabic).
+- **Remaining content task (not code):** the help dialog's markdown *guides*
+  (Getting Started / Shortcuts / FAQ prose) stay English — a standalone doc
+  translation, low priority.
 
-### Phase 3 — RTL polish
-- Layout mirroring, icon/alignment direction, number/date presentation review.
-- **Deliverable:** Arabic reads correctly right-to-left throughout.
+### Phase 3 — RTL — ✅ DONE (via page.rtl)
+- `page.rtl` flips on login + on the live toggle (main.py + header). Flet mirrors
+  layout flow, row order, and START/END alignment automatically.
+- Audit: zero absolute `TextAlign.LEFT/RIGHT`; the few absolute paddings are
+  symmetric (left==right) so they need no flip. No fixes required.
 
 ---
 
