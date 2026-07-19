@@ -413,7 +413,7 @@ def run():
               f"| queue {row['queue']:>4}  basket {row['basket']:>4}  ({row['secs']}s)")
         day += timedelta(days=1)
 
-    report(db, time.time() - wall_start)
+    return report(db, time.time() - wall_start)
 
 
 def report(db, wall):
@@ -509,8 +509,13 @@ def report(db, wall):
         "FROM reports GROUP BY 1 ORDER BY 1").fetchall()
     print("\n  numbering by month (the fortnight crosses a month end):")
     for m, n, lo, hi in months:
-        gaps = "" if hi - lo + 1 == n else f"   ({hi - lo + 1 - n} gaps)"
-        print(f"    {m}  {n:>5} reports   {m}/{lo:03d} .. {m}/{hi:03d}{gaps}")
+        missing = hi - lo + 1 - n
+        print(f"    {m}  {n:>5} reports   {m}/{lo:03d} .. {m}/{hi:03d}"
+              f"{'' if not missing else f'   ({missing} MISSING)'}")
+        if missing:
+            # a hole in a regulator-facing sequence has to be explainable; an
+            # unexplained one is a defect, not a footnote
+            bad += 1
     conn.close()
 
     print("\n" + "=" * 78)

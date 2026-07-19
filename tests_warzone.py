@@ -364,8 +364,8 @@ def child_main():
     def probe_search_filters():
         """A date-range filter that returns the wrong rows is a compliance defect:
         an analyst would report the wrong period to the regulator."""
-        if role == "reporter" or username != "rep1":
-            pass
+        if role == "reporter" and username != "rep1":
+            return          # one reporter is enough for a read-only probe
         refresh()
         allrows, total = R.get_reports(None, None, None, None, None, 500, 0)
         if not allrows:
@@ -857,6 +857,14 @@ def report(lab, host_db):
 
     print("\n" + "=" * 74)
     finished = len([f for f in findings if f["what"] == "persona finished"])
+    if finished < len(CREW):
+        print(f"  FAIL only {finished} of {len(CREW)} personas finished — the rest died "
+              f"before reporting, so the invariants above ran on partial data")
+        inv_fail += 1
+    if total_reports == 0:
+        print("  FAIL no reports were created at all — every invariant below is "
+              "vacuously true on an empty database")
+        inv_fail += 1
     print(f"personas finished: {finished}/{len(CREW)}   "
           f"distinct defects: {len({(f['role'], f['what']) for f in real})}   "
           f"invariant failures: {inv_fail}")

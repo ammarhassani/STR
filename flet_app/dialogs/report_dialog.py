@@ -1617,10 +1617,16 @@ def show_report_dialog(
                          left=24, bottom=14)
         )
 
+    # Size to the window, not to a fixed 1080x720. A hard-coded size larger
+    # than the screen makes the whole form render as an empty box -- and bank
+    # workstations run 1366x768, where a 720-tall dialog plus chrome does not
+    # fit. Clamp to something usable on a small screen and generous on a big one.
+    _pw = getattr(page, "width", None) or 1280
+    _ph = getattr(page, "height", None) or 800
     dialog_content = ft.Container(
         content=ft.Stack(controls=stack_controls, expand=True),
-        width=1080,
-        height=720,
+        width=max(720, min(1080, int(_pw * 0.92))),
+        height=max(480, min(720, int(_ph * 0.88))),
         bgcolor=colors["bg_secondary"],
         border_radius=6,
     )

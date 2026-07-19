@@ -359,9 +359,15 @@ def prosecute_races(admin):
 # ================================================================= BUSINESS LOGIC
 def prosecute_logic(admin):
     CAT = 'E. Business-logic bypass'
-    # delete a PENDING report (BRD: bulk delete skips pending; single delete?)
+    # delete a report that is genuinely PENDING APPROVAL (BRD 06§14: it must be
+    # decided first). A saved report now waits in the pending-FIU basket, so it
+    # has to be filed with the FIU and submitted before it is in that state --
+    # without this the charge was deleting a basket item and proving nothing.
     ag = Client(); ag.login('agent1', 'pass123')
-    ok, rid, _ = ag.make_report()  # pending
+    ok, rid, _ = ag.make_report()
+    ag.reports.update_report(rid, {'fiu_number': 'FIU-PROS-001', 'fiu_date': '04/11/2025'})
+    subok, _aid, submsg = ag.approvals.request_approval(rid, 'filed with the FIU')
+    charge(CAT, 'report could not be put into pending approval', not subok, submsg)
     ok, msg = admin.reports.delete_report(rid)
     charge(CAT, 'pending report can be soft-deleted', ok, msg)
 
@@ -426,4 +432,5 @@ if __name__ == '__main__':
     print('D. races...'); prosecute_races(admin)
     print('E. logic...'); prosecute_logic(admin)
     n = report()
-    sys.exit(0)
+    # A confirmed vulnerability is a failure, not a printout.
+    sys.exit(1 if n else 0)

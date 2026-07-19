@@ -124,6 +124,16 @@ def fuzz_method(label, fn, arg_templates):
                 finally:
                     _disarm()
 
+def _submit(client, rid, tag="conf"):
+    """Take a saved report all the way to pending_approval: file it with the
+    FIU (the details gate submission) and submit. Returns the approval_id."""
+    client.reports.update_report(rid, {'fiu_number': f'FIU-{tag}-{rid}',
+                                       'fiu_date': '04/11/2025'})
+    client.approvals.request_approval(rid, 'filed with the FIU')
+    return q1("SELECT approval_id FROM report_approvals WHERE report_id=? "
+              "AND approval_status='pending'", (rid,))
+
+
 def part1_fuzz():
     print('PART 1: crash-fuzzing service methods...')
     admin = Client(); admin.login('admin', 'Admin@1234')
@@ -235,6 +245,7 @@ def part2_conformance():
     conf('R31', 'rejected report cannot be resubmitted', not ok, msg)
     # R23 pending not deletable
     ok, rp, _ = agent.make_report({'cic': '5555555555555555'})
+    _submit(agent, rp, "r23")
     conf('R23', 'pending report not deletable', not admin.reports.delete_report(rp)[0])
     # R24 edit approved keeps approved + version increments
     v_before = q1("SELECT current_version FROM reports WHERE report_id=?", (radm,))
@@ -346,7 +357,7 @@ def part3_features():
 
     # ---- R36 rework reassign
     ok, rid2, _ = agent.make_report({'cic': '7000000000000002'})
-    ap = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid2,))
+    ap = _submit(agent, rid2, "r36a")
     okr, msg = admin.approvals.reject_report(ap, 'redo', request_rework=True, reassign_to='agent2')
     conf('R36', 'rework reassign to active agent', okr, msg)
     conf('R36', 'ownership moved to new agent', q1("SELECT created_by FROM reports WHERE report_id=?", (rid2,)) == 'agent2')
@@ -355,7 +366,7 @@ def part3_features():
     conf('R36', 'original agent can no longer edit', not agent.reports.update_report(rid2, {'reported_entity_name': 'byAlice'})[0])
     # invalid targets
     ok, rid3, _ = agent.make_report({'cic': '7000000000000003'})
-    ap3 = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid3,))
+    ap3 = _submit(agent, rid3, "r36b")
     conf('R36', 'reassign to non-agent rejected', not admin.approvals.reject_report(ap3, 'x', True, reassign_to='admin')[0])
     ap3b = q1("SELECT approval_id FROM report_approvals WHERE report_id=? AND approval_status='pending'", (rid3,))
     conf('R36', 'reassign without rework rejected', not admin.approvals.reject_report(ap3b or ap3, 'x', False, reassign_to='agent2')[0])
@@ -425,4 +436,6 @@ if __name__ == '__main__':
     except Exception as e:
         import traceback; print(f"[part3 harness error: {e}]\n{traceback.format_exc()}")
     nc, ng = report()
-    sys.exit(0)
+    # Exit non-zero when it found something. This previously exited 0 always,
+    # so every crash and every BRD gap it detected was reported as a pass.
+    sys.exit(1 if (nc or ng) else 0)
