@@ -34,9 +34,15 @@ def test_helper_mounts_and_unmounts():
     mount(page, d)
     check("mount puts the dialog on screen", len(page.overlay) == 1 and d.open is True)
     dismiss(page, d)
-    check("dismiss takes it back off", len(page.overlay) == 0 and d.open is False)
+    # dismiss CLOSES but must NOT unmount. Removing a dialog from the tree in
+    # the same breath as closing it leaves Flutter believing its modal barrier
+    # is still up: a sliver stays painted and every later click is swallowed,
+    # so the button that opens it silently stops working. Proven in a browser.
+    check("dismiss closes the dialog", d.open is False)
+    check("dismiss does NOT unmount it (that breaks the close)",
+          len(page.overlay) == 1, len(page.overlay))
     dismiss(page, d)
-    check("dismissing twice is harmless", len(page.overlay) == 0)
+    check("dismissing twice is harmless", d.open is False)
 
     dead = ft.AlertDialog(content=ft.Text("dead")); dead.open = False
     page.overlay.append(dead)
@@ -53,7 +59,14 @@ def test_repeated_dialog_cycles_do_not_pile_up():
         d = ft.AlertDialog(content=ft.Text("form"))
         mount(page, d)
         dismiss(page, d)
-    check("25 open/close cycles leave nothing behind", len(page.overlay) == 0, len(page.overlay))
+    # at most ONE closed dialog waits to be pruned -- the growth is what matters
+    check("25 open/close cycles leave at most one closed dialog behind",
+          len(page.overlay) <= 1, len(page.overlay))
+    check("and the one left is closed, not covering the page",
+          all(getattr(c, "open", None) is False for c in page.overlay),
+          [getattr(c, "open", None) for c in page.overlay])
+    mount(page, ft.AlertDialog(content=ft.Text("next")))
+    check("the next open prunes it", len(page.overlay) == 1, len(page.overlay))
 
 
 def test_toasts_do_not_stack():
@@ -101,7 +114,7 @@ def test_refused_form_still_explains_itself():
     # hammering the refusal must not leave the page covered in dead overlays
     for _ in range(8):
         show_report_dialog(page, st, report_data=None)
-    check("repeated refusals do not pile up overlays", len(page.overlay) <= 1, len(page.overlay))
+    check("repeated refusals do not pile up overlays", len(page.overlay) <= 2, len(page.overlay))
 
     # reserving again must make the form work -- this failed before the fix
     nums.reserve_block('agent1', 5)

@@ -44,12 +44,21 @@ def mount(page, control, update: bool = True):
 
 
 def dismiss(page, control, update: bool = True):
-    """Close `control` AND unmount it, so it cannot linger over the page."""
+    """Close `control`. Unmounting happens later, at the next mount().
+
+    Do NOT remove it from the overlay here. Taking a dialog out of the tree in
+    the same breath as closing it leaves Flutter believing its modal barrier is
+    still up: the window looks normal, a sliver of the dialog stays painted, and
+    every click afterwards is swallowed -- the button that opens it stops
+    working and nothing is logged. That is exactly what an earlier version of
+    this file did, and it is what Flet's own Page.close() avoids by only setting
+    `open = False` and updating.
+
+    Cleanup is not lost: mount() prunes every closed control before it adds a
+    new one, so at most one dead dialog sits in the overlay between operations
+    -- which is what Flet does on its own anyway.
+    """
     control.open = False
-    try:
-        page.overlay.remove(control)
-    except (ValueError, AttributeError):
-        pass
     if update:
         try:
             page.update()
