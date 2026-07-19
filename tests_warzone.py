@@ -125,10 +125,18 @@ def child_main():
             defect("RBAC", f"{role} was ALLOWED to {label}", val)
         return outcome
 
+    # Several supervisors work the same queue, so losing a race to decide an
+    # approval someone else just decided is the CORRECT outcome (first one
+    # wins), not a permission gap.
+    _RACE_LOST = ("already approved", "already rejected", "already rework",
+                  "already being processed", "not found")
+
     def must_allow(label, fn, *a, **k):
         outcome, val = attempt(label, fn, *a, **k)
         if outcome in ("refused", "error"):
-            defect("PERMISSION-GAP", f"{role} was DENIED {label} (should be allowed)", val)
+            msg = str(val).lower()
+            if not any(r in msg for r in _RACE_LOST):
+                defect("PERMISSION-GAP", f"{role} was DENIED {label} (should be allowed)", val)
         return outcome, val
 
     # ------------------------------------------------------- shared probes
