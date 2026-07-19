@@ -63,3 +63,25 @@ def set_button_enabled(btn, enabled: bool):
     btn.disabled = not enabled
     btn.opacity = 1.0 if enabled else 0.45
     btn.update()
+
+
+def disabled_aware_style(bgcolor, color=None):
+    """Button colours that actually change when the button is disabled.
+
+    ft.ElevatedButton(bgcolor=..., disabled=True) keeps the bgcolor: the button
+    renders exactly like an enabled one and silently swallows the click. A user
+    presses it, nothing happens, nothing explains why -- the same "no feedback"
+    failure as a missing error message. Per-state colours make the disabled
+    state visible.
+    """
+    c = theme_manager.get_colors()
+    return ft.ButtonStyle(
+        bgcolor={
+            ft.ControlState.DISABLED: c.get("bg_tertiary", "#e9ecef"),
+            ft.ControlState.DEFAULT: bgcolor,
+        },
+        color={
+            ft.ControlState.DISABLED: c.get("text_muted", "#9aa0a6"),
+            ft.ControlState.DEFAULT: color or "#ffffff",
+        },
+    )

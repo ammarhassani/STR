@@ -295,6 +295,23 @@ Only users with Admin role can approve reports.
     # pending-FIU basket (shared queue)
     "nav.fiu_basket": "Pending FIU",
 
+    # dashboard widget chrome (placeholders and table headers were English-only)
+    "dash.no_data": "no data",
+    "dd.add_value": "Add Value",
+    "dd.read_only": "Read-Only",
+    "dd.loading": "Loading values...",
+    "dash.col.cic": "CIC",
+    "dash.col.reports": "Reports",
+    "dash.col.entities": "Entities",
+    "dash.col.account": "Account",
+    "dash.col.label": "Label",
+    "dash.col.value": "Value",
+    "dash.col.month": "Month",
+    "dash.col.status": "Status",
+    "dash.col.classification": "Classification",
+    "dash.col.entity": "Entity",
+    "dash.col.count": "Count",
+
     # retrospective import (historical data from the old spreadsheets)
     "retro.title": "Import Historical Reports",
     "retro.subtitle": "Bring the unit's pre-STR reports in from a filled template. The whole file is refused unless every row is clean, and the refusal lists every problem found.",

@@ -178,6 +178,45 @@ def test_migration_seed_is_idempotent():
     check("re-running migration does not duplicate seeded widgets", n == 1, n)
 
 
+def test_widgets_never_print_python_at_the_user():
+    """A NULL metric reached the dashboard as the literal word "None".
+
+    'Rework Rate %' divides by NULLIF(COUNT(*),0), so with no reports the value
+    is NULL -- correct SQL, since a rate over nothing is unknown, not zero. The
+    renderer did str(None) and the tile read "None".
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
+    from components.widget_renderer import _single_value
+    shown = _single_value([{'value': None}])
+    check("a NULL metric is not rendered as the word 'None'", shown != 'None', shown)
+    check("it shows an em dash for 'unknown'", shown == '—', shown)
+    check("zero is still zero, not unknown", _single_value([{'value': 0}]) == '0')
+    check("a whole float loses its .0", _single_value([{'value': 12.0}]) == '12')
+    for junk in ([{'value': ''}], [{}], []):
+        out = _single_value(junk)
+        check(f"{junk!r} renders as text, never a Python repr",
+              'None' not in out and '{' not in out, out)
+
+
+def test_widget_chrome_is_translated():
+    """The dashboard was mostly Arabic with English 'no data' and English table
+    headers sitting inside a right-to-left layout."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'flet_app'))
+    from i18n import set_language, t
+    try:
+        for key in ('dash.no_data', 'dash.col.cic', 'dash.col.reports',
+                    'dash.col.entities', 'dash.col.account'):
+            set_language('en')
+            en = t(key)
+            set_language('ar')
+            ar = t(key)
+            check(f"'{key}' has an English string", en != key, en)
+            check(f"'{key}' is actually translated for Arabic", ar != key and ar != en,
+                  f"en={en!r} ar={ar!r}")
+    finally:
+        set_language('en')
+
+
 if __name__ == "__main__":
     test_query_validation()
     test_run_widget_query_is_readonly()
@@ -185,5 +224,7 @@ if __name__ == "__main__":
     test_get_dashboard_widgets_normalizes_and_survives_bad_widget()
     test_all_seeded_widgets_valid_and_runnable()
     test_migration_seed_is_idempotent()
+    test_widgets_never_print_python_at_the_user()
+    test_widget_chrome_is_translated()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

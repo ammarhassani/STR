@@ -3,6 +3,7 @@ Backup & Restore Dialog for FIU Report Management System.
 Comprehensive backup and restore functionality for database.
 """
 import flet as ft
+from components.app_button import disabled_aware_style
 from components.overlay import (mount as _overlay_mount,
                                 dismiss as _overlay_dismiss)
 from i18n import t
@@ -61,8 +62,7 @@ def show_backup_restore_dialog(
         "Restore Selected",
         icon=ft.Icons.RESTORE,
         disabled=True,
-        bgcolor=colors["primary"],
-        color=ft.Colors.WHITE,
+        style=disabled_aware_style(colors["primary"], ft.Colors.WHITE),
     )
 
     export_btn = ft.ElevatedButton(
@@ -75,8 +75,7 @@ def show_backup_restore_dialog(
         "Delete",
         icon=ft.Icons.DELETE,
         disabled=True,
-        bgcolor=colors["danger"],
-        color=ft.Colors.WHITE,
+        style=disabled_aware_style(colors["danger"], ft.Colors.WHITE),
     )
 
     def get_backup_dir() -> Path:

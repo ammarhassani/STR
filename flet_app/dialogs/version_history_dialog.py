@@ -4,6 +4,7 @@ Shows version history with diff comparison, delete options, and activity log.
 GitHub-style version management.
 """
 import flet as ft
+from components.app_button import disabled_aware_style
 from components.overlay import (mount as _overlay_mount,
                                 dismiss as _overlay_dismiss)
 from i18n import t
@@ -572,8 +573,7 @@ def show_version_history_dialog(
     compare_btn = ft.ElevatedButton(
         "Compare (0/2)",
         icon=ft.Icons.COMPARE_ARROWS,
-        bgcolor=colors["bg_tertiary"],
-        color=colors["text_primary"],
+        style=disabled_aware_style(colors["bg_tertiary"], colors["text_primary"]),
         disabled=True,
         on_click=compare_versions,
     )

@@ -3,6 +3,7 @@ Dropdown Management View for FIU Report Management System.
 Admin panel for managing dropdown values (CRUD operations).
 """
 import flet as ft
+from components.app_button import disabled_aware_style
 from components.overlay import (mount as _overlay_mount,
                                 dismiss as _overlay_dismiss)
 from components.searchable_dropdown import searchable_dropdown
@@ -188,7 +189,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                     )
             else:
                 action_controls.append(
-                    ft.Text("Read-Only", size=11, color=colors["text_muted"], italic=True)
+                    ft.Text(t("dd.read_only"), size=11, color=colors["text_muted"], italic=True)
                 )
 
             rows.append(
@@ -488,10 +489,9 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
                 ft.Container(expand=True),
                 ft.ElevatedButton(
                     ref=add_btn_ref,
-                    text="Add Value",
+                    text=t("dd.add_value"),
                     icon=ft.Icons.ADD,
-                    bgcolor=colors["primary"],
-                    color=ft.Colors.WHITE,
+                    style=disabled_aware_style(colors["primary"], ft.Colors.WHITE),
                     on_click=handle_add,
                     disabled=True,
                 ),
@@ -518,7 +518,7 @@ def build_dropdown_management_view(page: ft.Page, app_state: Any) -> ft.Column:
         content=ft.Column(
             controls=[
                 ft.ProgressRing(width=32, height=32, color=colors["primary"]),
-                ft.Text("Loading values...", color=colors["text_secondary"]),
+                ft.Text(t("dd.loading"), color=colors["text_secondary"]),
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             alignment=ft.MainAxisAlignment.CENTER,

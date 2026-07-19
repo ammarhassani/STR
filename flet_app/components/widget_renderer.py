@@ -46,6 +46,10 @@ def _single_value(data: List[Dict]) -> str:
     else:
         keys = list(row.keys())
         v = row[keys[0]] if keys else 0
+    if v is None:
+        # A rate over no reports is NULL, not zero -- SQL says so via NULLIF.
+        # str(None) put the literal word "None" on the dashboard.
+        return "—"
     if isinstance(v, float) and v.is_integer():
         v = int(v)
     return str(v)
@@ -77,8 +81,16 @@ def _kpi_card(colors, widget):
 
 def _table_widget(colors, widget):
     cols = widget.get('columns') or (list(widget['data'][0].keys()) if widget['data'] else [])
+
+    def _col_label(name):
+        """Column names come from the widget's SQL alias, so they are English.
+        Translate the ones we ship; leave an admin's custom alias alone."""
+        key = f"dash.col.{str(name).strip().lower().replace(' ', '_')}"
+        label = t(key)
+        return name if label == key else label
+
     table = ft.DataTable(
-        columns=[ft.DataColumn(ft.Text(c, weight=ft.FontWeight.BOLD, size=12,
+        columns=[ft.DataColumn(ft.Text(_col_label(c), weight=ft.FontWeight.BOLD, size=12,
                                        color=colors["text_primary"])) for c in cols],
         rows=[ft.DataRow(cells=[ft.DataCell(ft.Text(str(r.get(c, '')), size=12,
                                                     color=colors["text_secondary"])) for c in cols])
@@ -117,14 +129,14 @@ def render_widget(widget: Dict[str, Any]) -> ft.Control:
         return _table_widget(colors, widget)
     if wtype == 'pie_chart':
         return _card(colors, create_pie_chart(_label_value(data, columns), title=title, height=250).content
-                     if data else ft.Text(f"{title}: no data", color=colors["text_muted"]))
+                     if data else ft.Text(f"{title}: {t('dash.no_data')}", color=colors["text_muted"]))
     if wtype == 'bar_chart':
         return _card(colors, create_bar_chart(_label_value(data, columns), title=title, height=250).content
-                     if data else ft.Text(f"{title}: no data", color=colors["text_muted"]))
+                     if data else ft.Text(f"{title}: {t('dash.no_data')}", color=colors["text_muted"]))
     if wtype == 'line_chart':
         return _card(colors, create_line_chart(_label_value(data, columns), title=title, height=250,
                                                x_key='label', y_key='value').content
-                     if data else ft.Text(f"{title}: no data", color=colors["text_muted"]))
+                     if data else ft.Text(f"{title}: {t('dash.no_data')}", color=colors["text_muted"]))
     return _error_card(colors, {'title': title, 'error': f"Unknown widget type: {wtype}"})
 
 

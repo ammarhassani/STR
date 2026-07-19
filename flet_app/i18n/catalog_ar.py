@@ -297,6 +297,23 @@ STRINGS = {
     # سلة بانتظار بيانات وحدة التحرّيات (قائمة مشتركة)
     "nav.fiu_basket": "بانتظار الوحدة",
 
+    # عناصر لوحة المعلومات
+    "dash.no_data": "لا توجد بيانات",
+    "dd.add_value": "إضافة قيمة",
+    "dd.read_only": "للقراءة فقط",
+    "dd.loading": "جارٍ تحميل القيم...",
+    "dash.col.cic": "رقم CIC",
+    "dash.col.reports": "التقارير",
+    "dash.col.entities": "الجهات",
+    "dash.col.account": "الحساب",
+    "dash.col.label": "البيان",
+    "dash.col.value": "القيمة",
+    "dash.col.month": "الشهر",
+    "dash.col.status": "الحالة",
+    "dash.col.classification": "التصنيف",
+    "dash.col.entity": "الجهة",
+    "dash.col.count": "العدد",
+
     # استيراد التقارير التاريخية
     "retro.title": "استيراد التقارير التاريخية",
     "retro.subtitle": "أدخل تقارير الوحدة السابقة من ملف القالب. يُرفض الملف بالكامل ما لم تكن كل الصفوف سليمة، ويُعرض في الرفض كل خطأ تم العثور عليه.",
