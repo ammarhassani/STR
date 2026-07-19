@@ -79,7 +79,39 @@ read access to the repo, the repo cloned to the same folder (e.g. `C:\STR`).
 > screenshots at the 👁 steps, and diff against expected. The 👁 steps are the
 > only ones needing a human/vision check.
 
-### Phase A — First install on the HOST (once per site)
+### Phase 0 — Prove the share is real (do this before A)
+
+`deploy\smb_lab.ps1` sets the share up and then checks it. Run it elevated on
+the host, and as a normal user on each client:
+
+```powershell
+# on the HOST pc, as administrator
+.\deploy\smb_lab.ps1 -Role Host
+# on EACH client pc
+.\deploy\smb_lab.ps1 -Role Client -HostName VM-HOST
+```
+
+It verifies the client can write to the share root (STR needs that for
+`str_bus`), that a rename lands atomically, what the share does when you replace
+a file another PC holds open, how slow it really is, and that each PC can see
+the markers the others left.
+
+> **A loopback UNC path is not a share.** Measured on the dev machine,
+> `\localhost\C$`, `\<own-LAN-IP>\C$` and `\<own-hostname>\C$` all run at
+> **1.0x local-disk speed** - Windows short-circuits a connection to itself. Any
+> run where the client and the share are the same PC proves nothing about
+> locking, latency or a dropped session, and the script warns when it detects
+> that. Phases A-K need two machines.
+
+The failure modes a real share produces are covered deterministically by
+`tests_smb_faults.py`, which injects the actual Windows error codes
+(ERROR_SHARING_VIOLATION, ERROR_ACCESS_DENIED, ERROR_NETNAME_DELETED,
+ERROR_UNEXP_NET_ERR) into the file operations STR performs against the share.
+That suite found a real defect: the host's replica publish survived a locked
+file but **crashed when the share dropped**, because only `PermissionError` was
+being retried.
+
+### Phase A - First install on the HOST (once per site)
 
 | # | Step | Expected | ✅ |
 |---|------|----------|----|
