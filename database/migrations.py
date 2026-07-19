@@ -1612,6 +1612,30 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Widget Arabic titles skipped: {str(e)}")
 
+        # Retrospective import: 20 years of pre-STR history arrives from Excel.
+        # Each imported report records the batch it came from, so "where did
+        # this record come from?" is answerable to an auditor and a bad batch
+        # can be removed cleanly.
+        try:
+            cursor.execute("PRAGMA table_info(reports)")
+            if 'import_batch_id' not in [c[1] for c in cursor.fetchall()]:
+                cursor.execute("ALTER TABLE reports ADD COLUMN import_batch_id TEXT")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_reports_import_batch "
+                               "ON reports(import_batch_id)")
+                messages.append("Added import_batch_id column to reports")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS import_batches (
+                    batch_id TEXT PRIMARY KEY,
+                    source_file TEXT NOT NULL,
+                    row_count INTEGER NOT NULL,
+                    imported_by TEXT NOT NULL,
+                    imported_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
+        except Exception as e:
+            messages.append(f"Retrospective import setup skipped: {str(e)}")
+
         # Customer segment (owner directive): Retail (an individual person) or
         # Corporate. It also decides what the ID field holds -- a Corporate
         # customer has a commercial registration, a Retail one a national ID --

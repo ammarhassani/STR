@@ -173,6 +173,12 @@ class AppState:
             # get history too -- not only the ones made through a dialog
             self.report_service.set_version_service(self.version_service)
 
+            # retrospective import: 20 years of pre-STR history from Excel
+            from services.retrospective_import import RetrospectiveImportService
+            self.retrospective_import_service = RetrospectiveImportService(
+                self.db_manager, self.logging_service, self.auth_service,
+                self.report_service, self.report_number_service)
+
             # Maintenance schedulers: auto-purge (R80) + weekly backup (R107).
             # Client mode reads a throwaway, read-only replica - a local
             # purge/backup would write to it (and now crash on the ro

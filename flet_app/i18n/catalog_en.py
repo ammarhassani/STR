@@ -294,6 +294,24 @@ Only users with Admin role can approve reports.
 
     # pending-FIU basket (shared queue)
     "nav.fiu_basket": "Pending FIU",
+
+    # retrospective import (historical data from the old spreadsheets)
+    "retro.title": "Import Historical Reports",
+    "retro.subtitle": "Bring the unit's pre-STR reports in from a filled template. The whole file is refused unless every row is clean, and the refusal lists every problem found.",
+    "retro.get_template": "Get Template",
+    "retro.upload": "Upload Filled File",
+    "retro.save_template": "Save the blank template",
+    "retro.choose_file": "Choose the filled template",
+    "retro.template_written": "Template written to {path}. Fill it, then upload it here.",
+    "retro.working": "Checking {name}...",
+    "retro.imported": "Imported {n} historical report(s) from {name}.",
+    "retro.imported_short": "{n} historical report(s) imported",
+    "retro.batch": "Import batch {id}",
+    "retro.refused": "The file was refused. Nothing was imported.",
+    "retro.problems_heading": "Every problem found, grouped by type:",
+    "retro.example_rows": "rows: {rows}",
+    "retro.err.unavailable": "Historical import is not available in this session.",
+    "admin.import_history": "Import History",
     "fiu.title": "Reports waiting for FIU details",
     "fiu.subtitle": "Saved reports that still need the number the FIU issues. File the report on the FIU portal, then add its details here and submit it for approval.",
     "fiu.empty": "Nothing is waiting for FIU details.",

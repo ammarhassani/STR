@@ -243,6 +243,11 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
         status_filter = status_filter_ref.current.value if status_filter_ref.current else "All"
         page.run_task(load_users)
 
+    def handle_import_history(e):
+        """Bring the unit's pre-STR history in from a filled template."""
+        from dialogs.retrospective_import_dialog import show_retrospective_import_dialog
+        show_retrospective_import_dialog(page, app_state)
+
     def handle_add_user(e):
         """Handle add user button."""
         show_user_dialog(
@@ -322,6 +327,11 @@ def build_admin_panel_view(page: ft.Page, app_state: Any) -> ft.Column:
                 color=colors["text_primary"],
             ),
             ft.Container(expand=True),
+            ft.OutlinedButton(
+                t("admin.import_history"),
+                icon=ft.Icons.HISTORY_EDU,
+                on_click=handle_import_history,
+            ),
             ft.ElevatedButton(
                 t("users.add"),
                 icon=ft.Icons.PERSON_ADD,

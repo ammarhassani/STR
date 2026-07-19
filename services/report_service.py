@@ -239,8 +239,12 @@ class ReportService:
             # is reusable). Data-integrity rule — enforced here, not just the UI.
             cic = report_data.get('cic')
             if cic:
+                # Historical (archived) reports are lookup material, not live
+                # work: a customer reported in 2011 must never stop a filing
+                # today. They still show in the CIC intelligence banner.
                 dup = self.db_manager.execute_with_retry(
-                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0", (cic,))
+                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0 "
+                    "AND approval_status != 'archived'", (cic,))
                 if dup and dup[0][0] > 0:
                     return False, None, "A report already exists for this CIC"
 
@@ -418,8 +422,17 @@ class ReportService:
 
             # Authorization: admins edit any report; agents only their own;
             # reporters not at all. Uses the RBAC ownership rule.
-            if not self.auth_service.has_permission('edit_report',
-                                                    resource_owner=old_report.get('created_by')):
+            is_archived = (old_report.get('approval_status') or '') == 'archived'
+            if is_archived:
+                # An imported historical record has no author in this app -- it
+                # predates it. Anyone who may edit reports may correct a
+                # transcription error in one; the edit is versioned like any
+                # other. Stated here rather than leaning on the fact that a
+                # None owner happens to pass the ownership check.
+                if not self.auth_service.has_permission('edit_report'):
+                    return False, "You do not have permission to edit this report"
+            elif not self.auth_service.has_permission(
+                    'edit_report', resource_owner=old_report.get('created_by')):
                 return False, "You do not have permission to edit this report"
 
             # A report under approval must not change underneath its approver.
@@ -437,7 +450,8 @@ class ReportService:
             # CIC / Case ID uniqueness across other non-deleted reports
             if report_data.get('cic'):
                 dup = self.db_manager.execute_with_retry(
-                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0 AND report_id != ?",
+                    "SELECT COUNT(*) FROM reports WHERE cic = ? AND is_deleted = 0 "
+                    "AND report_id != ? AND approval_status != 'archived'",
                     (report_data['cic'], report_id))
                 if dup and dup[0][0] > 0:
                     return False, "A report already exists for this CIC"

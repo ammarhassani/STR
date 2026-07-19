@@ -1,6 +1,6 @@
 # Retrospective import — bringing 20 years of Excel history into STR
 
-**Status:** approved design, not yet implemented
+**Status:** implemented 2026-07-19 — `services/retrospective_import.py`, `flet_app/dialogs/retrospective_import_dialog.py`, `tests_retrospective_import.py`
 **Date:** 2026-07-19
 **Owner decision record.** Every choice below was made by the FIU unit owner; the
 reasoning is recorded so a later reader knows what was deliberate.
@@ -170,3 +170,33 @@ data-cleansing problem to solve before import, not a rule to relax.
 the form labels come from), so it stays in step with the app automatically. It
 must be checked against one real Excel file before the first import, to catch
 fields the old team recorded that STR has no column for.
+
+
+## Measured
+
+A generated 60,000-row file (5.8 MB, 20 years) on the dev workstation:
+
+| step | time |
+|------|------|
+| read the spreadsheet | 4.7 s |
+| validate all 60,000 rows | 0.6 s |
+| import in one transaction | 1.2 s |
+| **total the user waits** | **6.4 s** |
+
+Afterwards, against those 60,000 archived records: entity search 41 ms, CIC
+lookup 15 ms. The import runs on a background thread with a progress bar, so
+the window stays responsive.
+
+## Decisions made during implementation
+
+**A short CIC is padded, not rejected.** A CIC is a fixed 16-digit code and the
+bank prints it without leading zeros — the report form already pads on entry
+(`finalize_cic`). Historical spreadsheets carry the short form, so the importer
+pads to 16 the same way. Rejecting would have been wrong, and storing the short
+form would have meant an imported CIC never matching one typed today. Only
+non-digits or more than 16 digits are refused.
+
+**Import is refused on a client PC.** A client works against a read-only
+replica, and pushing 60,000 rows through the command queue would be absurd. The
+service says so plainly instead of failing on "attempt to write a readonly
+database".
