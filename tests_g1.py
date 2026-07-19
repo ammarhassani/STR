@@ -315,8 +315,38 @@ def test_launchers_survive_a_second_run():
         check(f"{name} still starts the app", "main.py" in cmd_line)
 
 
+def test_unc_share_misconfiguration_is_caught():
+    """A share path meant to be UNC but written with ONE backslash.
+
+    On Windows that is not an error: it resolves to a folder on the local C:
+    drive. STR then runs happily against a directory no other PC can see -- the
+    host publishes a replica nobody reads and clients queue commands nobody
+    answers. Nothing fails; the unit just silently stops sharing data. Easy to
+    do when hand-editing config.json, where each backslash must be doubled.
+    """
+    from config import Config
+    B = chr(92)
+    saved_mode, saved_share = Config.MODE, Config.SHARE_PATH
+    try:
+        Config.MODE = "host"
+        check("a single-backslash share path is flagged",
+              Config.warn_if_share_looks_local(B + "SERVER" + B + "share") is not None)
+        check("a proper UNC path is accepted",
+              Config.warn_if_share_looks_local(B + B + "SERVER" + B + "share") is None)
+        check("a mapped drive is accepted",
+              Config.warn_if_share_looks_local("Z:" + B + "STR_data") is None)
+        check("a local path is accepted",
+              Config.warn_if_share_looks_local("C:" + B + "STR_data") is None)
+        Config.MODE = "local"
+        check("local mode says nothing (it has no share)",
+              Config.warn_if_share_looks_local(B + "SERVER" + B + "x") is None)
+    finally:
+        Config.MODE, Config.SHARE_PATH = saved_mode, saved_share
+
+
 if __name__ == "__main__":
     test_config_mode()
+    test_unc_share_misconfiguration_is_caught()
     test_host_login_returns_user()
     test_replica_sync()
     test_client_replica_readonly()

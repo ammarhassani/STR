@@ -6,6 +6,7 @@ import json
 import os
 import socket
 from pathlib import Path
+from typing import Optional
 from uuid import uuid4
 
 from utils import utf8_console  # noqa: F401 - side effect: UTF-8 console on Windows
@@ -88,9 +89,40 @@ class Config:
         base = cls.SHARE_PATH or cls.BACKUP_PATH
         if not base:
             base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else "."
+        cls.warn_if_share_looks_local(base)
         bus_dir = os.path.join(base, "str_bus")
         os.makedirs(bus_dir, exist_ok=True)
         return bus_dir
+
+    @classmethod
+    def warn_if_share_looks_local(cls, base: str) -> Optional[str]:
+        r"""Catch a share path that was MEANT to be a UNC path but isn't.
+
+        `\\SERVER\share` written with one backslash instead of two --
+        easy to do when hand-editing config.json, where every backslash has to
+        be doubled -- is not an error on Windows. It resolves to a directory on
+        the local C: drive. STR then runs happily against a folder nobody else
+        can see: the host publishes a replica no client will ever read, and the
+        clients queue commands no host will ever answer. Nothing fails, and the
+        unit quietly stops sharing data.
+
+        Returns the warning text (also printed), or None when the path is fine.
+        """
+        if cls.MODE not in ("host", "client") or not base:
+            return None
+        looks_meant_to_be_unc = (
+            base.startswith("\\") and not base.startswith("\\\\")
+            and not base.startswith("\\?")
+        )
+        if not looks_meant_to_be_unc:
+            return None
+        msg = (f"[CONFIG][WARN] share_path {base!r} starts with a single backslash. "
+               f"On Windows that is a LOCAL path ({os.path.abspath(base)!r}), not a "
+               f"network share, so no other PC will see this data. A UNC path needs "
+               f"two leading backslashes -- in config.json that is four: "
+               f'"share_path": "\\\\SERVER\\share".')
+        print(msg)
+        return msg
 
     @classmethod
     def get_client_replica_path(cls) -> str:
