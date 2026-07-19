@@ -117,6 +117,49 @@ def test_role_creation_and_routing():
     check("a DIFFERENT approver can approve it", okother, msgother)
 
 
+def test_only_the_owner_can_submit_for_approval():
+    """Submitting is an act on the report, so it takes the same right as editing.
+
+    request_approval checked authentication, the report's status and its FIU
+    fields -- but never asked whether THIS user was entitled to the report. Any
+    authenticated account could therefore push any report into a supervisor's
+    queue: a reporter, who has no data-entry rights at all, or one agent
+    dumping another agent's half-finished work in front of a supervisor. The
+    warzone caught it only intermittently, because it needs someone else's
+    submittable report to exist first; these cases make it deterministic.
+    """
+    dbm, auth, numbers, reports, approvals = _services()
+    auth.authenticate('admin', 'Admin@1234')
+    for u, role in [('ag1', 'agent'), ('ag2', 'agent'), ('rep1', 'reporter')]:
+        auth.create_user(u, 'Pass@123', u.title(), role)
+
+    # Each intruder gets its OWN untouched report. Sharing one report made the
+    # second assertion pass even with the gate removed -- the first intruder's
+    # successful submit left the report pending, so the second was refused as
+    # "already pending approval" rather than on the rule under test.
+    ok1, rid1, _a1, msg1 = _make_and_submit(dbm, auth, numbers, reports, 'ag1')
+    ok2, rid2, _a2, msg2 = _make_and_submit(dbm, auth, numbers, reports, 'ag1')
+    check("ag1 has two reports waiting in the basket", ok1 and ok2, msg1 or msg2)
+
+    auth.authenticate('rep1', 'Pass@123')
+    okr, _, msgr = approvals.request_approval(rid1, 'not my report')
+    check("reporter CANNOT submit someone else's report", not okr, msgr)
+
+    auth.authenticate('ag2', 'Pass@123')
+    oka, _, msga = approvals.request_approval(rid2, 'not my report either')
+    check("an agent CANNOT submit another agent's report", not oka, msga)
+
+    rows = dbm.execute_with_retry(
+        "SELECT approval_status FROM reports WHERE report_id IN (?,?)", (rid1, rid2))
+    check("neither report left its basket",
+          all(r[0] != 'pending_approval' for r in rows), [r[0] for r in rows])
+
+    # and the owner is still able to submit their own
+    auth.authenticate('ag1', 'Pass@123')
+    oko, apid, msgo = approvals.request_approval(rid1, 'mine, filed with the FIU')
+    check("the owner CAN still submit their own report", oko and apid, msgo)
+
+
 def test_migration_rebuilds_old_check():
     """An existing DB whose users CHECK predates 'supervisor' gets rebuilt so the
     role can be inserted."""
@@ -237,6 +280,7 @@ def test_my_work_lanes_and_review_comment():
 if __name__ == "__main__":
     test_permissions_map()
     test_role_creation_and_routing()
+    test_only_the_owner_can_submit_for_approval()
     test_migration_rebuilds_old_check()
     test_submit_autosaves()
     test_my_work_lanes_and_review_comment()

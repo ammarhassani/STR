@@ -56,6 +56,14 @@ class ApprovalService:
             if not report:
                 return False, None, "Report not found"
 
+            # Submitting is an act ON the report, so it takes the same right as
+            # editing it. Without this, ANY authenticated user -- including a
+            # reporter, who has no data-entry rights at all -- could push
+            # someone else's report into a supervisor's approval queue.
+            if not self.auth_service.has_permission(
+                    'edit_report', resource_owner=report.get('created_by')):
+                return False, None, "You do not have permission to submit this report"
+
             # Check current approval status
             current_approval_status = report.get('approval_status', 'draft')
             if current_approval_status == 'pending_approval':
