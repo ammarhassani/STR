@@ -350,7 +350,7 @@ def show_report_dialog(
         if report_number_ref.current:
             value = report_number_ref.current.value.strip() if report_number_ref.current.value else ""
             if value:
-                if not re.match(r'^\d{4}/\d{2}/\d{3}$', value):
+                if not re.match(r'^\d{4}/\d{2}/\d{3,}$', value):
                     report_number_ref.current.error_text = "Format: YYYY/MM/NNN"
                 else:
                     report_number_ref.current.error_text = None
@@ -594,7 +594,7 @@ def show_report_dialog(
                 errors.append("Serial Number must be a number")
 
         report_num = form_data.get('report_number', '')
-        if report_num and not re.match(r'^\d{4}/\d{2}/\d{3}$', str(report_num)):
+        if report_num and not re.match(r'^\d{4}/\d{2}/\d{3,}$', str(report_num)):
             if "Report Number" not in str(errors):
                 errors.append("Report Number must be in format YYYY/MM/NNN (e.g., 2025/11/001)")
 

@@ -4,6 +4,7 @@ Provides comprehensive logging with database persistence and audit trail.
 """
 
 import logging
+import logging.handlers
 import traceback
 import json
 from datetime import datetime
@@ -107,6 +108,26 @@ class DatabaseLogHandler(logging.Handler):
         self.user_context = {}
 
 
+class _SharedRotatingFileHandler(logging.handlers.RotatingFileHandler):
+    """A rotating file handler that survives another process holding the file.
+
+    On this deployment a host PC runs the host process AND the desktop client,
+    and both log to the same file. When it reaches the rollover size, Windows
+    refuses the rename because the other process still has the file open --
+    logging then raises on every record and the app stalls exactly when it has
+    been busiest. Keep writing to the current file instead; the size cap is a
+    housekeeping preference, not a reason to take the app down.
+    """
+
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except (OSError, PermissionError):
+            # another process owns the file right now; it will roll it over
+            if self.stream is None:
+                self.stream = self._open()
+
+
 class LoggingService:
     """
     Centralized logging service that manages both file and database logging.
@@ -114,7 +135,7 @@ class LoggingService:
     """
 
     def __init__(self, db_manager, log_dir: Optional[Path] = None, db_logging: bool = True,
-                 auth_service=None):
+                 auth_service=None, log_filename: str = 'app.log'):
         """
         Initialize the logging service.
 
@@ -137,8 +158,8 @@ class LoggingService:
         self.logger.handlers.clear()
 
         # Add file handler
-        file_handler = logging.handlers.RotatingFileHandler(
-            self.log_dir / 'app.log',
+        file_handler = _SharedRotatingFileHandler(
+            self.log_dir / log_filename,
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
             encoding='utf-8'  # Windows defaults to cp1252 -> Arabic log lines are lost
@@ -440,5 +461,3 @@ class LoggingService:
         return stats
 
 
-# Import logging.handlers for RotatingFileHandler
-import logging.handlers

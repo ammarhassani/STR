@@ -69,55 +69,41 @@ class ReportNumberService:
         # Month prefix is the current calendar month (auto rollover).
         prefix = self._active_month(cursor) + "/"
 
-        # Get next report number for this month
-        # Extract the maximum number from existing reports (not COUNT!)
-        cursor.execute("""
-            SELECT report_number
+        # The sequence number must be compared as a NUMBER, not as text.
+        # 'YYYY/MM/1000' sorts BELOW 'YYYY/MM/999' lexically, so ORDER BY
+        # report_number DESC reported 999 as the highest number forever: the
+        # 1000th report of a month was issued a number that already existed and
+        # every reservation after it failed on the UNIQUE constraint. At 20
+        # analysts filing 50 a day that is one single day of work before the
+        # unit cannot file anything at all (proven by tests_simulation_fortnight).
+        # The month prefix is 'YYYY/MM/' -- 8 characters -- so the sequence
+        # starts at position 9.
+        seq = "CAST(substr(report_number, 9) AS INTEGER)"
+
+        cursor.execute(f"""
+            SELECT COALESCE(MAX({seq}), 0)
             FROM reports
             WHERE report_number LIKE ?
-            ORDER BY report_number DESC
-            LIMIT 1
         """, (f"{prefix}%",))
+        max_existing_num = cursor.fetchone()[0] or 0
 
-        result = cursor.fetchone()
-        max_existing_num = 0
-        if result:
-            # Extract number from "2025/11/003" -> 3
-            last_report = result[0]
-            max_existing_num = int(last_report.split('/')[-1])
-
-        # Also check reserved numbers for this month
-        cursor.execute("""
-            SELECT report_number
+        cursor.execute(f"""
+            SELECT COALESCE(MAX({seq}), 0)
             FROM report_number_reservations
             WHERE report_number LIKE ? AND is_used = 0
-            ORDER BY report_number DESC
-            LIMIT 1
         """, (f"{prefix}%",))
+        max_reserved_num = cursor.fetchone()[0] or 0
 
-        result = cursor.fetchone()
-        max_reserved_num = 0
-        if result:
-            # Extract number from "2025/11/003" -> 3
-            last_reserved = result[0]
-            max_reserved_num = int(last_reserved.split('/')[-1])
-
-        # Also check owned-block reservations (reserved_numbers): these hold
-        # report_number permanently (UNIQUE NOT NULL), including numbers
-        # allocated earlier in the *same* reserve_block loop/transaction —
-        # without this a multi-number reserve_block would generate the same
-        # number repeatedly and hit the UNIQUE constraint.
-        cursor.execute("""
-            SELECT report_number
+        # Owned-block reservations hold report_number permanently (UNIQUE NOT
+        # NULL), including numbers allocated earlier in the *same* reserve_block
+        # transaction — without this a multi-number reserve would generate the
+        # same number repeatedly and hit the UNIQUE constraint.
+        cursor.execute(f"""
+            SELECT COALESCE(MAX({seq}), 0)
             FROM reserved_numbers
             WHERE report_number LIKE ?
-            ORDER BY report_number DESC
-            LIMIT 1
         """, (f"{prefix}%",))
-        result = cursor.fetchone()
-        max_block_num = 0
-        if result:
-            max_block_num = int(result[0].split('/')[-1])
+        max_block_num = cursor.fetchone()[0] or 0
 
         # Next number is max of all three + 1 (ensures no conflicts!)
         next_num = max(max_existing_num, max_reserved_num, max_block_num) + 1

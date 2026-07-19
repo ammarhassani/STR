@@ -150,10 +150,54 @@ def test_release_numbers():
         check(f"release refuses junk input {junk!r}", not okj)
 
 
+def test_sequence_crosses_one_thousand():
+    """A month with more than 999 reports.
+
+    'YYYY/MM/1000' sorts BELOW 'YYYY/MM/999' as text, so a lexical MAX reported
+    999 as the highest number forever: the 1000th report of the month was
+    handed a number that already existed and every reservation after it failed
+    on the UNIQUE constraint. At 20 analysts filing 50 a day that is one day of
+    work before the unit cannot file at all.
+    """
+    dbm, auth, N, R = _setup()
+    auth.authenticate('agent1', 'Pass@123')
+
+    # walk the sequence up to 1010 in blocks (the cap is 100 per reserve)
+    issued = []
+    for _ in range(11):
+        ok, block, msg = N.reserve_block('agent1', 100)
+        check("reserve past the previous 999 ceiling", ok, msg)
+        if not ok:
+            break
+        issued.extend(block)
+
+    check("issued more than a thousand numbers in one month", len(issued) >= 1000, len(issued))
+    check("every number is unique", len(set(issued)) == len(issued),
+          len(issued) - len(set(issued)))
+
+    seqs = sorted(int(n.split('/')[-1]) for n in issued)
+    check("the sequence is continuous with no gaps or repeats",
+          seqs == list(range(1, len(seqs) + 1)), seqs[:5] + ['...'] + seqs[-5:])
+    check("it really did cross 1000", max(seqs) >= 1000, max(seqs))
+
+    # the four-digit number must also survive the format rule the UI applies
+    from services.validation_service import ValidationService
+    vs = ValidationService(dbm, None)
+    big = [n for n in issued if int(n.split('/')[-1]) >= 1000][0]
+    ok, msg = vs.validate_field_generic('report_number', big, check_required=False)
+    check("a four-digit report number passes validation", ok, f"{big}: {msg}")
+
+    # and a report can actually be filed on one
+    okc, rid, msgc = R.create_report({'report_date': '01/07/2026',
+                                      'reported_entity_name': 'Report One Thousand'})
+    check("a report can be filed after crossing 1000", okc, msgc)
+
+
 if __name__ == "__main__":
     test_calendar_month_no_grace()
     test_rollover_and_reservation_persistence()
     test_year_rollover()
     test_release_numbers()
+    test_sequence_crosses_one_thousand()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail)+' FAILED'}")
     sys.exit(1 if _fail else 0)

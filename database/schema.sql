@@ -331,7 +331,7 @@ INSERT OR IGNORE INTO system_config (config_key, config_value, config_type, conf
 -- Default Column Settings (All Report Fields)
 INSERT OR IGNORE INTO column_settings (column_name, display_name_en, display_name_ar, data_type, is_visible, is_required, display_order, validation_rules) VALUES
 ('sn', 'Serial Number', 'Ø§Ù„Ø±Ù‚Ù… Ø§Ù„ØªØ³Ù„Ø³Ù„ÙŠ', 'INTEGER', 1, 1, 1, '{"required": true, "type": "integer", "min": 1}'),
-('report_number', 'Report Number', 'Ø±Ù‚Ù… Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 1, 2, '{"required": true, "pattern": "^\\d{4}/\\d{2}/\\d{3}$", "example": "2025/11/001"}'),
+('report_number', 'Report Number', 'Ø±Ù‚Ù… Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'TEXT', 1, 1, 2, '{"required": true, "pattern": "^\\d{4}/\\d{2}/\\d{3,}$", "example": "2025/11/001"}'),
 ('report_date', 'Report Date', 'ØªØ§Ø±ÙŠØ® Ø§Ù„ØªÙ‚Ø±ÙŠØ±', 'DATE', 1, 1, 3, '{"required": true, "format": "DD/MM/YYYY"}'),
 ('outgoing_letter_number', 'Outgoing Letter Number', 'Ø±Ù‚Ù… Ø§Ù„Ø®Ø·Ø§Ø¨ Ø§Ù„ØµØ§Ø¯Ø±', 'TEXT', 1, 0, 4, '{"type": "text"}'),
 ('reported_entity_name', 'Reported Entity Name', 'Ø§Ø³Ù… Ø§Ù„Ø¬Ù‡Ø© Ø§Ù„Ù…Ø¨Ù„Øº Ø¹Ù†Ù‡Ø§', 'TEXT', 1, 1, 5, '{"required": true, "maxLength": 255}'),

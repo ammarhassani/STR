@@ -103,7 +103,11 @@ class AppState:
             log_dir = project_root / 'logs'
             self.logging_service = LoggingService(
                 self.db_manager, log_dir,
-                db_logging=(mode != "client" or not bus_dir))
+                db_logging=(mode != "client" or not bus_dir),
+                # A host PC runs the host process AND someone's client on the
+                # same desktop. Two processes sharing one log file collide on
+                # rollover, so each gets its own.
+                log_filename=("host-app.log" if mode == "host" else "app.log"))
 
             # Run migrations (skip on the read-only replica - the host
             # already migrated it, and this connection can't write anyway)
