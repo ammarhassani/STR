@@ -98,6 +98,26 @@ def child_main():
         except Exception:
             pass
 
+    def host_truth(rid, *fields):
+        """Read a report straight from the host DB.
+
+        The replica is published on a delay, so a report created a moment ago
+        can read back empty or stale on a client. A business invariant judged
+        off that lag reports an app defect that never happened -- which is
+        exactly how the phantom "submitted with no FIU details" arose. The host
+        is the only authority, so assertions ask it directly.
+        """
+        db = os.path.join(lab, "HOST", "database", "fiu.db")
+        try:
+            conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
+            row = conn.execute(
+                f"SELECT {','.join(fields)} FROM reports WHERE report_id=?",
+                (rid,)).fetchone()
+            conn.close()
+            return dict(zip(fields, row)) if row else {}
+        except Exception:
+            return {}
+
     def attempt(label, fn, *a, **k):
         """Run a call. Returns (outcome, value). outcome:
         'ok'      -> returned a success tuple/value
@@ -490,7 +510,8 @@ def child_main():
                 # anywhere near a supervisor
                 sub, sval = attempt("submit own report", A.request_approval, rid, "please review")
                 refresh()
-                fresh = R.get_report(rid) or {}
+                fresh = (host_truth(rid, "fiu_number", "fiu_date")
+                         or R.get_report(rid) or {})
                 has_fiu = bool(str(fresh.get("fiu_number") or "").strip()
                                and str(fresh.get("fiu_date") or "").strip())
                 if sub == "ok" and not has_fiu:
@@ -506,9 +527,21 @@ def child_main():
                              "fiu_date": datetime.now().strftime("%d/%m/%Y")})
                     attempt("submit after adding FIU details", A.request_approval, rid, "filed")
                 # editing while pending approval — BRD: locked until decided
+                # Only pending_approval is frozen. With 21 personas running, a
+                # supervisor often decides the report between the submit above
+                # and this edit -- and an approved or reworked report is
+                # SUPPOSED to be editable, so a successful edit is only a
+                # defect if the report was pending on BOTH sides of it.
+                # Checking one side alone either invents defects (after only,
+                # when the decision landed first) or hides them.
+                def _pending():
+                    return (host_truth(rid, "approval_status")
+                            .get("approval_status") == "pending_approval")
+
+                was_pending = _pending()
                 edit, eval_ = attempt("edit while pending",
                                       R.update_report, rid, {"reported_entity_name": "EDITED WHILE PENDING"})
-                if edit == "ok":
+                if edit == "ok" and was_pending and _pending():
                     defect("WORKFLOW", "report was editable while pending approval", rid)
                 # agents must never approve, not even their own
                 refresh()
@@ -685,7 +718,9 @@ def dump(lab, username, findings):
 
 # ---------------------------------------------------------------- orchestrator
 def build_lab():
-    lab = os.path.join(tempfile.gettempdir(), "str_warzone")
+    # one lab per process: a fixed path made two concurrent runs wipe each
+    # other's HOST mid-test, which reads as a phantom app defect
+    lab = os.path.join(tempfile.gettempdir(), f"str_warzone_{os.getpid()}")
     if os.path.exists(lab):
         shutil.rmtree(lab, ignore_errors=True)
     os.makedirs(os.path.join(lab, "SHARE"))
