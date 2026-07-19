@@ -5,11 +5,33 @@ Handles database paths and system settings
 import json
 import os
 import socket
+import sys
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
 from utils import utf8_console  # noqa: F401 - side effect: UTF-8 console on Windows
+
+
+def app_base_dir() -> Path:
+    """The folder that holds THIS installation's writable data.
+
+    Running from source that is the repo root, as it always was.
+
+    Running as a PyInstaller .exe it must be the folder holding the .exe, NOT
+    Path(__file__).parent. In a --onefile build the bundle unpacks to a temp
+    directory (…\\Temp\\_MEIxxxxx) that Windows deletes when the app exits, so
+    __file__-based paths put config.json and the database somewhere that
+    disappears every run: a client would start blank on every launch and lose
+    whatever it had queued. Anchoring to sys.executable keeps a client's data
+    beside its .exe where an operator can see it, back it up, or wipe it.
+
+    Read-only files that ship INSIDE the bundle (schema.sql, the assets) must
+    keep resolving through __file__ -- they live in the temp dir on purpose.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
 
 
 class Config:
@@ -34,8 +56,8 @@ class Config:
     RECORDS_PER_PAGE = 50
     DATE_FORMAT = "DD/MM/YYYY"
     
-    # Configuration file location - store with application files
-    CONFIG_FILE = Path(__file__).parent / 'config' / 'config.json'
+    # Configuration file location - stored beside the app (or the .exe)
+    CONFIG_FILE = app_base_dir() / 'config' / 'config.json'
     
     @classmethod
     def load(cls):
@@ -128,7 +150,7 @@ class Config:
     def get_client_replica_path(cls) -> str:
         """Local file a client keeps its copy of the host replica in."""
         base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else \
-            str(Path(__file__).parent / "database")
+            str(app_base_dir() / "database")
         os.makedirs(base, exist_ok=True)
         return os.path.join(base, "client_replica.db")
 
@@ -145,7 +167,7 @@ class Config:
     def get_client_outbox_dir(cls) -> str:
         """Local dir (next to the client replica) where the outbox persists queued writes."""
         base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else \
-            str(Path(__file__).parent / "database")
+            str(app_base_dir() / "database")
         d = os.path.join(base, "outbox")
         os.makedirs(d, exist_ok=True)
         return d
