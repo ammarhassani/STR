@@ -112,6 +112,43 @@ def test_source_run_is_unchanged():
               os.path.normcase(repo)), fresh.Config.CONFIG_FILE)
 
 
+def test_config_survives_a_byte_order_mark():
+    """A BOM in config.json must not silently reset the app to unconfigured.
+
+    Notepad and PowerShell's Out-File write UTF-8 with a BOM by default, so an
+    operator editing a client's config.json produces one without knowing. With
+    encoding='utf-8' json.load raises, Config.load swallows it and returns
+    False, and the app opens the first-run setup wizard as if it had never been
+    configured -- on a windowed .exe the printed error goes nowhere. Found when
+    exactly this happened to a client test box.
+    """
+    import config as cfg
+    importlib.reload(cfg)
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "config.json")
+    payload = ('{"database_path": null, "backup_path": null, '
+               '"session_timeout": 30, "max_login_attempts": 5, '
+               '"mode": "client", "share_path": "\\\\\\\\SERVER\\\\STR_data", '
+               '"host_id": null}')
+
+    old_file, old_mode, old_share = cfg.Config.CONFIG_FILE, cfg.Config.MODE, cfg.Config.SHARE_PATH
+    try:
+        for label, data in (("with a BOM", "﻿" + payload),
+                            ("without a BOM", payload)):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(data)
+            cfg.Config.MODE, cfg.Config.SHARE_PATH = "local", None
+            cfg.Config.CONFIG_FILE = __import__("pathlib").Path(path)
+            loaded = cfg.Config.load()
+            check(f"config.json loads {label}", loaded, "Config.load returned False")
+            check(f"mode read correctly {label}", cfg.Config.MODE == "client",
+                  cfg.Config.MODE)
+    finally:
+        cfg.Config.CONFIG_FILE, cfg.Config.MODE, cfg.Config.SHARE_PATH = (
+            old_file, old_mode, old_share)
+        importlib.reload(cfg)
+
+
 def test_the_build_spec_keeps_flet_app_on_the_path():
     """The one line whose absence produced 'No module named components'."""
     spec = os.path.join(os.path.dirname(os.path.abspath(__file__)), "STR.spec")
@@ -127,6 +164,7 @@ def test_the_build_spec_keeps_flet_app_on_the_path():
 if __name__ == "__main__":
     test_frozen_data_lives_beside_the_exe()
     test_source_run_is_unchanged()
+    test_config_survives_a_byte_order_mark()
     test_the_build_spec_keeps_flet_app_on_the_path()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail) + ' FAILED'}")
     sys.exit(1 if _fail else 0)

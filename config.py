@@ -64,7 +64,14 @@ class Config:
         """Load configuration from file"""
         if cls.CONFIG_FILE.exists():
             try:
-                with open(cls.CONFIG_FILE, 'r', encoding='utf-8') as f:
+                # utf-8-sig, not utf-8: Notepad and PowerShell's Out-File both
+                # write UTF-8 WITH a byte-order mark by default, and json.load
+                # rejects a leading BOM outright. An operator who edits
+                # config.json on a client PC would land back in the setup
+                # wizard with no visible reason -- the error below prints to a
+                # console a windowed .exe does not have. utf-8-sig reads files
+                # with or without the mark.
+                with open(cls.CONFIG_FILE, 'r', encoding='utf-8-sig') as f:
                     config_data = json.load(f)
                     cls.DATABASE_PATH = config_data.get('database_path')
                     cls.BACKUP_PATH = config_data.get('backup_path')
