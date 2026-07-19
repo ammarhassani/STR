@@ -1612,6 +1612,50 @@ def migrate_database(db_path: str) -> Tuple[bool, str]:
         except Exception as e:
             messages.append(f"Widget Arabic titles skipped: {str(e)}")
 
+        # Dashboard widget audiences. As seeded, NOT ONE of the 13 widgets
+        # listed 'agent', so an agent -- the person filing the reports -- logged
+        # in to "No dashboard widgets configured". Supervisors could not see
+        # Pending Approval either, which is the one number their job turns on.
+        # Only the exact SYSTEM-seeded titles are touched, so an admin's own
+        # audience choices are left alone.
+        try:
+            audiences = {
+                'Total Reports':                        'admin,supervisor,agent,reporter',
+                'Open Work':                            'admin,supervisor,agent',
+                'Pending Approval':                     'admin,supervisor,agent',
+                'Approved':                             'admin,supervisor,agent,reporter',
+                'Reports by Status':                    'admin,supervisor,agent,reporter',
+                'Reports by Month':                     'admin,supervisor,agent,reporter',
+                'Reports by Classification':            'admin,supervisor,agent,reporter',
+                'Top Reported Entities':                'admin,supervisor,reporter',
+                'Rework Rate %':                        'admin,supervisor',
+                'Reports in Rework':                    'admin,supervisor,agent',
+                # the intelligence tables are exactly what an agent needs while
+                # deciding whether a customer has been reported before
+                'Repeat CICs (multiple reports)':       'admin,supervisor,agent',
+                'Repeat Accounts (possible structuring)': 'admin,supervisor,agent',
+                'Approvals per Month':                  'admin,supervisor',
+                # the open-work widget is renamed by a later migration in the
+                # same pass, so cover both titles or it needs a second run
+                'Draft / Rework':                       'admin,supervisor,agent',
+            }
+            fixed = 0
+            for title, roles in audiences.items():
+                # `AND visible_to_roles != ?` matters: some targets are
+                # themselves in the match list, so without it the migration
+                # would "fix" the same rows on every single run.
+                cursor.execute(
+                    "UPDATE dashboard_config SET visible_to_roles = ? "
+                    "WHERE title = ? AND visible_to_roles != ? AND visible_to_roles IN "
+                    "('admin,reporter','admin,supervisor','admin')",
+                    (roles, title, roles))
+                fixed += cursor.rowcount
+            conn.commit()
+            if fixed:
+                messages.append(f"Dashboard widgets: fixed the audience of {fixed} widget(s)")
+        except Exception as e:
+            messages.append(f"Dashboard audience fix skipped: {str(e)}")
+
         # Retrospective import: 20 years of pre-STR history arrives from Excel.
         # Each imported report records the batch it came from, so "where did
         # this record come from?" is answerable to an auditor and a bad batch

@@ -24,6 +24,7 @@ STRINGS = {
     "status.rejected": "Rejected",
     "status.rework": "Rework",
     "status.pending_fiu": "Pending FIU Details",
+    "status.archived": "Archived (historical)",
 
     # reports list
     "reports.add_new": "Add New Report",

@@ -490,7 +490,7 @@ def build_reports_view(
                 )
 
             # Row styling for deleted
-            row_color = f"{colors['danger']}10" if is_deleted else None
+            row_color = ft.Colors.with_opacity(0.06, colors["danger"]) if is_deleted else None
 
             rows.append(
                 ft.DataRow(
@@ -872,7 +872,7 @@ def build_reports_view(
                             ],
                             spacing=8,
                         ),
-                        bgcolor=f"{colors['danger']}20",
+                        bgcolor=ft.Colors.with_opacity(0.13, colors["danger"]),
                         padding=12,
                         border_radius=4,
                     ),
@@ -1066,7 +1066,7 @@ def build_reports_view(
                 ),
                 padding=ft.padding.symmetric(horizontal=8, vertical=4),
                 border_radius=4,
-                bgcolor=f"{colors['danger']}20",
+                bgcolor=ft.Colors.with_opacity(0.13, colors["danger"]),
                 visible=False,
             ) if is_admin else ft.Container(),
             # My Reports button (for non-admins)
@@ -1195,7 +1195,7 @@ def build_reports_view(
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         padding=ft.padding.symmetric(horizontal=16, vertical=8),
-        bgcolor=f"{colors['primary']}15",
+        bgcolor=ft.Colors.with_opacity(0.08, colors["primary"]),
         border_radius=4,
         visible=False,  # Hidden by default
     ) if is_admin else ft.Container()

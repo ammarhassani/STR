@@ -33,8 +33,31 @@ def _label_value(data: List[Dict], columns: List[str]) -> List[Dict[str, Any]]:
             value = float(value)
         except (TypeError, ValueError):
             value = 0
-        out.append({'label': str(label), 'value': value})
+        out.append({'label': _humanise(label), 'value': value})
     return out
+
+
+# the workflow states a status column can hold (see report_service)
+_STATUS_KEYS = {'draft', 'pending_fiu', 'pending_approval', 'approved',
+                'rejected', 'rework', 'archived'}
+
+
+def _humanise(label) -> str:
+    """A status charted straight out of SQL arrives as the database key.
+
+    'Reports by Status' groups by approval_status, so the chart read
+    "pending_fiu" and "pending_approval" -- and stayed English in Arabic. Any
+    label that names a status we know gets its proper name; anything else is
+    left exactly as the query produced it.
+    """
+    raw = str(label)
+    # Only consult the catalog for values that ARE statuses. Asking for
+    # "status.falcon trading" would log a missing-translation warning for every
+    # entity name on every chart render.
+    if raw.strip().lower() not in _STATUS_KEYS:
+        return raw
+    named = t(f"status.{raw.strip().lower()}")
+    return raw if named == f"status.{raw.strip().lower()}" else named
 
 
 def _single_value(data: List[Dict]) -> str:

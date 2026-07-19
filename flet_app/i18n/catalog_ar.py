@@ -25,6 +25,7 @@ STRINGS = {
     "status.rejected": "مرفوض",
     "status.rework": "إعادة عمل",
     "status.pending_fiu": "بانتظار بيانات وحدة التحرّيات",
+    "status.archived": "أرشيف (تاريخي)",
 
     # reports list
     "reports.add_new": "إضافة تقرير جديد",

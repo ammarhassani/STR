@@ -304,7 +304,7 @@ def show_version_history_dialog(
                                         ),
                                         padding=ft.padding.symmetric(horizontal=6, vertical=2),
                                         border_radius=4,
-                                        bgcolor=f"{colors['danger']}20",
+                                        bgcolor=ft.Colors.with_opacity(0.13, colors["danger"]),
                                         visible=is_deleted,
                                     ),
                                 ],
@@ -341,7 +341,7 @@ def show_version_history_dialog(
             ),
             padding=ft.padding.all(12),
             border_radius=4,
-            bgcolor=f"{colors['danger']}10" if is_deleted else (
+            bgcolor=ft.Colors.with_opacity(0.06, colors["danger"]) if is_deleted else (
                 colors["bg_tertiary"] if is_selected else "transparent"
             ),
             border=ft.border.all(

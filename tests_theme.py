@@ -73,9 +73,45 @@ def test_app_button():
     set_button_enabled(dis, True)
     check('T4 set_button_enabled re-arms', dis.disabled is False and dis.opacity == 1.0)
 
+
+def test_no_fake_alpha_colours():
+    """A colour string with two hex digits stuck on the end is not a tint.
+
+    The code wrote f"{colors['danger']}20" meaning "danger at 12% opacity".
+    Flutter parses #AARRGGBB -- alpha FIRST -- so #c53030 + "20" became
+    alpha=0xc5 (77% opaque), red=0x30, green=0x30, blue=0x20: a dark, nearly
+    solid block. The "0 deleted" badge rendered as unreadable dark-on-dark.
+    ft.Colors.with_opacity() is the API that means what this intended.
+    """
+    import re, pathlib
+    # the tail of  f"{colors['danger']}20"  -- a colour with hex glued on
+    pat = re.compile(r"\]\}[0-9A-Fa-f]{2}[\"']")
+    offenders = []
+    for f in sorted(pathlib.Path("flet_app").rglob("*.py")):
+        if "__pycache__" in str(f):
+            continue
+        for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if pat.search(line) and "colors[" in line:
+                offenders.append(f"{f.name}:{i}")
+    check("no colour is built by appending hex digits to another colour",
+          not offenders, offenders)
+
+
+def test_opacity_helper_produces_a_real_tint():
+    import flet as ft
+    from theme.theme_manager import theme_manager
+    colors = theme_manager.get_colors()
+    tint = ft.Colors.with_opacity(0.13, colors["danger"])
+    check("a tint is not the same string as the solid colour",
+          str(tint) != str(colors["danger"]), tint)
+    check("and it records the opacity", "0.13" in str(tint), tint)
+
+
 if __name__ == '__main__':
     test_tokens()
     test_flat_theme()
     test_app_button()
+    test_no_fake_alpha_colours()
+    test_opacity_helper_produces_a_real_tint()
     print(f"\nTHEME FAILURES: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

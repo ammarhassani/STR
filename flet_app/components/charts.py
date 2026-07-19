@@ -3,9 +3,26 @@ Chart Components for FIU Report Management System.
 Uses lightweight Flet-native visualizations for fast rendering.
 """
 import flet as ft
+from i18n import t
 from typing import List, Dict, Any, Optional
 
 from theme.theme_manager import theme_manager
+
+
+def fmt_measure(value) -> str:
+    """Render a chart measure the way a person writes it.
+
+    Query rows are coerced to float so charts can size bars, then printed
+    straight: a count of seven reports appeared as "7.0". Whole numbers lose the
+    decimal; genuine fractions keep one place.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if v.is_integer():
+        return str(int(v))
+    return f"{v:.1f}"
 
 
 def create_pie_chart(
@@ -44,7 +61,7 @@ def create_pie_chart(
                 controls=[
                     ft.Text(title, size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
                     ft.Container(
-                        content=ft.Text("No data available", color=colors["text_muted"]),
+                        content=ft.Text(t("dash.no_data"), color=colors["text_muted"]),
                         alignment=ft.alignment.center,
                         expand=True,
                     ),
@@ -82,7 +99,7 @@ def create_pie_chart(
                                     expand=True,
                                 ),
                                 ft.Text(
-                                    f"{value} ({percentage:.1f}%)",
+                                    f"{fmt_measure(value)} ({percentage:.1f}%)",
                                     size=11,
                                     color=colors["text_secondary"],
                                 ),
@@ -156,7 +173,7 @@ def create_bar_chart(
                 controls=[
                     ft.Text(title, size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
                     ft.Container(
-                        content=ft.Text("No data available", color=colors["text_muted"]),
+                        content=ft.Text(t("dash.no_data"), color=colors["text_muted"]),
                         alignment=ft.alignment.center,
                         expand=True,
                     ),
@@ -197,7 +214,7 @@ def create_bar_chart(
                                         border_radius=4,
                                     ),
                                     ft.Text(
-                                        str(value),
+                                        fmt_measure(value),
                                         size=11,
                                         color=colors["text_primary"],
                                         weight=ft.FontWeight.W_500,
@@ -260,7 +277,7 @@ def create_line_chart(
                 controls=[
                     ft.Text(title, size=14, weight=ft.FontWeight.W_500, color=colors["text_primary"]),
                     ft.Container(
-                        content=ft.Text("No data available", color=colors["text_muted"]),
+                        content=ft.Text(t("dash.no_data"), color=colors["text_muted"]),
                         alignment=ft.alignment.center,
                         expand=True,
                     ),
@@ -288,7 +305,7 @@ def create_line_chart(
                 content=ft.Column(
                     controls=[
                         ft.Text(
-                            str(y_val),
+                            fmt_measure(y_val),
                             size=10,
                             color=colors["text_primary"],
                             weight=ft.FontWeight.W_500,
@@ -360,7 +377,7 @@ def create_multi_line_chart(
 
     if not datasets:
         return ft.Container(
-            content=ft.Text("No data available", color=colors["text_muted"]),
+            content=ft.Text(t("dash.no_data"), color=colors["text_muted"]),
             height=height,
             alignment=ft.alignment.center,
         )
@@ -423,7 +440,7 @@ def create_stat_display(
         controls.append(ft.Icon(icon, size=20, color=display_color))
 
     controls.extend([
-        ft.Text(str(value), size=24, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
+        ft.Text(fmt_measure(value), size=24, weight=ft.FontWeight.BOLD, color=colors["text_primary"]),
         ft.Text(label, size=11, color=colors["text_secondary"]),
     ])
 
