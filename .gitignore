@@ -78,3 +78,5 @@ sandbox/
 
 # graphify knowledge graph output (generated)
 graphify-out/
+
+.playwright-mcp/
