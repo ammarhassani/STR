@@ -57,13 +57,30 @@ python flet_app\main.py --panel
 
 ### A4. Make it start at login
 
+> **Tell security BEFORE you do this.**
+>
+> Anything placed in the Startup folder gets picked up by the endpoint
+> security automation, which scans persistence locations and asks what the
+> entry is. That is exactly how the old `.vbs` launcher was found — not by
+> analysing it, but by finding it in Startup.
+>
+> A business application starting at login is completely normal (OneDrive and
+> Teams do it). It just needs to be declared rather than discovered. One line
+> in your open ticket: *"the STR host application will have a Startup entry on
+> ENGAMMARPC so it runs when I log in."*
+>
+> Until that is acknowledged, **skip this step** and start the host by hand
+> from the Control Panel each morning. It costs one click.
+
+Once it's declared:
+
 1. Press **Show me the Startup folder** → a window opens
 2. Drag `FIU_System.exe` into that window
 3. Right-click the copy that appears → **Properties** → in **Target**, add ` --host` at the end → OK
 
-> Done by hand on purpose. Creating that shortcut in code needs a Windows
-> scripting component that your security software flags, and this app does not
-> use it.
+> Done by hand on purpose: creating that shortcut in code needs a Windows
+> scripting component that endpoint security flags, and this app does not use
+> one.
 
 ### A4. Confirm
 

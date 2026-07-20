@@ -4,6 +4,17 @@ One page. Take it with you.
 
 ---
 
+## Do NOT add anything to Startup yet
+
+Endpoint security scans persistence locations — Startup folder, Run keys,
+scheduled tasks — and asks what it finds. That is how the old `.vbs` launcher
+was caught.
+
+For this test, start the host by hand from the Control Panel. Declare the
+Startup entry separately, once, and add it after it's acknowledged.
+
+---
+
 ## Before you leave this PC
 
 - [ ] `build.bat` → says **Build OK**
