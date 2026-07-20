@@ -296,9 +296,11 @@ class FletApp:
         if user.get('must_change_password'):
             try:
                 from dialogs.change_password_dialog import show_change_password_dialog
-                from components.toast import show_error
-                show_error(self.page, "You are using a default password — please set a new one now.")
-                show_change_password_dialog(self.page, app_state)
+                # The reason goes INSIDE the dialog. Showing a toast first put a
+                # snackbar and a modal into the overlay back to back while the
+                # main window was still being built, and the barrier they share
+                # is what can leave the screen greyed and unclickable.
+                show_change_password_dialog(self.page, app_state, forced=True)
             except Exception as e:
                 app_state.logging_service.warning(f"Could not open forced password change: {e}")
 
@@ -587,6 +589,15 @@ if __name__ == "__main__":
         native window launches offline (no CDN download)."""
         if not sys.platform.startswith("win"):
             return  # mac/linux download their own client (dev machines have net)
+        if getattr(sys, "frozen", False):
+            # The packaged exe already carries the desktop client
+            # (flet_desktop/app/flet/flet.exe), and vendor/ is not bundled, so
+            # looking for the zip here always failed -- silently, into the web
+            # fallback, which then died in uvicorn because a windowed exe has no
+            # stdout. It never showed up in testing because this developer PC
+            # had ~/.flet/bin already seeded and returned early below; every
+            # fresh client PC hit it.
+            return
         import zipfile
         try:
             import flet_desktop.version

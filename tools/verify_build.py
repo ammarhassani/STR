@@ -30,8 +30,22 @@ REQUIRED_DATA = (
     os.path.join("assets", "logo.png"),
 )
 
+# The native window is launched by this. Without it the app silently falls back
+# to a browser view, and a windowed exe has no stdout, so uvicorn's logger dies
+# with "Unable to configure formatter 'default'" before anything is drawn. That
+# is what happened on the first real client PC: this developer machine had the
+# client cached in ~/.flet and never took the fallback.
+REQUIRED_BINARY = os.path.join("flet_desktop", "app", "flet", "flet.exe")
 
-def verify(exe_path):
+# The panel reads the heartbeat, the queue and config; it never opens the
+# report database or builds app views, so it needs far less than the app. This
+# list is the actual import closure of panel_main -> control_panel_ui ->
+# panel_controller -> host.*, not a guess at what "an app" needs.
+PANEL_MODULES = ("panel", "config", "utils", "host")
+PANEL_DATA = (os.path.join("assets", "logo.png"),)
+
+
+def verify(exe_path, panel=False):
     from PyInstaller.archive.readers import CArchiveReader
 
     if not os.path.isfile(exe_path):
@@ -51,38 +65,60 @@ def verify(exe_path):
 
     problems = []
 
-    for mod in REQUIRED_MODULES:
+    want_modules = PANEL_MODULES if panel else REQUIRED_MODULES
+    want_data = PANEL_DATA if panel else REQUIRED_DATA
+
+    for mod in want_modules:
         # a package appears as its own name or as `name.something`
         if not any(n == mod or n.startswith(mod + ".") for n in modules):
             problems.append(
                 f"module '{mod}' is missing from the bundle -- the exe will "
                 f"raise ModuleNotFoundError on a PC without the source tree")
 
-    for data in REQUIRED_DATA:
+    for data in want_data:
         if data not in outer:
             problems.append(
                 f"data file '{data}' is missing from the bundle -- the app "
                 f"looks for it at runtime")
 
+    if REQUIRED_BINARY not in outer:
+        problems.append(
+            f"'{REQUIRED_BINARY}' is missing -- without the bundled desktop "
+            f"client the app falls back to a browser view and then dies in "
+            f"uvicorn, because a windowed exe has no stdout")
+
     return problems
 
 
-def main():
-    exe = sys.argv[1] if len(sys.argv) > 1 else os.path.join("dist", "FIU_System.exe")
-    problems = verify(exe)
-
+def _report(exe, panel=False):
+    problems = verify(exe, panel=panel)
+    label = "Control Panel" if panel else "App"
     if problems:
-        print(f"BUILD VERIFICATION FAILED: {len(problems)} problem(s)\n")
+        print(f"\n{label} FAILED VERIFICATION: {len(problems)} problem(s)")
         for p in problems:
             print("  - " + p)
-        print("\nDo NOT distribute this exe.")
         return 1
-
     size_mb = os.path.getsize(exe) / (1024 * 1024)
-    print(f"Build verified: {exe} ({size_mb:.1f} MB)")
-    print(f"  {len(REQUIRED_MODULES)} app packages present")
-    print(f"  {len(REQUIRED_DATA)} runtime data files present")
+    print(f"ok  {label:<14} {os.path.basename(exe)} ({size_mb:.1f} MB)")
     return 0
+
+
+def main():
+    if len(sys.argv) > 1:
+        # An explicit path: verify just that one, guessing its kind by name.
+        exe = sys.argv[1]
+        return _report(exe, panel="panel" in os.path.basename(exe).lower())
+
+    rc = _report(os.path.join("dist", "FIU_System.exe"))
+    panel_exe = os.path.join("dist", "FIU_Control_Panel.exe")
+    if os.path.exists(panel_exe):
+        rc |= _report(panel_exe, panel=True)
+    else:
+        print("note: dist\\FIU_Control_Panel.exe not built")
+
+    if rc:
+        print("\nDo NOT distribute these.")
+    return rc
 
 
 if __name__ == "__main__":

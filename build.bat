@@ -14,23 +14,32 @@ python -m pip install --upgrade pyinstaller
 if errorlevel 1 goto :failed
 
 echo.
-echo Step 2: Building executable from STR.spec...
+echo Step 2: Building the app from STR.spec...
 python -m PyInstaller --noconfirm --clean STR.spec
 if errorlevel 1 goto :failed
 
 echo.
-echo Step 3: Verifying the build...
+echo Step 3: Building the Control Panel from STR_Panel.spec...
+REM A separate executable because the panel has to work when the APP does not:
+REM the button on the login screen is unreachable if the app cannot start.
+python -m PyInstaller --noconfirm --clean STR_Panel.spec
+if errorlevel 1 goto :failed
+
+echo.
+echo Step 4: Verifying both builds...
 python tools\verify_build.py
 if errorlevel 1 goto :failed
 
 echo.
 echo ================================================
-echo  Build OK:  dist\FIU_System.exe
+echo  Build OK
+echo    dist\FIU_System.exe          the app
+echo    dist\FIU_Control_Panel.exe   the check-up tool
 echo ================================================
 echo.
-echo  Copy the .exe to the client PC and run it. It creates
-echo  config\ and database\ NEXT TO ITSELF, so put it in a
-echo  writable folder such as C:\STR\ -- not Program Files.
+echo  Copy BOTH to the client PC. They create config\ and
+echo  database\ NEXT TO THEMSELVES, so put them in a writable
+echo  folder such as C:\STR\ -- not Program Files.
 echo.
 pause
 exit /b 0

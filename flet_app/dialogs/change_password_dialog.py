@@ -12,13 +12,18 @@ from theme.theme_manager import theme_manager
 from components.toast import show_success, show_error
 
 
-def show_change_password_dialog(page: ft.Page, app_state: Any):
+def show_change_password_dialog(page: ft.Page, app_state: Any, forced: bool = False):
     """
     Show the change password dialog.
 
     Args:
         page: Flet page object
         app_state: Application state
+        forced: the user is on a default password and cannot skip this. The
+            reason is shown INSIDE the dialog rather than as a toast behind it:
+            stacking a snackbar under a modal means two overlay entries mounted
+            back to back while the main window is still being built, and the
+            barrier they share is what leaves a screen greyed and unclickable.
     """
     colors = theme_manager.get_colors()
     current_user = app_state.auth_service.get_current_user()
@@ -168,6 +173,17 @@ def show_change_password_dialog(page: ft.Page, app_state: Any):
         content=ft.Container(
             content=ft.Column(
                 controls=[
+                    *([ft.Container(
+                        content=ft.Row([
+                            ft.Icon(ft.Icons.LOCK_RESET, size=18,
+                                    color=colors["warning"]),
+                            ft.Text("You are using the default password. "
+                                    "Set your own to continue.", size=12,
+                                    color=colors["text_primary"], expand=True),
+                        ], spacing=8),
+                        bgcolor=colors["warning_bg"], padding=10,
+                        border_radius=4,
+                    ), ft.Container(height=8)] if forced else []),
                     ft.Text(
                         "Please enter your current password and choose a new password.",
                         size=12,
