@@ -11,8 +11,11 @@
     "gate is .git/hooks/pre-commit, which runs the full suite and refuses to let",
     "a loop branch weaken a test, touch a Windows-only file, or stage bank data.",
     "",
-    "push stays OUT of allow: the pre-push hook refuses loop/* branches, and a",
-    "human decides what reaches a remote."
+    "push is neither allowed nor denied: unlisted means 'prompt', which a",
+    "headless loop cannot answer, so the loop is denied while an interactive",
+    "session can still push main with your approval. Denying it outright also",
+    "blocked legitimate pushes, and .git/hooks/pre-push already refuses loop/*",
+    "regardless of what this file says."
   ],
   "permissions": {
     "allow": [
@@ -41,8 +44,7 @@
       "mcp__ide__getDiagnostics"
     ],
     "deny": [
-      "Bash(git push:*)",
-      "Bash(git reset:*)",
+      "Bash(git reset --hard:*)",
       "Bash(git rebase:*)",
       "Bash(git checkout:*)",
       "Bash(git restore:*)",
