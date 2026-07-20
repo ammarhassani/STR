@@ -42,6 +42,25 @@ grep -q '"Bash(git commit:\*)"' .claude/settings.json || {
   exit 1
 }
 
+# An untrusted workspace makes Claude Code ignore permissions.allow ENTIRELY --
+# it prints one line about it and then carries on denying everything. Silent
+# enough to waste a night.
+python3 - "$PWD" <<'PY' || exit 1
+import json, os, sys
+cfg = os.path.expanduser("~/.claude.json")
+try:
+    projects = json.load(open(cfg)).get("projects", {})
+except Exception as e:
+    print(f"refusing: cannot read {cfg}: {e}")
+    sys.exit(1)
+here = sys.argv[1]
+if not projects.get(here, {}).get("hasTrustDialogAccepted"):
+    print(f"refusing: {here} is not a trusted workspace, so every")
+    print("  permissions.allow entry is ignored and no iteration can commit.")
+    print("  Run `claude` interactively here once and accept the trust dialog.")
+    sys.exit(1)
+PY
+
 export STR_SEED="${STR_SEED:-$RANDOM}"
 start=$(date +%s)
 
