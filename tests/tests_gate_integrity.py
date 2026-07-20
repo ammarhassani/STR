@@ -20,6 +20,22 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 
+
+def _hooks_dir():
+    """Where the hooks actually live.
+
+    Not REPO/.git/hooks: the loop runs in a git WORKTREE, where .git is a FILE
+    pointing at the real git dir, and hooks are shared from the common dir. This
+    check reported every hook missing when run from the worktree -- i.e. it went
+    red in exactly the place it was written to protect.
+    """
+    out = subprocess.run(["git", "rev-parse", "--git-common-dir"],
+                         cwd=REPO, capture_output=True, text=True)
+    common = out.stdout.strip() or os.path.join(REPO, ".git")
+    if not os.path.isabs(common):
+        common = os.path.join(REPO, common)
+    return os.path.join(common, "hooks")
+
 _fail = 0
 
 
@@ -56,12 +72,13 @@ def test_the_commit_holes_are_closed():
 
 
 def test_the_hooks_are_installed_and_armed():
+    hooks = _hooks_dir()
     for hook in ("pre-commit", "commit-msg", "pre-push"):
-        p = os.path.join(REPO, ".git", "hooks", hook)
+        p = os.path.join(hooks, hook)
         check(f"{hook} hook exists", os.path.isfile(p), p)
         check(f"{hook} hook is executable", os.access(p, os.X_OK), p)
 
-    pre = os.path.join(REPO, ".git", "hooks", "pre-commit")
+    pre = os.path.join(hooks, "pre-commit")
     if os.path.isfile(pre):
         src = open(pre, encoding="utf-8").read()
         # The rule that cannot be expressed as a prompt line.
