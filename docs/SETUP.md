@@ -6,6 +6,17 @@ Do the sections in order. Stop at the end of each one and check it worked.
 
 ---
 
+## There is only ONE program
+
+`FIU_System.exe` is everything.
+
+- **Double-click it** → the app
+- **`STR Control Panel` shortcut** → the same exe in check-up mode (`--panel`)
+
+There is no second program to install and no launcher script.
+
+---
+
 ## FIRST: pick the host
 
 The host is the PC that owns the data. It must be **on** whenever anyone works.
@@ -39,7 +50,8 @@ python flet_app\main.py --panel
 1. **Check the shared folder** → must say *reachable and writable*
 2. **Make this PC the host**
 3. **Start automatically at login**
-4. **Start host on this PC**
+4. **Put Control Panel on this PC** (so you can reopen it without typing)
+5. **Start host on this PC**
 
 ### A4. Confirm
 
