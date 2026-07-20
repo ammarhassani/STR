@@ -102,15 +102,30 @@ See [SETUP.md](SETUP.md) section C. Short version:
 
 ## Updating STR to a new version
 
-Client PCs run a single file, `FIU_System.exe`. To update:
+Each PC runs **two** files, `FIU_System.exe` and `FIU_Control_Panel.exe`, and
+they stay in the same folder. Both are replaced together — the panel starts the
+host by launching the app beside it, so a mismatched pair is a needless way to
+break a working PC.
 
-1. Get the new `FIU_System.exe`
-2. On each client PC, close STR and replace the file
-3. Their settings and local data are untouched — those live beside it, not inside it
+How it goes out:
 
-There is no automatic update for client PCs. That is deliberate: pushing code
-to workstations by itself is the kind of thing security teams object to, and
-rightly.
+1. `build.bat` on the build PC
+2. Copy both files from `dist\` into the shared folder, under `app\`
+3. Email everyone: close STR, copy both files from `\\ENGAMMARPC\STR_data\app`
+   into `C:\STR`, overwriting what is there
+4. On the host PC, do the same and then start the host again
+
+Settings and local data are untouched — those live *beside* the .exe files, not
+inside them. `config\` and `database\` are never copied and never overwritten.
+
+> Close STR first. Windows will not let you overwrite a running .exe, and a
+> half-copied one is worse than an old one.
+
+There is no automatic update, and there is not going to be one. That is
+deliberate: an application that reaches into a network share and overwrites
+code on other people's PCs is the kind of thing security teams object to, and
+rightly. Copying a file by hand is a person doing a thing, and it needs no
+explanation to anyone.
 
 ---
 
