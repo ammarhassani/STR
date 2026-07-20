@@ -180,6 +180,40 @@ def build_panel(page: ft.Page):
         Config.SHARE_PATH = share_field.value or Config.SHARE_PATH
         run(controller.designate_host, Config)
 
+    # Everything past the first two buttons is a rare, deliberate act -- setting
+    # a PC up, deploying to a workstation, taking over after a host failure.
+    # Showing all of it at once made a panel used daily look like a job. It is
+    # collapsed by default, not removed: nothing here lost a capability.
+    advanced = ft.Column(spacing=0, visible=False, controls=[
+        section("SET UP THIS PC", [
+            big_button("Make this PC the host", ft.Icons.DNS, do_designate),
+            big_button("Show me the Startup folder", ft.Icons.BOLT,
+                       lambda _: run(show_startup_folder), "#4a5568"),
+            big_button("Check the shared folder", ft.Icons.FOLDER_SHARED,
+                       lambda _: run(controller.check_share, share_field.value),
+                       "#4a5568"),
+        ]),
+        section("DEPLOY TO A CLIENT PC", [share_field, dest_field,
+                                          big_button("Build client folder",
+                                                     ft.Icons.INVENTORY_2, do_kit)]),
+        section("IF THE HOST PC IS GONE", [
+            big_button("Take over as host", ft.Icons.SWAP_HORIZ,
+                       lambda _: run(controller.become_host_now), WARN_COLOR),
+            big_button("Check data is healthy", ft.Icons.HEALTH_AND_SAFETY,
+                       lambda _: run(controller.run_integrity), "#4a5568"),
+        ]),
+    ])
+
+    more = ft.TextButton("Show setup and recovery options ▾")
+
+    def toggle_advanced(_):
+        advanced.visible = not advanced.visible
+        more.text = ("Hide setup and recovery options ▴" if advanced.visible
+                     else "Show setup and recovery options ▾")
+        page.update()
+
+    more.on_click = toggle_advanced
+
     page.add(
         ft.Container(
             content=ft.Column([
@@ -190,38 +224,27 @@ def build_panel(page: ft.Page):
                              border_radius=4, border=ft.border.all(1, "#e2e8f0")),
                 ft.Container(height=8),
 
-                section("RUN", [
+                # The two things anyone does day to day.
+                section("", [
                     big_button("Start host on this PC", ft.Icons.PLAY_ARROW,
                                lambda _: run(controller.start_host)),
-                    big_button("Stop host", ft.Icons.STOP,
-                               lambda _: run(controller.stop_host), BAD_COLOR),
-                    big_button("Open the app", ft.Icons.LAUNCH,
-                               lambda _: run(controller.start_client), "#4a5568"),
-                ]),
-
-                section("SET UP THIS PC", [
-                    big_button("Make this PC the host", ft.Icons.DNS, do_designate),
-                    big_button("Show me the Startup folder", ft.Icons.BOLT,
-                               lambda _: run(show_startup_folder), "#4a5568"),
-                    big_button("Check the shared folder", ft.Icons.FOLDER_SHARED,
-                               lambda _: run(controller.check_share, share_field.value),
-                               "#4a5568"),
-                ]),
-
-                section("DEPLOY TO A CLIENT PC", [share_field, dest_field,
-                                                 big_button("Build client folder",
-                                                            ft.Icons.INVENTORY_2, do_kit)]),
-
-                section("DATA", [
                     big_button("Back up now", ft.Icons.BACKUP,
                                lambda _: run(controller.manual_backup)),
-                    big_button("Check data is healthy", ft.Icons.HEALTH_AND_SAFETY,
-                               lambda _: run(controller.run_integrity), "#4a5568"),
-                    big_button("Refresh", ft.Icons.REFRESH, refresh_health, "#4a5568"),
                 ]),
+                ft.Row([
+                    ft.TextButton("Stop host",
+                                  on_click=lambda _: run(controller.stop_host)),
+                    ft.TextButton("Open the app",
+                                  on_click=lambda _: run(controller.start_client)),
+                    ft.TextButton("Refresh", on_click=refresh_health),
+                ], spacing=4),
 
                 ft.Container(content=log, bgcolor="white", padding=14,
                              border_radius=4, border=ft.border.all(1, "#e2e8f0")),
+
+                ft.Container(height=4),
+                more,
+                advanced,
             ], scroll=ft.ScrollMode.AUTO, spacing=10),
             padding=22, expand=True,
         )

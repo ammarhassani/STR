@@ -3,17 +3,17 @@
 Walks the ENTIRE deployment lifecycle the way it runs on real machines, but with
 each "PC" as a directory and the "SMB share" as a temp folder, driving the REAL
 code paths (HostService, QueueTransport, RemoteGateway, replica sync, outbox,
-failover, updater, hard reset). One command proves the whole journey:
+failover, hard reset). One command proves the whole journey:
 
   host bring-up -> client join -> onboarding handshake -> client write via host
   -> second client sees it -> host offline (outbox queue) -> failover (become
-  host) -> self-update from the share -> hard reset.
+  host) -> hard reset.
 
-Run: python3.14 tests_e2e_deployment.py
+Run: python tests/tests_e2e_deployment.py
 
 This covers the machinery. The bits it CANNOT simulate (they need a real Windows
 box) are called out at the end and in docs/TEST_DAY.md: the GUI itself, the
-windowless .vbs launch, the Windows taskbar icon, and a genuine SMB filesystem.
+Windows taskbar icon, and a genuine SMB filesystem.
 """
 import os, sys, time, shutil, tempfile, threading, uuid, sqlite3
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -201,23 +201,11 @@ def run():
     check("new host applies writes", rc['ok'] and rc['result'][0], rc)
     pump2.stop()
 
-    # ---- P8 self-update from the share (host publishes, client copies)
-    phase("P8 Self-update — host publishes a code snapshot, client copies it")
-    from updater import publish_to_share, update_from_share, current_version
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    pub_ok, pmsg = publish_to_share(repo, share)
-    ver = current_version(repo)
-    check("host publishes a code snapshot to the share", pub_ok and os.path.isdir(os.path.join(share, "app", ver)), pmsg)
-    client_app = os.path.join(root, "clientA_app"); os.makedirs(client_app)
-    # a stale client app + its own local config that must survive
-    open(os.path.join(client_app, "main.py"), "w", encoding="utf-8").write("print('OLD')\n")
-    os.makedirs(os.path.join(client_app, "config"))
-    open(os.path.join(client_app, "config", "config.json"), "w", encoding="utf-8").write('{"mode":"client"}')
-    up_ok, umsg = update_from_share(client_app, share)
-    check("client copies the new version from the share", up_ok, umsg)
-    check("client code updated", "def " in open(os.path.join(client_app, "updater.py"), encoding="utf-8").read() if os.path.exists(os.path.join(client_app, "updater.py")) else False)
-    check("client's own config.json NOT clobbered by the update",
-          '"mode":"client"' in open(os.path.join(client_app, "config", "config.json"), encoding="utf-8").read())
+    # P8 was self-update: the host git-pulled and published a code snapshot to
+    # the share, and clients copied it on launch. Deleted with updater.py --
+    # a packaged client has no Python, no repo and no git, so that path could
+    # never run on the machines it was built for. Updating a client is now
+    # replacing one .exe (docs/OPERATIONS.md).
 
     # ---- P9 hard reset (go-live: wipe test data, keep config, one fresh admin)
     phase("P9 Hard reset — test -> production")
