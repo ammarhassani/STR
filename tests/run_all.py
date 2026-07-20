@@ -56,9 +56,14 @@ def main():
         t0 = time.time()
         r = subprocess.run([sys.executable, os.path.join(HERE, name)],
                            cwd=REPO, capture_output=True, text=True)
+        # Each suite reports its own way. Missing a keyword here means a suite
+        # that found real defects still prints a blank summary line, which is
+        # the opposite of what a runner is for -- so cover every wording used.
         tail = [l for l in (r.stdout or "").splitlines()
                 if any(k in l for k in ("TOTAL", "ALL PASS", "FAILED",
-                                        "FAILURES", "Conformance", "VULNERAB"))]
+                                        "FAILURES", "Conformance", "VULNERAB",
+                                        "VERDICT", "distinct defects",
+                                        "SIMULATION", "checks passed"))]
         status = "ok  " if r.returncode == 0 else "FAIL"
         print(f"{status} {name:<34} {time.time() - t0:5.1f}s  "
               f"{tail[-1].strip() if tail else ''}")
