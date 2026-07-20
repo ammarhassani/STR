@@ -564,7 +564,13 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if "--panel" in sys.argv:
-        from panel.control_panel import main as panel_main
+        # The window is the panel an operator uses. --panel-cli keeps the old
+        # text menu, which is what a headless or scripted run needs (and what
+        # tests_panel.py drives).
+        if "--panel-cli" in sys.argv:
+            from panel.control_panel import main as panel_main
+        else:
+            from panel.control_panel_ui import main as panel_main
         panel_main()
         sys.exit(0)
 

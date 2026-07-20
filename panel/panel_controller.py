@@ -1,8 +1,11 @@
 """Operator-plane logic (UI-free, fully testable). Reads the shared heartbeat/
 queue/backups and drives the Phase-3a primitives."""
+import json
 import os
+import signal
 import sys
 import glob
+import time
 import uuid
 import shutil
 import sqlite3
@@ -11,6 +14,48 @@ import subprocess
 from host.heartbeat import read_heartbeat, is_stale
 from host.integrity import check_and_restore
 from host.failover import become_host
+
+
+_CLIENT_KIT_README = """SET UP STR ON THIS PC
+=====================
+
+Do these 3 things. Nothing else.
+
+
+1. COPY THIS WHOLE FOLDER to the C: drive.
+
+   Put it at:   C:\\STR
+   NOT in Program Files. The app writes next to itself and cannot write there.
+
+
+2. DOUBLE-CLICK {exe}
+
+   First time only, Windows may ask about the network. Say yes.
+
+
+3. LOG IN with the username your admin gave you.
+
+
+-----------------------------------------------------------------
+IF SOMETHING GOES WRONG
+-----------------------------------------------------------------
+
+It asks me to set up a database
+   -> It cannot see the shared folder.
+      Open this in File Explorer:  {share}
+      If that fails, the problem is the network or your permissions,
+      not the app. Tell your admin.
+
+It says access denied
+   -> Your PC needs the share account. Tell your admin:
+      "this PC needs the STR share credentials"
+
+It opens but there are no reports
+   -> The host PC is not running. Someone must start it there.
+
+Nothing happens when I double-click
+   -> Check you copied the WHOLE folder, including the config folder.
+"""
 
 
 class PanelController:
@@ -44,20 +89,224 @@ class PanelController:
             "backups": self.list_backups(),
         }
 
+    def health(self, share_path=None):
+        """Everything an operator needs to answer 'is it working?' in one look.
+
+        status() answers 'what is the state'. This answers 'is anything wrong',
+        which is a different question -- it is the one asked when a user says
+        the app is slow, and the answer is usually 'the share went away' or
+        'this client is reading an hour-old replica'.
+        """
+        import socket
+        st = self.status()
+        hb = st["heartbeat"] or {}
+
+        now_ms = time.time() * 1000
+        hb_age = (now_ms - hb["epoch_ms"]) / 1000.0 if hb.get("epoch_ms") else None
+
+        # How stale is the copy this PC actually reads from?
+        replica = os.path.join(self.bus, "replica", "fiu_ro.db")
+        replica_age = None
+        if os.path.exists(replica):
+            replica_age = max(0.0, time.time() - os.path.getmtime(replica))
+
+        share_ok, share_msg = self.check_share(share_path or os.path.dirname(self.bus))
+
+        problems = []
+        if not st["host_online"]:
+            problems.append("No host is running. Nobody can save changes.")
+        if not share_ok:
+            problems.append(f"Shared folder problem: {share_msg}")
+        if replica_age is not None and replica_age > 300:
+            # "908 minutes" makes an operator do arithmetic to find out whether
+            # to worry; say it in the largest unit that still means something.
+            if replica_age >= 86400:
+                howold = f"{int(replica_age // 86400)} day(s)"
+            elif replica_age >= 3600:
+                howold = f"{int(replica_age // 3600)} hour(s)"
+            else:
+                howold = f"{int(replica_age // 60)} minute(s)"
+            problems.append(f"This PC's copy of the data is {howold} old. "
+                            f"It is not seeing recent changes.")
+        if st["queue_pending"] > 25:
+            problems.append(f"{st['queue_pending']} changes are waiting to be saved. "
+                            f"The host may be struggling or stopped.")
+        if not st["backups"]:
+            problems.append("There are no backups yet.")
+
+        return {
+            **st,
+            "this_pc": socket.gethostname(),
+            "host_pc": hb.get("hostname"),
+            "heartbeat_age_seconds": hb_age,
+            "replica_age_seconds": replica_age,
+            "share_ok": share_ok,
+            "share_message": share_msg,
+            "problems": problems,
+            "healthy": not problems,
+        }
+
+    def check_share(self, share_path):
+        """Is the shared folder actually reachable AND writable from this PC?
+
+        Readable is not enough: a client that cannot WRITE cannot queue a single
+        change, and read-only access is a normal way for share permissions to be
+        misconfigured. So this writes a probe file and removes it.
+        """
+        if not share_path:
+            return False, "no shared folder is configured"
+        try:
+            if not os.path.isdir(share_path):
+                return False, f"cannot reach {share_path}"
+            probe = os.path.join(share_path, f".str_probe_{uuid.uuid4().hex[:8]}")
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write("probe")
+            os.remove(probe)
+            return True, f"{share_path} is reachable and writable"
+        except PermissionError:
+            return False, (f"{share_path} is reachable but this PC may not write to it "
+                           f"-- check the share permissions for this account")
+        except OSError as e:
+            return False, f"{share_path}: {e}"
+
     def designate_host(self, config):
         config.MODE = "host"
         config.ensure_host_id()
         config.save()
         return True, f"This PC designated as host (mode=host, id={config.HOST_ID})"
 
+    @staticmethod
+    def _launch_cmd(*args):
+        """How to start another copy of this app.
+
+        From source that is `python flet_app/main.py <args>`. Packaged, there is
+        no python.exe and no main.py on the machine at all -- sys.executable IS
+        the app -- so the exe relaunches itself with the same arguments.
+        Getting this wrong means the panel's start buttons do nothing on every
+        client PC, which is exactly where they matter most.
+        """
+        if getattr(sys, "frozen", False):
+            return [sys.executable, *args]
+        main_py = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "flet_app", "main.py")
+        return [sys.executable, main_py, *args]
+
     def start_host(self, spawn=subprocess.Popen):
-        main_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "flet_app", "main.py")
-        cmd = [sys.executable, main_py, "--host"]
         try:
-            p = spawn(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            p = spawn(self._launch_cmd("--host"),
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return True, f"host started (pid {getattr(p, 'pid', '?')})"
         except Exception as e:
             return False, f"could not start host: {e}"
+
+    def start_client(self, spawn=subprocess.Popen):
+        """Launch the app normally (client/local mode)."""
+        try:
+            p = spawn(self._launch_cmd(),
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True, f"app started (pid {getattr(p, 'pid', '?')})"
+        except Exception as e:
+            return False, f"could not start the app: {e}"
+
+    def stop_host(self, killer=None):
+        """Stop the host running on THIS PC.
+
+        The pid comes from the heartbeat, but a pid alone is not enough: the
+        heartbeat is on a shared folder, so it may well describe a host on a
+        different PC. Killing by that pid would take out whatever unrelated
+        process happens to hold that number here. The hostname must match.
+        """
+        hb = read_heartbeat(self.bus)
+        if not hb:
+            return False, "no host is publishing a heartbeat"
+        import socket
+        if (hb.get("hostname") or "").lower() != socket.gethostname().lower():
+            return False, (f"the host is running on {hb.get('hostname')}, not this PC "
+                           f"-- stop it there")
+        pid = hb.get("pid")
+        if not pid:
+            return False, "the heartbeat carries no pid"
+        try:
+            if killer is not None:
+                killer(pid)
+            else:
+                os.kill(int(pid), signal.SIGTERM)
+            return True, f"asked the host (pid {pid}) to stop"
+        except ProcessLookupError:
+            return False, f"no process with pid {pid} -- the host is already gone"
+        except Exception as e:
+            return False, f"could not stop the host: {e}"
+
+    def make_client_kit(self, dest_dir, share_path, exe_path=None):
+        """Build a ready-to-copy folder for a client PC.
+
+        Deploying a client used to mean: copy an exe, hand-write a config.json,
+        get the UNC path and the JSON escaping right, and hope. Every one of
+        those is a chance to produce a client that silently opens the setup
+        wizard instead of connecting. This writes the folder so the operator's
+        only job is copy and double-click.
+
+        config.json is written WITHOUT a byte-order mark on purpose -- see
+        Config.load; a BOM used to send the client back to the setup wizard.
+        """
+        if not share_path:
+            return False, "no shared folder configured -- set that first"
+
+        exe = exe_path
+        if exe is None:
+            exe = sys.executable if getattr(sys, "frozen", False) else None
+        if not exe or not os.path.isfile(exe):
+            return False, ("no FIU_System.exe to copy. Run build.bat first, then "
+                           "point at dist\\FIU_System.exe")
+
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            os.makedirs(os.path.join(dest_dir, "config"), exist_ok=True)
+            shutil.copyfile(exe, os.path.join(dest_dir, os.path.basename(exe)))
+
+            cfg = {
+                "database_path": None,
+                "backup_path": None,
+                "session_timeout": 30,
+                "max_login_attempts": 5,
+                "mode": "client",
+                "share_path": share_path,
+                "host_id": None,
+            }
+            # encoding="utf-8" (no -sig): never write the BOM we had to teach
+            # the loader to tolerate.
+            with open(os.path.join(dest_dir, "config", "config.json"),
+                      "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2)
+
+            with open(os.path.join(dest_dir, "READ ME FIRST.txt"),
+                      "w", encoding="utf-8") as f:
+                f.write(_CLIENT_KIT_README.format(share=share_path,
+                                                  exe=os.path.basename(exe)))
+            return True, f"client kit ready: {dest_dir}"
+        except OSError as e:
+            return False, f"could not build the client kit: {e}"
+
+    def install_startup_shortcut(self, target=None, name="STR.lnk"):
+        """Put a shortcut in the Startup folder so the app runs at login."""
+        try:
+            startup = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows",
+                                   "Start Menu", "Programs", "Startup")
+            os.makedirs(startup, exist_ok=True)
+            link = os.path.join(startup, name)
+            tgt = target or (sys.executable if getattr(sys, "frozen", False)
+                             else sys.executable)
+            # WScript.Shell is present on every Windows box; no dependency.
+            import subprocess as _sp
+            ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{link}');"
+                  f"$s.TargetPath='{tgt}';"
+                  f"$s.WorkingDirectory='{os.path.dirname(tgt)}';$s.Save()")
+            _sp.run(["powershell", "-NoProfile", "-Command", ps],
+                    check=True, capture_output=True)
+            return True, f"shortcut created: {link}"
+        except Exception as e:
+            return False, f"could not create the startup shortcut: {e}"
 
     def become_host_now(self, stale_seconds=60, force=False):
         return become_host(self.bus, self.db_path, self.host_id, stale_seconds, force)

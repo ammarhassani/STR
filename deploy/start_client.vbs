@@ -1,6 +1,19 @@
+' DEPRECATED -- do not deploy this to client PCs.
+'
+' Client PCs now run the packaged FIU_System.exe, which needs no Python, no
+' source tree and no launcher script. Use the control panel's "Build client
+' folder" button instead (see docs/SETUP.md section C).
+'
+' Kept only for running a client from source on a developer machine.
+'
+' Why it is retired: this script's WScript -> cmd -> python chain with a hidden
+' window is indistinguishable from a malware dropper to endpoint security, and
+' it was flagged by the bank's EDR on 2026-07-20. The exe removes the pattern
+' entirely rather than asking for a detection exclusion, which would have been
+' the wrong fix.
+'
 ' Launch the STR CLIENT app with no console window (#23). The app's own window
-' still appears; only the black CMD window is suppressed. Put a shortcut to THIS
-' file on the desktop / Startup folder for a clean launch.
+' still appears; only the black CMD window is suppressed.
 Option Explicit
 Dim oShell, oFSO, strRoot, strCmd
 Set oShell = CreateObject("WScript.Shell")

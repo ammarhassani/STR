@@ -1,3 +1,14 @@
+' DEPRECATED -- prefer the control panel.
+'
+' Use the panel's "Start automatically at login" + "Start host on this PC"
+' buttons (see docs/SETUP.md section A). Kept for running a host from source
+' without the panel.
+'
+' Why it is retired: this script's WScript -> cmd -> python chain with a hidden
+' window is indistinguishable from a malware dropper to endpoint security, and
+' it was flagged by the bank's EDR on 2026-07-20. Removing the pattern is the
+' right fix; a detection exclusion for wscript.exe would not have been.
+'
 ' Launch the STR HOST completely hidden — no CMD window kept open (#23).
 ' Put a shortcut to THIS file (not the .bat) in the Startup folder
 ' (Win+R -> shell:startup) so the host runs invisibly on login.
