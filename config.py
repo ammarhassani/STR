@@ -117,7 +117,12 @@ class Config:
         folder next to the DB (or the CWD) if that isn't set yet."""
         base = cls.SHARE_PATH or cls.BACKUP_PATH
         if not base:
-            base = os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH else "."
+            # app_base_dir(), never "." -- a relative fallback puts str_bus/ in
+            # whatever working directory Windows happened to hand the process,
+            # so the panel then reported "no host is running" against a bus it
+            # had just created itself somewhere the host never looks.
+            base = (os.path.dirname(cls.DATABASE_PATH) if cls.DATABASE_PATH
+                    else str(app_base_dir()))
         cls.warn_if_share_looks_local(base)
         bus_dir = os.path.join(base, "str_bus")
         os.makedirs(bus_dir, exist_ok=True)

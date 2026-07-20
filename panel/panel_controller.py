@@ -69,6 +69,9 @@ Nothing happens when I double-click
 
 
 class PanelController:
+    # The app executable, which is NOT necessarily the one this code runs in.
+    APP_EXE = "FIU_System.exe"
+
     def __init__(self, bus_dir, local_db_path, host_id):
         self.bus = bus_dir
         self.db_path = local_db_path
@@ -186,38 +189,90 @@ class PanelController:
         return True, f"This PC designated as host (mode=host, id={config.HOST_ID})"
 
     @staticmethod
+    def _app_exe():
+        """Where FIU_System.exe is, seen from whichever exe is running this.
+
+        NOT sys.executable. This code runs inside TWO different executables:
+        in-process under FIU_System.exe --panel, and standalone as
+        FIU_Control_Panel.exe. Assuming sys.executable is the app is only true
+        in the first case; in the second, "Start host on this PC" launched a
+        SECOND control panel. Both processes then shared one PyInstaller
+        _MEIxxxxx extraction directory, and the one that exited first deleted
+        it out from under the other -- "Failed to remove temporary directory"
+        followed by a missing base_library.zip in the survivor.
+
+        ponytail: sibling lookup, because build.bat ships both exes to the same
+        folder and config.app_base_dir() already depends on that. Deliberately
+        no fallback to sys.executable: that fallback IS the bug above. A
+        missing app exe must surface as a plain "could not start" error.
+        """
+        return os.path.join(os.path.dirname(os.path.abspath(sys.executable)),
+                            PanelController.APP_EXE)
+
+    @staticmethod
     def _launch_cmd(*args):
-        """How to start another copy of this app.
+        """How to start the app.
 
         From source that is `python flet_app/main.py <args>`. Packaged, there is
-        no python.exe and no main.py on the machine at all -- sys.executable IS
-        the app -- so the exe relaunches itself with the same arguments.
+        no python.exe and no main.py on the machine at all, so the app exe is
+        launched directly -- see _app_exe for why that is not sys.executable.
         Getting this wrong means the panel's start buttons do nothing on every
         client PC, which is exactly where they matter most.
         """
         if getattr(sys, "frozen", False):
-            return [sys.executable, *args]
+            return [PanelController._app_exe(), *args]
         main_py = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "flet_app", "main.py")
         return [sys.executable, main_py, *args]
 
+    @staticmethod
+    def _survived(p, what):
+        """Did the process we just spawned still exist a moment later?
+
+        Popen returning without raising only proves Windows found the file. The
+        app exits within a second on a PC with no database configured, and it
+        is a windowed exe with nowhere to print why -- so the panel used to
+        report "host started (pid N)" for a process that was already gone, and
+        the operator went looking for a network problem that did not exist.
+        """
+        wait = getattr(p, "wait", None)
+        if not callable(wait):
+            return True, None          # injected test double with no lifecycle
+        try:
+            rc = wait(timeout=1.5)
+        except subprocess.TimeoutExpired:
+            return True, None          # still running after 1.5s: it started
+        return False, f"{what} exited immediately (code {rc})"
+
     def start_host(self, spawn=subprocess.Popen):
         try:
             p = spawn(self._launch_cmd("--host"),
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True, f"host started (pid {getattr(p, 'pid', '?')})"
+        except OSError as e:
+            return False, (f"could not start host: {e}. Is {self.APP_EXE} in the "
+                           f"same folder as this Control Panel?")
         except Exception as e:
             return False, f"could not start host: {e}"
+        alive, why = self._survived(p, "the host")
+        if not alive:
+            return False, why
+        return True, f"host started (pid {getattr(p, 'pid', '?')})"
 
     def start_client(self, spawn=subprocess.Popen):
         """Launch the app normally (client/local mode)."""
         try:
             p = spawn(self._launch_cmd(),
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True, f"app started (pid {getattr(p, 'pid', '?')})"
+        except OSError as e:
+            return False, (f"could not start the app: {e}. Is {self.APP_EXE} in "
+                           f"the same folder as this Control Panel?")
         except Exception as e:
             return False, f"could not start the app: {e}"
+        alive, why = self._survived(p, "the app")
+        if not alive:
+            return False, why
+        return True, f"app started (pid {getattr(p, 'pid', '?')})"
 
     def stop_host(self, killer=None):
         """Stop the host running on THIS PC.
@@ -265,10 +320,13 @@ class PanelController:
 
         exe = exe_path
         if exe is None:
-            exe = sys.executable if getattr(sys, "frozen", False) else None
+            # _app_exe, not sys.executable: run from FIU_Control_Panel.exe the
+            # latter is the PANEL, and the kit shipped a folder whose README
+            # told the user to double-click a diagnostic tool. No app in it.
+            exe = self._app_exe() if getattr(sys, "frozen", False) else None
         if not exe or not os.path.isfile(exe):
-            return False, ("no FIU_System.exe to copy. Run build.bat first, then "
-                           "point at dist\\FIU_System.exe")
+            return False, (f"no {self.APP_EXE} to copy. Run build.bat first, then "
+                           f"point at dist\\{self.APP_EXE}")
 
         try:
             os.makedirs(dest_dir, exist_ok=True)

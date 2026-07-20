@@ -250,7 +250,10 @@ class LoginView:
             self.page.run_task(_register)
 
         def cancel(e):
-            dlg.open = False; self.page.update()
+            # page.update() alone leaves the barrier up -- see components/overlay.
+            dlg.open = False
+            _overlay_dismiss(self.page, dlg)
+            self.page.update()
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -282,17 +285,26 @@ class LoginView:
         the moments nobody can get past this screen. Reaching it must not
         require logging in, and must not require a shortcut or a typed flag.
         """
+        import os as _os
         import subprocess
         import sys as _sys
+        env = None
         try:
             if getattr(_sys, "frozen", False):
                 cmd = [_sys.executable, "--panel"]
+                # This is the one genuine self-spawn in the app, and the panel
+                # is designed to OUTLIVE it. Without the reset, the child
+                # inherits the bootloader's handoff variables, runs out of the
+                # parent's _MEIxxxxx directory, and the parent deletes that
+                # directory on exit -- the surviving panel then dies on its next
+                # lazy import with a missing base_library.zip. PyInstaller
+                # documents this exact case (independent subprocess).
+                env = {**_os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"}
             else:
-                import os as _os
                 main_py = _os.path.join(_os.path.dirname(_os.path.dirname(
                     _os.path.abspath(__file__))), "main.py")
                 cmd = [_sys.executable, main_py, "--panel"]
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+            subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
         except Exception as ex:
             from components.toast import show_error

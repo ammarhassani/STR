@@ -39,10 +39,14 @@ def _seed():
 def test_launch_command_survives_being_packaged():
     """The start buttons must work on a PC with no Python and no main.py.
 
-    Packaged, sys.executable IS the app, so it relaunches itself. The old code
-    always built `python main.py`, which on a client .exe points at an
-    interpreter and a script that do not exist there -- the buttons would have
-    done nothing on exactly the machines they matter on.
+    Packaged there is no interpreter and no main.py, so the app exe is launched
+    directly. The old code built `python main.py`, which on a client .exe points
+    at two things that do not exist there -- the buttons would have done nothing
+    on exactly the machines they matter on.
+
+    The frozen case is checked from BOTH executables. It used to be checked only
+    from FIU_System.exe, the single identity where `sys.executable` happens to
+    be the right answer, which is why the real bug walked straight past it.
     """
     from panel.panel_controller import PanelController
 
@@ -50,15 +54,119 @@ def test_launch_command_survives_being_packaged():
     check("from source, launches main.py with the flag",
           src[-1] == "--host" and any("main.py" in str(p) for p in src), src)
 
+    # A real directory, not a literal C:\STR\... : the code under test calls
+    # os.path.dirname, and on the POSIX box this suite also runs on a backslash
+    # is an ordinary character, so a Windows literal would prove nothing.
+    install = tempfile.mkdtemp()
     old_frozen, old_exe = getattr(sys, "frozen", None), sys.executable
     sys.frozen = True
-    sys.executable = r"C:\STR\FIU_System.exe"
     try:
+        sys.executable = os.path.join(install, "FIU_System.exe")
         frozen = PanelController._launch_cmd("--host")
-        check("packaged, the exe relaunches ITSELF",
-              frozen == [r"C:\STR\FIU_System.exe", "--host"], frozen)
+        check("packaged in the app, launches the app",
+              frozen == [os.path.join(install, "FIU_System.exe"), "--host"], frozen)
         check("packaged, no main.py is referenced",
               not any("main.py" in str(p) for p in frozen), frozen)
+
+        # The bug: from the standalone panel, sys.executable is the PANEL. This
+        # launched a second Control Panel, which shared the first one's
+        # PyInstaller _MEIxxxxx directory; whichever exited first deleted it out
+        # from under the other -- "Failed to remove temporary directory", then a
+        # missing base_library.zip in the survivor.
+        sys.executable = os.path.join(install, "FIU_Control_Panel.exe")
+        from_panel = PanelController._launch_cmd("--host")
+        check("packaged in the PANEL, launches the APP and not itself",
+              os.path.basename(from_panel[0]) == "FIU_System.exe", from_panel)
+        check("and it looks for it beside the panel",
+              os.path.dirname(from_panel[0]) == install, from_panel)
+    finally:
+        if old_frozen is None:
+            del sys.frozen
+        else:
+            sys.frozen = old_frozen
+        sys.executable = old_exe
+
+
+def test_panel_exe_refuses_arguments_meant_for_the_app():
+    """FIU_Control_Panel.exe silently ignored --host, so a misroute looked fine."""
+    import subprocess as _sp
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    r = _sp.run([sys.executable, os.path.join(root, "panel", "panel_main.py"), "--host"],
+                capture_output=True, text=True, timeout=60)
+    check("the panel entry point rejects --host instead of ignoring it",
+          r.returncode != 0 and "no arguments" in (r.stderr + r.stdout).lower(),
+          (r.returncode, r.stderr[-200:]))
+
+
+def test_start_host_reports_failure_when_the_process_dies():
+    """Popen not raising only proves Windows found the file.
+
+    FIU_System.exe --host exits within a second on a PC with no database, and it
+    is a windowed exe with nowhere to print why. The panel used to answer
+    "host started (pid N)" and the operator went looking for a network fault.
+    """
+    from panel.panel_controller import PanelController
+    import subprocess as _sp
+    d, bus, db = _seed()
+    c = PanelController(bus, db, "h1")
+
+    class Died:
+        pid = 4321
+        def wait(self, timeout=None): return 2
+
+    class Lives:
+        pid = 4322
+        def wait(self, timeout=None): raise _sp.TimeoutExpired("x", timeout)
+
+    ok, msg = c.start_host(spawn=lambda *a, **k: Died())
+    check("a host that exits immediately is reported as a failure", ok is False, msg)
+    check("and the message says so", "exited" in msg.lower(), msg)
+
+    ok, msg = c.start_host(spawn=lambda *a, **k: Lives())
+    check("a host still running after the grace period is a success", ok is True, msg)
+
+
+def test_client_kit_ships_the_app_not_the_panel():
+    """The kit built from FIU_Control_Panel.exe contained no app at all.
+
+    make_client_kit fell back to sys.executable when given no exe. Run from the
+    panel that is the PANEL, the isfile() guard passed, and the README told the
+    user to double-click a diagnostic tool.
+    """
+    from panel.panel_controller import PanelController
+    d, bus, db = _seed()
+    c = PanelController(bus, db, "h1")
+
+    inst = os.path.join(d, "install")
+    os.makedirs(inst, exist_ok=True)
+    panel_exe = os.path.join(inst, "FIU_Control_Panel.exe")
+    app_exe = os.path.join(inst, "FIU_System.exe")
+    for p in (panel_exe, app_exe):
+        with open(p, "wb") as f:
+            f.write(b"MZ")
+
+    dest = os.path.join(d, "kit")
+    old_frozen, old_exe = getattr(sys, "frozen", None), sys.executable
+    sys.frozen = True
+    sys.executable = panel_exe
+    try:
+        ok, msg = c.make_client_kit(dest, r"\\server\share")
+        check("the kit builds", ok, msg)
+        shipped = os.listdir(dest)
+        check("it contains FIU_System.exe", "FIU_System.exe" in shipped, shipped)
+        check("it does NOT contain the control panel",
+              "FIU_Control_Panel.exe" not in shipped, shipped)
+        with open(os.path.join(dest, "READ ME FIRST.txt"), encoding="utf-8") as f:
+            readme = f.read()
+        check("and the README tells the user to open the app",
+              "FIU_Control_Panel" not in readme and "FIU_System.exe" in readme,
+              readme[:200])
+
+        # no app beside the panel -> a plain refusal, never a wrong binary
+        os.remove(app_exe)
+        ok2, msg2 = c.make_client_kit(os.path.join(d, "kit2"), r"\\server\share")
+        check("with no app to copy it refuses rather than shipping the panel",
+              ok2 is False and "FIU_System.exe" in msg2, msg2)
     finally:
         if old_frozen is None:
             del sys.frozen
@@ -275,6 +383,9 @@ def test_durations_are_human():
 
 if __name__ == "__main__":
     test_launch_command_survives_being_packaged()
+    test_panel_exe_refuses_arguments_meant_for_the_app()
+    test_start_host_reports_failure_when_the_process_dies()
+    test_client_kit_ships_the_app_not_the_panel()
     test_stop_host_refuses_to_kill_another_pc_s_pid()
     test_check_share_requires_write_not_just_read()
     test_health_names_the_actual_problem()

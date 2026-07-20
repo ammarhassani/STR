@@ -6,18 +6,27 @@ Do the sections in order. Stop at the end of each one and check it worked.
 
 ---
 
-## There is only ONE program
+## Two files, one folder, and they must stay together
 
-`FIU_System.exe` is everything.
+`build.bat` produces two executables:
 
-- **Double-click it** → the app
-- **Bottom-right of the login screen → "Control Panel"** → check-up mode
+| File | What it is |
+|---|---|
+| `FIU_System.exe` | the app. Double-click this one. |
+| `FIU_Control_Panel.exe` | check-up mode, for when the app will not start. |
 
-There is no second program, no launcher script, and nothing to install.
+**Keep them in the same folder.** This is not tidiness — both find `config\`
+and `database\` by looking next to themselves, and the Control Panel starts the
+host by launching `FIU_System.exe` from its own folder. Separate them and the
+panel's start buttons report `could not start host`, and the two programs read
+two different configurations.
 
-> The Control Panel sits on the login screen on purpose. When something is
-> wrong, nobody can get past that screen — so that is where the button that
-> tells you what's wrong has to be.
+You do not normally touch the second file: the app opens it for you from
+**bottom-right of the login screen → "Control Panel"**. It exists as its own
+`.exe` for the one case that button cannot cover — the app not starting at all,
+so the login screen never appears.
+
+There is no launcher script and nothing to install.
 
 ---
 

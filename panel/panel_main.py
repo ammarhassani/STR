@@ -22,6 +22,15 @@ for _p in (_ROOT, os.path.join(_ROOT, "flet_app")):
 
 
 def main():
+    # This executable takes no arguments. It used to accept and silently ignore
+    # them, which is how "Start host on this PC" could launch a second copy of
+    # the PANEL with --host and look like it had done something. Refusing loudly
+    # means a future misroute names itself instead of dying later inside
+    # PyInstaller's shared temp directory.
+    if len(sys.argv) > 1:
+        raise SystemExit(
+            f"FIU_Control_Panel.exe takes no arguments (got {sys.argv[1:]}). "
+            f"Host and client modes live in FIU_System.exe.")
     from panel.control_panel_ui import main as panel_main
     panel_main()
 

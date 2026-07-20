@@ -27,6 +27,34 @@ class FakePage:
     def run_task(self, fn, *a): pass
 
 
+class OffstagePage:
+    """A page that models what flet 0.28.3 ACTUALLY does.
+
+    The two classes above give `overlay` its own list, unrelated to open(). Real
+    Flet does not: `Page.overlay` returns `self.__offstage.controls`, the same
+    list `Page.open()` appends to (page.py:1373, page.py:1297). Because the old
+    fakes never modelled that aliasing, they could not see prune() reaching into
+    the live tree and unmounting a dialog that had just closed -- which is the
+    bug that survived commit 42b6ef1 and kept the screen grey after the forced
+    password change.
+    """
+    def __init__(self):
+        self._offstage = []
+        self.snack_bar = None
+    @property
+    def overlay(self):
+        return self._offstage
+    def open(self, control):
+        control.open = True
+        if control not in self._offstage:
+            self._offstage.append(control)
+    @staticmethod
+    def close(control):
+        control.open = False          # Flet leaves it MOUNTED on purpose
+    def update(self, *a): pass
+    def run_task(self, fn, *a): pass
+
+
 class FletLikePage(FakePage):
     """A page WITH Flet's own open/close, which is what the real app has.
 
@@ -114,7 +142,10 @@ def test_helper_mounts_and_unmounts():
     dead = ft.AlertDialog(content=ft.Text("dead")); dead.open = False
     page.overlay.append(dead)
     mount(page, ft.AlertDialog(content=ft.Text("live")))
-    check("mounting clears anything already closed", len(page.overlay) == 1, len(page.overlay))
+    check("the first mount after a close leaves the dialog mounted",
+          dead in page.overlay, len(page.overlay))
+    mount(page, ft.AlertDialog(content=ft.Text("later")))
+    check("the one after that sweeps it", dead not in page.overlay, len(page.overlay))
 
 
 def test_repeated_dialog_cycles_do_not_pile_up():
@@ -126,14 +157,108 @@ def test_repeated_dialog_cycles_do_not_pile_up():
         d = ft.AlertDialog(content=ft.Text("form"))
         mount(page, d)
         dismiss(page, d)
-    # at most ONE closed dialog waits to be pruned -- the growth is what matters
-    check("25 open/close cycles leave at most one closed dialog behind",
-          len(page.overlay) <= 1, len(page.overlay))
-    check("and the one left is closed, not covering the page",
+    # A closed dialog gets one prune of grace, so a couple linger. What matters
+    # is that the count does not track the number of cycles.
+    check("25 open/close cycles leave at most two closed dialogs behind",
+          len(page.overlay) <= 2, len(page.overlay))
+    check("and what is left is closed, not covering the page",
           all(getattr(c, "open", None) is False for c in page.overlay),
           [getattr(c, "open", None) for c in page.overlay])
-    mount(page, ft.AlertDialog(content=ft.Text("next")))
-    check("the next open prunes it", len(page.overlay) == 1, len(page.overlay))
+
+
+def test_a_toast_after_a_close_leaves_the_dialog_mounted():
+    """The grey screen after the forced password change, reproduced.
+
+    handle_change() in change_password_dialog.py dismisses the dialog and then
+    calls show_success() on the very next line. Toast.show() opens with
+    prune(page). Before this fix that prune removed the dialog that had closed
+    a moment earlier -- and because page.overlay IS the live offstage list, the
+    AlertDialog widget was destroyed while Flutter was still animating its route
+    out. The route never popped, its ModalBarrier stayed on the Navigator, and
+    the user got a rendered dashboard that dimmed and ate every click.
+
+    Web never showed it, so it survived testing. Only the packaged desktop
+    build reproduced it.
+    """
+    import flet as ft
+    from components.overlay import mount, dismiss, prune
+    from components.toast import show_success
+
+    page = OffstagePage()
+    dlg = ft.AlertDialog(modal=True, content=ft.Text("change password"))
+
+    mount(page, dlg)
+    check("the dialog is mounted and open", dlg in page.overlay and dlg.open is True)
+
+    dismiss(page, dlg)
+    check("dismiss closes it", dlg.open is False)
+    check("dismiss leaves it mounted so Flutter can pop the route",
+          dlg in page.overlay)
+
+    show_success(page, "Password changed successfully!")
+    check("the success toast must NOT unmount the dialog that just closed",
+          dlg in page.overlay,
+          "prune() removed a dialog mid route-pop: this is the grey screen")
+
+    # and a spent snack bar is still swept, which is what prune is for
+    bar = ft.SnackBar(content=ft.Text("old")); bar.open = False
+    page.overlay.append(bar)
+    prune(page)
+    check("spent snack bars are still swept", bar not in page.overlay)
+
+
+def test_escape_cannot_dismiss_a_forced_dialog():
+    """Escape used to let a default-password account into the system.
+
+    main.py's Escape handler closed every open AlertDialog it found. The forced
+    password change is one of those, so the account that STR ships with -- whose
+    password is written down in the setup docs -- could press Escape and carry on
+    using an AML system without ever setting a password of its own.
+    """
+    import flet as ft
+    forced = ft.AlertDialog(modal=True, data="forced", content=ft.Text("x"))
+    normal = ft.AlertDialog(modal=True, content=ft.Text("y"))
+    for d in (forced, normal):
+        d.open = True
+
+    def escape_would_close(d):
+        # the condition from main.py's Escape branch
+        return (isinstance(d, ft.AlertDialog) and d.open
+                and getattr(d, "data", None) != "forced")
+
+    check("Escape refuses the forced dialog", not escape_would_close(forced))
+    check("Escape still closes ordinary dialogs", escape_would_close(normal))
+
+
+def test_forced_password_dialog_has_no_way_out():
+    """No Cancel button when the account is still on the default password."""
+    import flet as ft
+    from tests_fiu_phase import _setup
+    from dialogs.change_password_dialog import show_change_password_dialog
+
+    auth, reports, nums, appr, dbm = _setup()
+    auth.authenticate('agent1', 'Pass@123')
+
+    class S: pass
+    st = S(); st.auth_service = auth
+
+    page = OffstagePage()
+    show_change_password_dialog(page, st, forced=True)
+    dlgs = [c for c in page.overlay if isinstance(c, ft.AlertDialog)]
+    check("the forced dialog opened", len(dlgs) == 1, len(dlgs))
+    if dlgs:
+        labels = [getattr(b, "text", None) for b in (dlgs[0].actions or [])]
+        check("forced: no cancel button", not any(
+            (lbl or "").strip().lower() in ("cancel", "إلغاء") for lbl in labels), labels)
+        check("forced: marked so Escape will not dismiss it",
+              dlgs[0].data == "forced", dlgs[0].data)
+
+    page2 = OffstagePage()
+    show_change_password_dialog(page2, st, forced=False)
+    dlgs2 = [c for c in page2.overlay if isinstance(c, ft.AlertDialog)]
+    if dlgs2:
+        check("voluntary change still has a cancel button",
+              len(dlgs2[0].actions or []) == 2, dlgs2[0].actions)
 
 
 def test_toasts_do_not_stack():
@@ -196,6 +321,9 @@ if __name__ == "__main__":
     test_uses_flets_own_dialog_api()
     test_fallback_updates_the_control_not_just_the_page()
     test_repeated_dialog_cycles_do_not_pile_up()
+    test_a_toast_after_a_close_leaves_the_dialog_mounted()
+    test_escape_cannot_dismiss_a_forced_dialog()
+    test_forced_password_dialog_has_no_way_out()
     test_toasts_do_not_stack()
     test_refused_form_still_explains_itself()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail) + ' FAILED'}")

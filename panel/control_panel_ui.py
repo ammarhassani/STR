@@ -50,7 +50,12 @@ def _controller():
     Config.load()
     bus = Config.get_bus_dir()
     local_db = Config.DATABASE_PATH or Config.get_client_replica_path()
-    return PanelController(bus, local_db, Config.ensure_host_id())
+    # HOST_ID, not ensure_host_id(): the latter mints an id and SAVES config.
+    # Opening the diagnostic tool on a PC with no install then manufactured an
+    # all-null config.json next to itself -- the panel creating the broken
+    # installation it exists to diagnose. An id is minted only when this PC is
+    # actually made a host (do_designate / do_takeover below).
+    return PanelController(bus, local_db, Config.HOST_ID)
 
 
 def build_panel(page: ft.Page):
@@ -179,6 +184,13 @@ def build_panel(page: ft.Page):
     def do_designate(_):
         Config.SHARE_PATH = share_field.value or Config.SHARE_PATH
         run(controller.designate_host, Config)
+        controller.host_id = Config.HOST_ID
+
+    def do_takeover(_):
+        # Taking over IS becoming a host, so minting the id here is the one
+        # place the panel is meant to write config. See _controller().
+        controller.host_id = Config.ensure_host_id()
+        run(controller.become_host_now)
 
     # Everything past the first two buttons is a rare, deliberate act -- setting
     # a PC up, deploying to a workstation, taking over after a host failure.
@@ -198,7 +210,7 @@ def build_panel(page: ft.Page):
                                                      ft.Icons.INVENTORY_2, do_kit)]),
         section("IF THE HOST PC IS GONE", [
             big_button("Take over as host", ft.Icons.SWAP_HORIZ,
-                       lambda _: run(controller.become_host_now), WARN_COLOR),
+                       do_takeover, WARN_COLOR),
             big_button("Check data is healthy", ft.Icons.HEALTH_AND_SAFETY,
                        lambda _: run(controller.run_integrity), "#4a5568"),
         ]),

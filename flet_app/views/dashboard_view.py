@@ -85,7 +85,12 @@ def build_dashboard_content(
             update_dashboard_ui()
 
         except Exception as e:
-            print(f"Error loading dashboard data: {e}")
+            # Not print(): the packaged exe is windowed, so sys.stdout is None
+            # and a dashboard that failed to load left no trace anywhere.
+            try:
+                app_state.logging_service.error(f"Error loading dashboard data: {e}")
+            except Exception:
+                pass
             state["is_loading"] = False
             if loading_ref.current:
                 loading_ref.current.visible = False

@@ -169,6 +169,9 @@ def show_change_password_dialog(page: ft.Page, app_state: Any, forced: bool = Fa
 
     dialog = ft.AlertDialog(
         modal=True,
+        # Read by main.py's Escape handler: "forced" means there is no way out
+        # of this dialog except changing the password.
+        data="forced" if forced else None,
         title=ft.Text(t("cpw.title")),
         content=ft.Container(
             content=ft.Column(
@@ -218,7 +221,13 @@ def show_change_password_dialog(page: ft.Page, app_state: Any, forced: bool = Fa
             width=400,
         ),
         actions=[
-            ft.TextButton(t("common.cancel"), on_click=close_dialog),
+            # No way out when forced. The account is still on the default
+            # password: a Cancel button here let an admin dismiss the dialog and
+            # keep using the system with credentials that are written down in
+            # the setup docs. Closing the window is the only other exit, and
+            # that costs the session.
+            *([] if forced else
+              [ft.TextButton(t("common.cancel"), on_click=close_dialog)]),
             ft.ElevatedButton(
                 t("cpw.title"),
                 icon=ft.Icons.KEY,

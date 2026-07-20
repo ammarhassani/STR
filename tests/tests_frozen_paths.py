@@ -69,7 +69,12 @@ def _frozen_paths(exe_dir, meipass):
 
 
 def test_frozen_data_lives_beside_the_exe():
-    exe_dir = os.path.join(tempfile.mkdtemp(), "STR")
+    # realpath: app_base_dir() resolves symlinks, and on macOS (where this suite
+    # also runs) tempfile hands back /var/..., which is a symlink to
+    # /private/var/.... Comparing the raw temp path against a resolved one
+    # failed on every check here for a reason that has nothing to do with the
+    # behaviour being tested.
+    exe_dir = os.path.realpath(os.path.join(tempfile.mkdtemp(), "STR"))
     meipass = os.path.join(tempfile.mkdtemp(), "_MEI12345")
     os.makedirs(exe_dir, exist_ok=True)
     os.makedirs(meipass, exist_ok=True)

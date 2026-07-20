@@ -154,9 +154,14 @@ class FletApp:
 
         # Escape - Close any open dialogs
         elif key == "Escape":
-            # Close any open overlay dialogs
+            # Skipping data == "forced" is a security condition, not a nicety:
+            # Escape used to dismiss the forced password change, letting an
+            # account still on the default password into the system. Not keyed
+            # off modal=True -- 38 dialogs set that, including Help, and Escape
+            # should still close those.
             for overlay in self.page.overlay[:]:
-                if isinstance(overlay, ft.AlertDialog) and overlay.open:
+                if (isinstance(overlay, ft.AlertDialog) and overlay.open
+                        and getattr(overlay, "data", None) != "forced"):
                     overlay.open = False
                     _overlay_dismiss(self.page, overlay)
             self.page.update()

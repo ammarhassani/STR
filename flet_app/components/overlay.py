@@ -19,8 +19,18 @@ and they need different fixes.
 So this module now delegates to Flet's own `page.open()` / `page.close()`,
 which put the control in the offstage container and update the control itself.
 The manual path is kept only as a fallback for objects Flet will not take.
+
+3. Same symptom, third cause, and the one that survived fix 2: `prune()` was
+   unmounting the closed dialog a moment later, from Toast.show(). See prune().
 """
+import weakref
+
 import flet as ft
+
+# Dialogs that have already survived one prune since they closed. The second
+# prune takes them out. See prune() for why a closed dialog cannot be unmounted
+# straight away, and why it must not be kept forever either.
+_seen_closed = weakref.WeakSet()
 
 
 def _is_dead(control) -> bool:
@@ -29,26 +39,57 @@ def _is_dead(control) -> bool:
 
 
 def prune(page) -> int:
-    """Drop every closed control from page.overlay. Returns how many went.
+    """Drop spent controls from page.overlay. Returns how many went.
 
-    Only touches `page.overlay` -- what Flet's own open() uses (the offstage
-    container) is Flet's to manage.
+    Snack bars go immediately. A dialog gets one prune of grace first, and that
+    delay is the fix for the grey screen this module exists for:
+
+    `page.overlay` is not a separate list from the one `page.open()` uses -- in
+    flet 0.28.3 `Page.overlay` returns `self.__offstage.controls`, the very list
+    `Page.open()` appends to (page.py:1373, page.py:1297). Removing a control
+    from it emits a `remove` command against the LIVE tree. Flet pops an
+    AlertDialog's Flutter route only when the widget rebuilds with `open=False`;
+    unmount it in the same breath and the widget is destroyed mid-animation, the
+    route never pops, and its ModalBarrier stays painted over a fully rendered
+    screen that swallows every click.
+
+    Commit 42b6ef1 took that removal out of dismiss() but left it here -- and
+    Toast.show() calls prune() one line after a dialog closes. That is why the
+    forced password change still greyed out after the "fix".
+
+    One prune of grace, not forever: a closed dialog still costs an offstage
+    entry, and this file's first bug was an analyst opening the report form over
+    and over. Two prunes never land in the same frame -- each one is a separate
+    user action -- so by the second the route has long since popped.
     """
     overlay = getattr(page, "overlay", None)
     if not overlay:
         return 0
-    dead = [c for c in list(overlay) if _is_dead(c)]
-    for c in dead:
+    removed = 0
+    for c in list(overlay):
+        if not _is_dead(c):
+            continue
+        if not isinstance(c, ft.SnackBar) and c not in _seen_closed:
+            try:
+                _seen_closed.add(c)   # goes on the NEXT prune, not this one
+            except TypeError:
+                pass                  # not weak-referenceable: leave it mounted
+            continue
         try:
             overlay.remove(c)
+            _seen_closed.discard(c)
+            removed += 1
         except ValueError:
             pass
-    return len(dead)
+    return removed
 
 
 def mount(page, control, update: bool = True):
     """Show `control`, preferring Flet's own dialog handling."""
     prune(page)
+    # Reopening a dialog object that was closed earlier: it is live again, so it
+    # must earn its prune of grace afresh when it next closes.
+    _seen_closed.discard(control)
     opener = getattr(page, "open", None)
     if callable(opener):
         try:
