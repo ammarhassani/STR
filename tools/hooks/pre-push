@@ -1,0 +1,18 @@
+#!/bin/sh
+# The loop has no push rights. You review the branch and push yourself.
+#
+# Blocking the remote pushurl would have blocked YOUR pushes too -- a worktree
+# shares the repo config. Refusing by branch name is precise: main pushes
+# normally, loop/* never leaves this machine.
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_ref" in
+    refs/heads/loop/*)
+      echo "pre-push REFUSED: $local_ref is a bug-hunt branch."
+      echo "  Review it, merge what you want into main, push that."
+      exit 1
+      ;;
+  esac
+done
+
+exit 0

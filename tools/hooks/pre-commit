@@ -1,0 +1,59 @@
+#!/bin/sh
+# Guard rails for the autonomous bug-hunt loop.
+#
+# These bite ONLY on a loop/* branch. A prompt line telling an agent "do not
+# weaken the tests" is advice; a grep over the staged diff is enforcement. On
+# main this hook does nothing, so ordinary human commits are unaffected.
+#
+# Bypassing this is --no-verify, which is on the loop's forbidden list and shows
+# up in the reflog.
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$branch" in
+  loop/*) ;;
+  *) exit 0 ;;
+esac
+
+staged=$(git diff --cached --name-only)
+[ -z "$staged" ] && exit 0
+
+fail() { echo "pre-commit REFUSED: $1"; exit 1; }
+
+# The loop must not edit its own rules, its own gate, or the platform fence.
+echo "$staged" | grep -qE '^\.claude/|^\.gitignore$|^tests/(run_all|loop_gate)\.py$|^tests/windows_only\.txt$' \
+  && fail "agent config, the gate, or the platform fence is staged"
+
+# Bank data and scratch boxes never get committed, gitignore or not.
+echo "$staged" | grep -qE '\.(db|sqlite3?|xlsx|xls|csv|env|pem|key)$|^(cbox|nukebox|uibox|pbox|sandbox)/' \
+  && fail "data file or scratch path staged"
+
+# The one enforceable form of "don't fix the test to make it pass".
+git diff --cached -- tests/ | grep -qE '^-[^-].*(check\(|finding\(|assert |sys\.exit)' \
+  && fail "staged diff DELETES test assertions -- tests may only gain them"
+
+# Hiding a suite from the gate by moving it into the opt-in LONG set.
+git diff --cached -- tests/run_all.py | grep -qE '^\+.*LONG' \
+  && fail "moving a suite into LONG hides it from the gate"
+
+# Windows-only lines cannot be verified on this machine. Park them instead.
+for f in $(sed 's/#.*//' tests/windows_only.txt 2>/dev/null | cut -d: -f1 | tr -d ' ' | sort -u); do
+  [ -z "$f" ] && continue
+  echo "$staged" | grep -qx "$f" && fail "$f is Windows-only -- park it in tests/WINDOWS_MANUAL.md"
+done
+
+# A product change with no test costs nothing otherwise, which is exactly how an
+# idle iteration turns into an unrequested refactor of working code.
+prod=$(echo "$staged" | grep -E '^(services|flet_app|database|host|panel|utils)/' | head -1)
+test=$(echo "$staged" | grep '^tests/' | head -1)
+[ -n "$prod" ] && [ -z "$test" ] && fail "product change with no test ($prod)"
+
+# A tests-only commit is allowed to be RED. That is the whole point of the
+# workflow: prove the bug exists by committing a failing test BEFORE the fix.
+# Running the suite here unconditionally made that commit impossible, so the
+# hook was quietly forbidding the one thing the loop is told to do first.
+if [ -z "$prod" ]; then
+  echo "pre-commit: tests-only commit, suite not required to be green (RED-first is allowed)"
+  exit 0
+fi
+
+exec python3.14 tests/run_all.py

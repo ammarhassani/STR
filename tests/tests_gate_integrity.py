@@ -73,10 +73,22 @@ def test_the_commit_holes_are_closed():
 
 def test_the_hooks_are_installed_and_armed():
     hooks = _hooks_dir()
+    tracked = os.path.join(REPO, "tools", "hooks")
     for hook in ("pre-commit", "commit-msg", "pre-push"):
         p = os.path.join(hooks, hook)
-        check(f"{hook} hook exists", os.path.isfile(p), p)
+        src = os.path.join(tracked, hook)
+        check(f"{hook} is in tools/hooks (reviewable)", os.path.isfile(src), src)
+        check(f"{hook} hook is installed", os.path.isfile(p),
+              f"{p} -- run tools/install_hooks.sh")
         check(f"{hook} hook is executable", os.access(p, os.X_OK), p)
+        # An installed hook that has drifted from the reviewed copy is a guard
+        # rail nobody has read. Editing .git/hooks is also how you would quietly
+        # disarm one.
+        if os.path.isfile(p) and os.path.isfile(src):
+            check(f"{hook} matches the reviewed copy",
+                  open(p, encoding="utf-8").read()
+                  == open(src, encoding="utf-8").read(),
+                  "installed hook differs from tools/hooks -- rerun install_hooks.sh")
 
     pre = os.path.join(hooks, "pre-commit")
     if os.path.isfile(pre):

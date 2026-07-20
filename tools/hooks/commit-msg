@@ -1,0 +1,20 @@
+#!/bin/sh
+# A fix commit from the loop must cite what makes the old behaviour wrong.
+# Without this, "I think this is a bug" and "this violates a documented rule"
+# produce identical commits. Only bites on loop/* branches.
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$branch" in
+  loop/*) ;;
+  *) exit 0 ;;
+esac
+
+# RED-test, chore and docs commits carry no fix, so they need no evidence.
+grep -qE '^(test|chore|docs)' "$1" && exit 0
+
+grep -qE '^Evidence: [^ ]+:[0-9]+' "$1" || {
+  echo "commit-msg REFUSED: no 'Evidence: <path>:<line>' line."
+  echo "  A fix with no citation is a product decision, not a defect."
+  echo "  Mark the ledger line 'ask ' instead."
+  exit 1
+}
