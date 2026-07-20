@@ -134,8 +134,12 @@ def test_setup_guide_covers_the_real_deployment():
           'C:\\STR' in guide)
     check("setup guide has a troubleshooting section",
           'wrong' in guide.lower() or 'denied' in guide.lower())
-    check("setup guide does not tell anyone to run a .vbs",
-          '.vbs' not in guide.lower())
+    # Names the deleted launchers, not the extension: the guide legitimately
+    # MENTIONS .vbs to explain why a Startup entry gets scanned, and a test
+    # that bans the word blocks the explanation rather than the mistake.
+    for gone in ('start_host.vbs', 'start_client.vbs'):
+        check(f"setup guide does not tell anyone to run {gone}",
+              gone not in guide.lower())
 
 
 if __name__ == "__main__":

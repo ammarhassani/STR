@@ -158,8 +158,11 @@ def test_operator_docs_cover_the_real_procedures():
     check("SETUP.md warns against Program Files", "program files" in setup)
     check("SETUP.md has a troubleshooting section", "something is wrong" in setup)
 
+    # The deleted launchers by name, not the extension: the guides legitimately
+    # mention .vbs when explaining why Startup entries get scanned.
     for name, text in (("SETUP.md", setup), ("OPERATIONS.md", ops)):
-        check(f"{name} does not tell anyone to run a .vbs", ".vbs" not in text)
+        for gone in ("start_host.vbs", "start_client.vbs"):
+            check(f"{name} does not tell anyone to run {gone}", gone not in text)
 
 
 if __name__ == "__main__":
