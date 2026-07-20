@@ -121,6 +121,32 @@ Tick **Remember my credentials**.
 
 ---
 
+## D. Going live (clearing the test data)
+
+Do this **once**, when you stop testing and start real work.
+
+It deletes every report, number and log made during testing, and keeps your
+users, settings and field configuration.
+
+1. Make sure nobody is using STR
+2. On the host PC, Control Panel → **Back up now**
+3. Run:
+
+```
+python reset_to_production.py
+```
+
+4. It asks you to confirm. Read what it says before typing anything.
+
+> **There is no undo.** The backup from step 2 is your only way back.
+> Do not skip it, even though the data is "only test data" — if the reset
+> catches something real, that backup is the difference between an
+> inconvenience and a loss.
+
+After this, the numbering starts clean and the app is ready for real reports.
+
+---
+
 ## Something is wrong
 
 ### The app asks me to set up a database

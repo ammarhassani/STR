@@ -20,33 +20,57 @@ is used only as a **mailbox** (command files in, responses out). This is the
 distribution architecture, specified in
 [docs/superpowers/specs/2026-07-16-single-writer-host-architecture-design.md](docs/superpowers/specs/2026-07-16-single-writer-host-architecture-design.md).
 
+> **Setting it up, or running it?** You do not need this page.
+> Go to **[docs/SETUP.md](docs/SETUP.md)** (install) or
+> **[docs/OPERATIONS.md](docs/OPERATIONS.md)** (day to day). Both are written
+> for non-technical readers.
+
 ## Run modes (one codebase, three entry points)
 
 - **default** — the user report UI (client mode).
 - **`--host`** — the single-writer host loop (owns the DB on local disk).
 - **`--panel`** — the operator control panel (setup, host designation, monitoring,
-  failover, config, maintenance).
+  failover, config, maintenance). Also reachable from the login screen, so a user
+  never needs the flag.
 
 ## Development
 
-- Run everything with **`python3.14`** (user-site has Flet 0.28.3 + bcrypt). Plain
-  `python3` lacks the deps.
-- Launch the app: `python3.14 flet_app/main.py`.
-- Test harnesses (all `python3.14 tests_*.py`, each builds its own sandbox):
-  - `tests_e2e_harness.py` — 180 functional checks + 10-user stress
-  - `tests_prosecutor.py` — 35 adversarial security charges (target: 0 vulnerabilities)
-  - `tests_conformance.py` — BRD conformance + crash-fuzz (target: 0 uncaught)
-  - `tests_ui_driver.py` — drives real Flet views/dialogs
-  - `tests_theme.py` — flat-theme + component checks
+- Python **3.13** with Flet 0.28.3 + bcrypt.
+- Launch the app: `python flet_app/main.py`
+- Build the distributable exe: `build.bat` (defined by `STR.spec`; it refuses to
+  produce a binary that is missing packages or data files).
+
+### Tests
+
+```
+python tests/run_all.py          # standard suites, a few minutes
+python tests/run_all.py --all    # including the long simulations
+python tests/run_all.py roles    # only suites matching "roles"
+```
+
+Each suite builds its own sandbox and exits non-zero on failure. The notable ones:
+
+| Suite | What it does |
+|---|---|
+| `tests_e2e_harness.py` | 192 functional checks + 10-user stress |
+| `tests_prosecutor.py` | 36 adversarial security charges (target: 0) |
+| `tests_conformance.py` | BRD conformance + crash-fuzz (target: 0 uncaught) |
+| `tests_warzone.py` | 1 host + 16 client processes over the real queue |
+| `tests_simulation_fortnight.py` | two weeks of business, 20 agents, 5 supervisors |
+| `tests_frozen_paths.py` | the packaged exe keeps its data beside itself |
+
+The last three are opt-in (`--all`) on time, not importance — the warzone and
+fortnight simulations have each found defects nothing else did.
 
 ## Status
 
-Application layer: **built, hardened, tested.** Distribution/durability architecture
-(single-writer host): **specified, under review, not yet implemented** — the service
-layer is deliberately shaped so it bolts on without rewriting business logic.
+Application layer: **built, hardened, tested.** Distribution architecture
+(single-writer host + folder queue): **implemented**, proven on one machine and
+against a real SMB share. Not yet proven across a real network — that needs two
+physical PCs, and it is the last open item.
 
 ## Distribution
 
-Source lives on **Codeberg**; the organization workstation pulls the repo (and the
-control-panel script) from there. "Remote" management means a separate local script
-on the same PC — not network remote control (the locked network forbids it).
+Client PCs get a single packaged `FIU_System.exe` — no Python, no source, no
+launcher script. It writes its config and local data beside itself, so it must
+live somewhere writable (`C:\STR`), never Program Files.

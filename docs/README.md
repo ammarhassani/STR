@@ -1,47 +1,77 @@
-# STR / FIU Report Management System — Documentation Index
+# STR documentation
 
-**Version:** 1.2 | **Updated:** July 2026
+**Pick the row that matches what you're doing.**
 
----
+| I want to... | Read |
+|---|---|
+| Set STR up on a PC | [SETUP.md](SETUP.md) |
+| Run it day to day, or fix a problem | [OPERATIONS.md](OPERATIONS.md) |
+| Test it across real PCs | [TEST_DAY.md](TEST_DAY.md) |
+| Understand why it's built this way | [CONTEXT.md](CONTEXT.md) |
+| Change the code | [DECISIONS.md](DECISIONS.md), then the specs below |
 
-## Start here (context & rationale — read in this order)
-
-| Document | Description |
-|----------|-------------|
-| [CONTEXT.md](CONTEXT.md) | **The situation & hard constraints** — org, budget, locked-down environment, stakes, why the architecture is what it is. Read first. |
-| [DECISIONS.md](DECISIONS.md) | **Architecture Decision Records** — each major choice with its context, alternatives, and research-backed rationale. |
-| [superpowers/specs/2026-07-16-single-writer-host-architecture-design.md](superpowers/specs/2026-07-16-single-writer-host-architecture-design.md) | **The active design spec** — single-writer host + folder-queue + control panel. The distribution/durability architecture. |
-
-## Business requirements (what the app must do)
-
-| Document | Description |
-|----------|-------------|
-| [00_Scope_Amendment.md](00_Scope_Amendment.md) | **ACTIVE amendment — external integrations removed, standalone program** |
-| [01_BRD_Main.md](01_BRD_Main.md) | System overview, scope, and requirements |
-| [02_Data_Fields.md](02_Data_Fields.md) | Report fields and dropdown values |
-| [03_Integrations.md](03_Integrations.md) | ~~External system integrations~~ (void — see amendment) |
-| [04_Roles_Permissions.md](04_Roles_Permissions.md) | User roles and access rights |
-| [05_UI_Screens.md](05_UI_Screens.md) | Screen layouts and navigation |
-| [06_Developer_Decisions.md](06_Developer_Decisions.md) | Preemptive answers to common developer questions |
+The first three need no technical background. The last two assume you write code.
 
 ---
 
-## System summary
+## For whoever runs STR
 
-STR manages Suspicious Transaction Reports for a bank FIU/AML team as a **standalone,
-on-premises desktop app** (manual data entry, local auth, no external integrations —
-see [00_Scope_Amendment.md](00_Scope_Amendment.md)).
+**[SETUP.md](SETUP.md)** — installing the host and the client PCs. Ordered
+steps, one action each, with a symptom-to-fix section at the end.
 
-The **application layer** (report CRUD, validation, approval workflow, versioning,
-numbering, RBAC, export) is built and tested. The **distribution architecture** that
-lets the whole team share it safely over a network folder without corrupting the data
-is designed in the active spec above and is the current work.
+**[OPERATIONS.md](OPERATIONS.md)** — the daily check, backups, what to do when
+the host PC dies, and the handful of problems you will actually meet.
 
-**Why the architecture matters:** multiple PCs writing one SQLite file on a shared
-drive corrupts compliance data (SQLite's own documented position — see DECISIONS.md
-ADR-001). The design routes every write through a single host process on local disk,
-with the shared folder used only as a mailbox. See CONTEXT.md.
+**[TEST_DAY.md](TEST_DAY.md)** — one-page checklist for testing across real
+machines. Print it.
 
 ---
 
-*End of Index*
+## For whoever maintains the code
+
+**[CONTEXT.md](CONTEXT.md)** — the situation and the hard constraints: a
+locked-down bank environment, no budget, no admin rights, one shared folder, and
+compliance data that must not corrupt. Read this before judging any design
+choice; most of them are forced.
+
+**[DECISIONS.md](DECISIONS.md)** — every significant decision with its context,
+alternatives and rationale. Includes the FIU round-trip workflow, which is
+domain knowledge you cannot infer from the code.
+
+**[superpowers/specs/](superpowers/specs/)** — designs for the larger pieces:
+the single-writer host architecture, the retrospective import, the UI redesign.
+
+**Why the architecture matters:** several PCs writing one SQLite file on a
+shared drive corrupts compliance data — SQLite's own documented position, see
+DECISIONS.md ADR-001. Every write goes through a single host process on local
+disk; the shared folder is only a mailbox.
+
+### Requirements baseline
+
+`01_BRD_Main.md` and companions (`02_Data_Fields`, `03_Integrations`,
+`04_Roles_Permissions`, `05_UI_Screens`, `06_Developer_Decisions`,
+`00_Scope_Amendment`) are the original agreed requirements. They record what was
+asked for, so they stay even where the build has moved on.
+`03_Integrations` is void — see the amendment.
+
+### Tests
+
+```
+python tests/run_all.py          # standard suites, a few minutes
+python tests/run_all.py --all    # including the long simulations
+python tests/run_all.py roles    # only suites matching "roles"
+```
+
+The long simulations are opt-in because they take minutes, **not** because they
+matter less — the warzone and fortnight simulations have each found defects
+nothing else did.
+
+---
+
+## [archive/](archive/)
+
+Superseded, kept for history: the old host runbook and VM test plan (both
+describe `.vbs` launchers that no longer exist), the 20-item roadmap, the i18n
+plan, and implementation plans for work that shipped. **Nothing in there
+describes how STR works today.** Git holds the full history if these are ever
+deleted.

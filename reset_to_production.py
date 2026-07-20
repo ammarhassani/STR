@@ -7,7 +7,7 @@ are reset to a single fresh admin (must change password at first login).
 
 ALWAYS run this on the HOST PC against the authoritative database, with the host
 process stopped. It backs the database up first; even so, this is irreversible
-for the wiped data. See docs/HOST_RUNBOOK.md → "Hard Reset".
+for the wiped data. See docs/SETUP.md → "Going live".
 
 Usage:
     python reset_to_production.py                # uses the configured DB path

@@ -128,7 +128,7 @@ eliminates the corruption class entirely. Full design:
   workstation runs host mode and promotes from the replica.
 - **The host role is portable, not personal.** Everything a new host needs lives on
   the share.
-- A **handoff runbook** (`docs/HOST_RUNBOOK.md`, delivered with the control panel)
+- A **handoff runbook** (`docs/SETUP.md` + `docs/OPERATIONS.md`, delivered with the control panel)
   documents start/stop, promotion, integrity verification, and backup restore for a
   non-author teammate.
 - **Migration to real infrastructure is a deployment change, not a rewrite.** Because

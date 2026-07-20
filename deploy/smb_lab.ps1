@@ -162,5 +162,5 @@ Check 'this PC sees at least one other PC on the share' ($others.Count -ge 2) `
 Remove-Item $probe -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ""
 if ($fails) { Write-Host "$fails CHECK(S) FAILED" -ForegroundColor Red; exit 1 }
-Write-Host "SHARE IS USABLE -- now run the Phase A-K steps in docs/E2E-TEST-PLAN.md" -ForegroundColor Green
+Write-Host "SHARE IS USABLE -- now run the checklist in docs/TEST_DAY.md" -ForegroundColor Green
 exit 0

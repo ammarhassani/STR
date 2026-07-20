@@ -9,14 +9,19 @@ is the update hub:
            copy the snapshot over the app folder and record the new version.
   LOCAL  : single-PC install -> just git pull.
 
-The launchers (deploy/start_host.vbs, deploy/start_client.vbs) run this before
-the app. It is best-effort and NEVER fatal: on any error it logs and lets the
-app start on the code already present. Migrations run at app startup, so a
-pulled/copied schema change applies itself.
+The source launchers (deploy/*.bat) run this before the app. It is best-effort
+and NEVER fatal: on any error it logs and lets the app start on the code
+already present.
+
+Migrations run at app startup, so a pulled/copied schema change applies itself.
+
+NOTE: this is a git-based self-update and applies to SOURCE installs only.
+Packaged client PCs have no Python, no repo and no git, so they do not
+self-update -- a new FIU_System.exe is distributed to them instead
+(docs/OPERATIONS.md, "Updating STR to a new version").
 
 Rollback: the host keeps the last few version folders on the share; to roll a
-client back, set its .str_version to an older version and it re-copies that one
-(documented in HOST_RUNBOOK.md).
+client back, set its .str_version to an older version and it re-copies that one.
 """
 import shutil
 import subprocess
