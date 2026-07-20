@@ -1,0 +1,33 @@
+# Lines the bug-hunt loop must not touch.
+#
+# Every one of these behaves differently, or only exists, on the Windows
+# workstation or inside the packaged executable. A green test run on the dev Mac
+# is not evidence about any of them. This repo has already shipped two
+# Mac-authored fixes with passing tests that were broken on Windows -- see the
+# docstrings at tests/tests_overlay_leak.py and panel/panel_controller.py.
+#
+# The loop parks suspicions here in tests/WINDOWS_MANUAL.md instead of editing
+# the code. The pre-commit hook refuses a loop commit that stages these files.
+
+host/sleep_guard.py:9            # sys.platform guard
+host/sleep_guard.py:13           # ctypes.windll.kernel32.SetThreadExecutionState
+flet_app/main.py:595             # sys.platform win check
+flet_app/main.py:597             # sys.frozen branch
+flet_app/main.py:630             # sys.platform darwin check
+flet_app/views/log_management_view.py:235   # os.name == 'nt' / os.startfile
+flet_app/views/export_view.py:225           # os.name == 'nt' / os.startfile
+panel/control_panel_ui.py:178               # os.startfile on a directory
+panel/panel_controller.py:222               # sys.frozen -> _app_exe
+panel/panel_controller.py:326               # sys.frozen -> client kit exe
+flet_app/views/login_view.py:293            # sys.frozen -> PYINSTALLER_RESET_ENVIRONMENT
+config.py:32                                # sys.frozen -> app_base_dir
+STR.spec                                    # PyInstaller collection, hiddenimports
+STR_Panel.spec                              # PyInstaller collection
+
+# Whole categories, not single lines:
+#   - PyInstaller _MEIxxxx extraction and teardown
+#   - sys.stdout is None under --windowed
+#   - real SMB oplock / lease / reconnect semantics (tests_smb_faults.py
+#     simulates with temp dirs; that is the ceiling)
+#   - anything about rendered pixels, the taskbar icon, or Arabic RTL shaping.
+#     Assert on the control tree instead, as tests_setup_screens.py does.

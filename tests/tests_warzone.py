@@ -49,7 +49,13 @@ def child_main():
     os.chdir(repo)
 
     import random
-    random.seed(hash(username) & 0xFFFF)
+    # STR_SEED, not hash(username): Python randomizes str hashing per process
+    # (PYTHONHASHSEED), so this suite explored different ground on every run and
+    # a failure could not be reproduced -- the worst property a commit gate can
+    # have. The seed is now an input: vary it deliberately to hunt, pin it to
+    # reproduce. Same username + same seed = same run.
+    random.seed((int(os.environ.get("STR_SEED", "0")) * 1009
+                 + sum(username.encode())) & 0xFFFF)
 
     from config import Config
     from app_state import app_state

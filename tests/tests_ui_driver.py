@@ -362,4 +362,8 @@ def run():
     return len(fails)
 
 if __name__ == '__main__':
-    run()
+    # sys.exit, not a bare run(): run() RETURNS the failure count and this used
+    # to discard it, so the process always exited 0. run_all.py reported this
+    # suite as "ok" no matter how many of its 60 UI checks failed -- 60 checks
+    # with no teeth, and a gate that could not go red.
+    sys.exit(1 if run() else 0)

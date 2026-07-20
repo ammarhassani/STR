@@ -80,3 +80,23 @@ sandbox/
 graphify-out/
 
 .playwright-mcp/
+
+# Bank data and scratch boxes. An autonomous loop with commit rights must not
+# be able to stage a report database, an export, or a sandbox run.
+cbox/
+nukebox/
+uibox/
+pbox/
+sandbox/
+*.xlsx
+*.xls
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+
+# Loop scratch state (gate output). The LEDGER is tracked; this is not.
+.loop/
+
+# Per-machine agent permissions. Contains local paths and is not shared state.
+.claude/settings.local.json
