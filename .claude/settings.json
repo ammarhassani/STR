@@ -1,0 +1,59 @@
+{
+  "$comment": [
+    "Shared project permissions. This file is TRACKED on purpose: the bug-hunt",
+    "loop runs in a git worktree (../STR-loop), and an untracked",
+    "settings.local.json does not travel there -- the loop then has no allowlist",
+    "at all and is denied on its first Bash call.",
+    "",
+    "Headless `claude -p` cannot answer a prompt, so anything on 'ask' is",
+    "effectively denied. The loop needs to commit, so commit is allowed here.",
+    "That is safe because commits are local and reversible, and because the real",
+    "gate is .git/hooks/pre-commit, which runs the full suite and refuses to let",
+    "a loop branch weaken a test, touch a Windows-only file, or stage bank data.",
+    "",
+    "push stays OUT of allow: the pre-push hook refuses loop/* branches, and a",
+    "human decides what reaches a remote."
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(python3.14:*)",
+      "Bash(python3:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git branch:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(sed:*)",
+      "Bash(diff:*)",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)",
+      "Bash(git clean:*)",
+      "Bash(git config:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(rm -rf:*)",
+      "Bash(chmod:*)"
+    ],
+    "ask": []
+  }
+}

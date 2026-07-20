@@ -28,6 +28,20 @@ case "$branch" in
      exit 1 ;;
 esac
 
+# Headless `claude -p` cannot answer a permission prompt, so a missing allowlist
+# does not fail loudly -- the agent works for ten minutes and is then denied the
+# commit. Refuse to start rather than burn a night discovering that.
+[ -f .claude/settings.json ] || {
+  echo "refusing: no .claude/settings.json in this worktree."
+  echo "  Without it every Bash call is denied and no iteration can commit."
+  exit 1
+}
+grep -q '"Bash(git commit:\*)"' .claude/settings.json || {
+  echo "refusing: .claude/settings.json does not allow 'git commit'."
+  echo "  In headless mode 'ask' means denied, so the loop could not save work."
+  exit 1
+}
+
 export STR_SEED="${STR_SEED:-$RANDOM}"
 start=$(date +%s)
 

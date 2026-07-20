@@ -99,4 +99,6 @@ sandbox/
 .loop/
 
 # Per-machine agent permissions. Contains local paths and is not shared state.
+# NOTE: .claude/settings.json IS tracked -- the loop runs in a worktree, and an
+# untracked settings file does not travel there.
 .claude/settings.local.json
