@@ -273,6 +273,31 @@ class LoginView:
         dlg.open = True
         self.page.update()
 
+    def _open_control_panel(self, e):
+        """Open the operator Control Panel in a second window.
+
+        It lives on the LOGIN screen deliberately. The panel answers "why isn't
+        this working?", and the moments that matters most -- the share is
+        unreachable, no host is running, this PC was never set up -- are exactly
+        the moments nobody can get past this screen. Reaching it must not
+        require logging in, and must not require a shortcut or a typed flag.
+        """
+        import subprocess
+        import sys as _sys
+        try:
+            if getattr(_sys, "frozen", False):
+                cmd = [_sys.executable, "--panel"]
+            else:
+                import os as _os
+                main_py = _os.path.join(_os.path.dirname(_os.path.dirname(
+                    _os.path.abspath(__file__))), "main.py")
+                cmd = [_sys.executable, main_py, "--panel"]
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except Exception as ex:
+            from components.toast import show_error
+            show_error(self.page, f"Could not open the Control Panel: {ex}")
+
     def build(self) -> ft.View:
         """Build and return the view."""
         colors = theme_manager.get_colors()
@@ -280,12 +305,33 @@ class LoginView:
         return ft.View(
             route="/login",
             controls=[
-                ft.Container(
-                    content=self.login_card,
+                # A Stack, not two siblings in a column: the login card is
+                # expand=True and would push anything after it off-screen.
+                ft.Stack(
                     expand=True,
-                    alignment=ft.alignment.center,
-                    bgcolor=colors["bg_primary"],
-                )
+                    controls=[
+                        ft.Container(
+                            content=self.login_card,
+                            expand=True,
+                            alignment=ft.alignment.center,
+                            bgcolor=colors["bg_primary"],
+                        ),
+                        ft.Container(
+                            content=ft.TextButton(
+                                content=ft.Row([
+                                    ft.Icon(ft.Icons.BUILD_CIRCLE, size=15,
+                                            color=colors["text_muted"]),
+                                    ft.Text("Control Panel", size=12,
+                                            color=colors["text_muted"]),
+                                ], spacing=6, tight=True),
+                                on_click=self._open_control_panel,
+                                tooltip="Check whether STR is working on this PC",
+                            ),
+                            alignment=ft.alignment.bottom_right,
+                            padding=ft.padding.only(right=14, bottom=10),
+                        ),
+                    ],
+                ),
             ],
             padding=0,
             spacing=0,

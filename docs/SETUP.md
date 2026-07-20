@@ -11,9 +11,13 @@ Do the sections in order. Stop at the end of each one and check it worked.
 `FIU_System.exe` is everything.
 
 - **Double-click it** → the app
-- **`STR Control Panel` shortcut** → the same exe in check-up mode (`--panel`)
+- **Bottom-right of the login screen → "Control Panel"** → check-up mode
 
-There is no second program to install and no launcher script.
+There is no second program, no launcher script, and nothing to install.
+
+> The Control Panel sits on the login screen on purpose. When something is
+> wrong, nobody can get past that screen — so that is where the button that
+> tells you what's wrong has to be.
 
 ---
 
@@ -49,9 +53,17 @@ python flet_app\main.py --panel
 
 1. **Check the shared folder** → must say *reachable and writable*
 2. **Make this PC the host**
-3. **Start automatically at login**
-4. **Put Control Panel on this PC** (so you can reopen it without typing)
-5. **Start host on this PC**
+3. **Start host on this PC**
+
+### A4. Make it start at login
+
+1. Press **Show me the Startup folder** → a window opens
+2. Drag `FIU_System.exe` into that window
+3. Right-click the copy that appears → **Properties** → in **Target**, add ` --host` at the end → OK
+
+> Done by hand on purpose. Creating that shortcut in code needs a Windows
+> scripting component that your security software flags, and this app does not
+> use it.
 
 ### A4. Confirm
 

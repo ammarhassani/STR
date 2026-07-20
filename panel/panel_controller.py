@@ -37,14 +37,12 @@ Do these 3 things. Nothing else.
 
 
 -----------------------------------------------------------------
-THE OTHER ICON
+IF SOMETHING SEEMS WRONG
 -----------------------------------------------------------------
 
-"STR Control Panel" is the same app in check-up mode.
+On the login screen, bottom right: "Control Panel"
 
-Double-click it if something seems wrong. The box at the top
-says what the problem is in plain words.
-
+It opens a window that says what the problem is in plain words.
 You do not need it for normal work.
 
 
@@ -297,80 +295,28 @@ class PanelController:
                 f.write(_CLIENT_KIT_README.format(share=share_path,
                                                   exe=os.path.basename(exe)))
 
-            # The panel is the same exe with --panel. Ship the shortcut so a
-            # user on a client PC can check "is it working?" without a terminal.
-            # It points at the exe's FINAL location (C:\STR), not this build
-            # folder, because a .lnk records an absolute path and the kit is
-            # meant to be copied.
-            self._make_shortcut(
-                os.path.join(dest_dir, "STR Control Panel.lnk"),
-                os.path.join(r"C:\STR", os.path.basename(exe)),
-                arguments="--panel", description="STR Control Panel")
-
             return True, f"client kit ready: {dest_dir}"
         except OSError as e:
             return False, f"could not build the client kit: {e}"
 
-    def _make_shortcut(self, link_path, target, arguments="", description=""):
-        """Create a Windows .lnk.
+    # Deliberately NO shortcut-creation code here.
+    #
+    # Creating a .lnk normally means the WScript.Shell COM object, usually via
+    # PowerShell -- which would put back the exact process-spawn pattern the
+    # bank's EDR flagged, and the approval covering this work is for Python
+    # only. Writing the .lnk format by hand instead was tried and REJECTED by
+    # Windows (ShellExecute: "no application is associated"), so it is not
+    # shipped: a shortcut that silently fails to open is worse than none.
+    #
+    # Instead: the app opens its own Control Panel from the login screen, and
+    # starting at login is a documented drag-and-drop step (docs/SETUP.md).
+    # Both are things Windows already does, with no code and no new file
+    # format to get wrong.
 
-        A shortcut, not a .bat or .vbs: those spawn a console or a script host,
-        and a script host launching another process with a hidden window is the
-        pattern the bank's EDR flags. A .lnk is inert data that Explorer reads --
-        it starts nothing itself.
-        """
-        try:
-            os.makedirs(os.path.dirname(link_path), exist_ok=True)
-            # Single-quoted PS strings: double any quote inside a path.
-            def q(s):
-                return str(s).replace("'", "''")
-            ps = (f"$s=(New-Object -ComObject WScript.Shell)"
-                  f".CreateShortcut('{q(link_path)}');"
-                  f"$s.TargetPath='{q(target)}';"
-                  f"$s.Arguments='{q(arguments)}';"
-                  f"$s.WorkingDirectory='{q(os.path.dirname(target))}';"
-                  f"$s.Description='{q(description)}';"
-                  f"$s.Save()")
-            r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive",
-                                "-Command", ps], capture_output=True, text=True)
-            if r.returncode != 0 or not os.path.exists(link_path):
-                return False, f"shortcut not created: {(r.stderr or '').strip()[:200]}"
-            return True, link_path
-        except Exception as e:
-            return False, f"shortcut not created: {e}"
-
-    def _app_exe(self):
-        """The thing a shortcut should point at."""
-        if getattr(sys, "frozen", False):
-            return sys.executable
-        return None  # from source there is no exe to point a shortcut at
-
-    def install_startup_shortcut(self, target=None, name="STR.lnk"):
-        """Start the app (or host) automatically at login."""
-        tgt = target or self._app_exe() or sys.executable
-        startup = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows",
-                               "Start Menu", "Programs", "Startup")
-        ok, res = self._make_shortcut(os.path.join(startup, name), tgt,
-                                      description="STR")
-        return (True, f"will start at login: {res}") if ok else (False, res)
-
-    def install_panel_shortcut(self, folder=None, target=None,
-                               name="STR Control Panel.lnk"):
-        """Put a double-clickable Control Panel shortcut next to the app.
-
-        The panel is the same executable with --panel; without a shortcut an
-        operator would have to open a terminal and type the flag, which is not
-        something to ask of someone during a rollout.
-        """
-        tgt = target or self._app_exe()
-        if not tgt:
-            return False, ("no packaged exe to point at -- build.bat first, or "
-                           "run the panel from source with --panel")
-        dest = folder or os.path.dirname(tgt)
-        ok, res = self._make_shortcut(os.path.join(dest, name), tgt,
-                                      arguments="--panel",
-                                      description="STR Control Panel")
-        return (True, f"control panel shortcut: {res}") if ok else (False, res)
+    def startup_folder(self):
+        """Where the operator drops a shortcut to start STR at login."""
+        return os.path.join(os.environ.get("APPDATA", ""), "Microsoft",
+                            "Windows", "Start Menu", "Programs", "Startup")
 
     def become_host_now(self, stale_seconds=60, force=False):
         return become_host(self.bus, self.db_path, self.host_id, stale_seconds, force)

@@ -158,6 +158,24 @@ def build_panel(page: ft.Page):
         run(controller.make_client_kit, dest_field.value, share_field.value,
             exe if os.path.isfile(exe) else None)
 
+    def show_startup_folder():
+        """Open the Startup folder so the operator can drag the app in.
+
+        Opening a folder, not creating a shortcut: writing a .lnk means the
+        WScript.Shell COM object (the pattern the bank's EDR flagged), and
+        hand-writing the format produced a file Windows refused to open. A
+        drag-and-drop the operator does once is honest and cannot silently
+        half-work.
+        """
+        folder = controller.startup_folder()
+        try:
+            os.makedirs(folder, exist_ok=True)
+            os.startfile(folder)  # ShellExecute on a directory: no shell, no script
+            return True, ("Drag FIU_System.exe into the window that just opened. "
+                          "STR will then start when you log in.")
+        except OSError as e:
+            return False, f"could not open {folder}: {e}"
+
     def do_designate(_):
         Config.SHARE_PATH = share_field.value or Config.SHARE_PATH
         run(controller.designate_host, Config)
@@ -183,12 +201,8 @@ def build_panel(page: ft.Page):
 
                 section("SET UP THIS PC", [
                     big_button("Make this PC the host", ft.Icons.DNS, do_designate),
-                    big_button("Start automatically at login", ft.Icons.BOLT,
-                               lambda _: run(controller.install_startup_shortcut),
-                               "#4a5568"),
-                    big_button("Put Control Panel on this PC", ft.Icons.ADD_LINK,
-                               lambda _: run(controller.install_panel_shortcut),
-                               "#4a5568"),
+                    big_button("Show me the Startup folder", ft.Icons.BOLT,
+                               lambda _: run(show_startup_folder), "#4a5568"),
                     big_button("Check the shared folder", ft.Icons.FOLDER_SHARED,
                                lambda _: run(controller.check_share, share_field.value),
                                "#4a5568"),

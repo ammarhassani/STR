@@ -166,44 +166,57 @@ def test_client_kit_is_ready_to_double_click():
           not ok and "build" in msg.lower(), msg)
 
 
-def test_panel_shortcut_actually_carries_the_flag():
-    """The panel is the SAME exe with --panel, so the shortcut IS the feature.
+def test_nothing_shells_out_to_powershell_or_com():
+    """The app must not create shortcuts via PowerShell or WScript.Shell COM.
 
-    A .lnk that loses its argument opens the app instead of the panel, which
-    looks like the panel is broken. Read the shortcut back through the same COM
-    interface Explorer uses and confirm the flag survived.
+    The bank's EDR flagged a script-host launcher, the approval covering this
+    work is for Python only, and an earlier version of the panel shelled out to
+    PowerShell to write a .lnk -- which would have put the same pattern back.
+    Hand-writing the .lnk format instead was tried and rejected by Windows, so
+    neither approach ships. This test is the guard against either returning.
     """
-    if os.name != "nt":
-        print("SKIP shortcut test (not Windows)")
-        return
-    import subprocess
+    import pathlib
+    root = pathlib.Path(os.path.dirname(os.path.abspath(__file__)))
+    for rel in ("panel/panel_controller.py", "panel/control_panel_ui.py",
+                "flet_app/views/login_view.py"):
+        src = (root / rel).read_text(encoding="utf-8")
+        # Only executable lines: the comments explain why these are absent.
+        code = "\n".join(l for l in src.splitlines()
+                         if not l.strip().startswith("#"))
+        # Strip docstrings, which also discuss the banned techniques.
+        parts = code.split('"""')
+        code = "".join(parts[::2])
+        for banned in ("powershell", "ComObject", "WScript.Shell", "os.system("):
+            check(f"{rel} does not use {banned}",
+                  banned.lower() not in code.lower(), banned)
+
+
+def test_startup_is_a_folder_the_operator_drags_into():
+    """No programmatic Startup shortcut: the panel just opens the folder."""
     from panel.panel_controller import PanelController
     d, bus, db = _seed()
     pc = PanelController(bus, db, host_id="P")
+    folder = pc.startup_folder()
+    check("startup folder path is built", folder.endswith("Startup"), folder)
+    check("no install_startup_shortcut remains",
+          not hasattr(pc, "install_startup_shortcut"))
+    check("no install_panel_shortcut remains",
+          not hasattr(pc, "install_panel_shortcut"))
 
+
+def test_client_kit_ships_no_shortcut():
+    """A .lnk Windows refuses to open is worse than no .lnk at all."""
+    from panel.panel_controller import PanelController
+    d, bus, db = _seed()
+    pc = PanelController(bus, db, host_id="P")
     fake_exe = os.path.join(d, "FIU_System.exe")
     with open(fake_exe, "wb") as f:
         f.write(b"MZ fake")
-
-    ok, msg = pc.install_panel_shortcut(folder=d, target=fake_exe)
-    check("panel shortcut is created", ok, msg)
-    link = os.path.join(d, "STR Control Panel.lnk")
-    check("the .lnk exists on disk", os.path.isfile(link), link)
-
-    if os.path.isfile(link):
-        ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{link}');"
-              f"Write-Output $s.TargetPath; Write-Output $s.Arguments")
-        out = subprocess.run(["powershell", "-NoProfile", "-Command", ps],
-                             capture_output=True, text=True).stdout.splitlines()
-        check("it points at the exe", out and out[0].strip().lower() ==
-              fake_exe.lower(), out)
-        check("it carries --panel", len(out) > 1 and out[1].strip() == "--panel", out)
-
-    # From source there is no exe; it must say so instead of making a dead link.
-    ok, msg = pc.install_panel_shortcut(folder=d, target=None)
-    if not getattr(sys, "frozen", False):
-        check("from source it refuses and says to build", not ok and
-              "build" in msg.lower(), msg)
+    dest = os.path.join(d, "kit2")
+    ok, _ = pc.make_client_kit(dest, r"\\S\share", exe_path=fake_exe)
+    check("kit still builds", ok)
+    lnks = [n for n in os.listdir(dest) if n.lower().endswith(".lnk")]
+    check("the kit ships no .lnk", not lnks, lnks)
 
 
 def test_panel_window_builds():
@@ -266,7 +279,9 @@ if __name__ == "__main__":
     test_check_share_requires_write_not_just_read()
     test_health_names_the_actual_problem()
     test_client_kit_is_ready_to_double_click()
-    test_panel_shortcut_actually_carries_the_flag()
+    test_nothing_shells_out_to_powershell_or_com()
+    test_startup_is_a_folder_the_operator_drags_into()
+    test_client_kit_ships_no_shortcut()
     test_panel_window_builds()
     test_durations_are_human()
     print(f"\n{'ALL PASS' if _fail == 0 else str(_fail) + ' FAILED'}")
