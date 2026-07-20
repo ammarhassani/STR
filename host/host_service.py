@@ -174,6 +174,15 @@ class HostService:
         print(f"[HOST] integrity: {msg}")
         if not ok:
             # Corruption-fatal app: never serve (or publish) an unrecoverable DB.
+            # Say so on screen first -- a windowed build has no stdout, so this
+            # traceback would otherwise be the second invisible host death.
+            from utils.fatal_notice import fatal_notice
+            fatal_notice(
+                f"The STR host stopped: the database is damaged and could not be "
+                f"repaired from a backup.\n\n{msg}\n\n"
+                f"It is refusing to serve rather than publish damaged data to "
+                f"every PC. Restore a backup from the Control Panel.",
+                title="STR host -- database damaged")
             raise RuntimeError(f"[HOST] DB integrity unrecoverable, refusing to serve: {msg}")
         prevent_sleep()
         self.publish_replica()

@@ -55,7 +55,10 @@ def _controller():
     # all-null config.json next to itself -- the panel creating the broken
     # installation it exists to diagnose. An id is minted only when this PC is
     # actually made a host (do_designate / do_takeover below).
-    return PanelController(bus, local_db, Config.HOST_ID)
+    return PanelController(bus, local_db, Config.HOST_ID,
+                           mode=Config.MODE,
+                           outbox_dir=Config.get_client_outbox_dir(),
+                           config_file=str(Config.CONFIG_FILE))
 
 
 def build_panel(page: ft.Page):
@@ -114,16 +117,27 @@ def build_panel(page: ft.Page):
                            ft.Text(str(value), size=12, color=INK)])
 
         age = h["heartbeat_age_seconds"]
+        host_line = (f"{h['host_pc']} — running, last seen {_ago(age)}"
+                     if h["host_online"] and h["host_pc"]
+                     else f"{h['host_pc'] or '— none —'} — NOT running"
+                          f"{'' if age is None else f', last seen {_ago(age)}'}")
         rows += [
             ft.Divider(height=12),
-            fact("This PC", h["this_pc"]),
-            fact("Host PC", h["host_pc"] or "— none —"),
-            fact("Host", "running" if h["host_online"] else "NOT running"),
-            fact("Host last seen", _ago(age)),
-            fact("Waiting to save", h["queue_pending"]),
-            fact("Data copy updated",
-                 _ago(h["replica_age_seconds"]) if h["replica_age_seconds"] is not None
-                 else "no copy yet"),
+            fact("This PC", f"{h['this_pc']}  —  {(h.get('mode') or 'not set up').upper()}"),
+            fact("Host PC", host_line),
+            # Both numbers, labelled. "Waiting to save" used to show only the
+            # SHARED queue, so an analyst with 40 unsent reports on their own
+            # disk read 0.
+            fact("Waiting to save",
+                 f"{h.get('outbox_pending', 0)} on this PC  ·  "
+                 f"{h['queue_pending']} on the shared folder"),
+            fact("My data",
+                 f"{h.get('replica_path') or '—'} — "
+                 f"{_ago(h['replica_age_seconds']) if h['replica_age_seconds'] is not None else 'no copy yet'}"),
+            # The highest-value line here. A settings path reading
+            # ...\Programs\Startup\config\config.json explains a whole class of
+            # broken install at a glance, where "No host is running" does not.
+            fact("My settings", h.get("config_file") or "—"),
             fact("Shared folder", h["share_message"]),
             fact("Backups", len(h["backups"])),
         ]
@@ -182,9 +196,15 @@ def build_panel(page: ft.Page):
             return False, f"could not open {folder}: {e}"
 
     def do_designate(_):
+        nonlocal controller
         Config.SHARE_PATH = share_field.value or Config.SHARE_PATH
         run(controller.designate_host, Config)
-        controller.host_id = Config.HOST_ID
+        # Rebuild, do not just patch host_id. The controller was built with the
+        # OLD bus dir, and designating changes SHARE_PATH -- so every health
+        # check afterwards measured a stale local bus and cheerfully reported
+        # healthy. Nothing in the UI hinted that a panel restart was required.
+        controller = _controller()
+        refresh_health()
 
     def do_takeover(_):
         # Taking over IS becoming a host, so minting the id here is the one

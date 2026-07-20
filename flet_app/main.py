@@ -188,8 +188,19 @@ class FletApp:
                 bus_dir = Config.get_bus_dir()
                 local_replica = Config.get_client_replica_path()
                 if not bootstrap_replica(bus_dir, local_replica, timeout=30.0):
-                    self._show_error("Cannot reach the host replica on the shared folder.\n"
-                                     "Make sure a host PC is running and the share is available.")
+                    # Name the share and say what to do. This screen is what a
+                    # blipped network looks like now; it used to be the setup
+                    # wizard, which is how a client could quietly become a
+                    # standalone PC with its own private database of STRs.
+                    self._show_error(
+                        f"Cannot reach the shared folder right now.\n\n"
+                        f"{Config.SHARE_PATH}\n\n"
+                        f"This PC is set up correctly -- nothing here is lost, and "
+                        f"anything you saved earlier is still queued to send.\n\n"
+                        f"Usual cause: the host PC is off, asleep, or not logged in.\n"
+                        f"Press Retry once it is back.\n\n"
+                        f"For a full check-up, open FIU_Control_Panel.exe "
+                        f"(it sits next to this app).")
                     return False
                 ok = app_state.initialize_services(local_replica, mode="client", bus_dir=bus_dir)
                 if not ok:
@@ -557,9 +568,16 @@ if __name__ == "__main__":
         # DB would be published as the replica and every client would see a bank
         # with no reports. Say what is wrong and stop.
         if app_state.db_manager is None:
-            print(f"[HOST][FATAL] cannot open the database at {Config.DATABASE_PATH!r}. "
-                  "Run the setup wizard on this PC (python flet_app/main.py) or restore "
-                  "a backup before starting the host.")
+            # fatal_notice, not print: this is a windowed build, sys.stdout is
+            # None, and print() here vanished without a trace at every login.
+            from utils.fatal_notice import fatal_notice
+            fatal_notice(
+                f"The STR host cannot start.\n\n"
+                f"It could not open the database at:\n{Config.DATABASE_PATH!r}\n\n"
+                f"Run FIU_System.exe normally on this PC and complete the setup, "
+                f"or restore a backup, then start the host again.\n\n"
+                f"Until then nobody on any PC can save changes.",
+                title="STR host -- cannot start")
             sys.exit(2)
         host_services = {a: getattr(app_state, a) for a in (
             "auth_service", "settings_service", "report_service", "dashboard_service",

@@ -11,3 +11,12 @@ plotly>=5.18.0
 bcrypt>=4.1.2
 openpyxl>=3.1.2
 apscheduler>=3.10.4
+
+# Pinned for the same reason flet is. The bootloader and the flet hook come from
+# PyInstaller, and this app has already lost days to _MEI extraction behaviour --
+# that is bootloader behaviour. build.bat used to `pip install --upgrade` on
+# every build, which handed PyPI the decision mid-project.
+# Set this to whatever `python -m PyInstaller --version` prints on the box that
+# currently produces a working exe, then install with:
+#     python -m pip install -r requirements.txt
+pyinstaller==6.21.0

@@ -186,9 +186,25 @@ class Config:
 
     @classmethod
     def is_configured(cls) -> bool:
-        """Check if configuration exists and is valid"""
+        """Has this PC been set up? NOT "is everything reachable right now".
+
+        The distinction is the whole point. This used to also require
+        os.path.isdir(SHARE_PATH), which made a configured client with a
+        sleeping host indistinguishable from a PC nobody had ever set up. The
+        caller (main.py _start) sends "not configured" to the SETUP WIZARD, and
+        the wizard's mode defaults to 'local' -- so an analyst whose share
+        blipped could click through three fields and end up filing suspicious
+        transaction reports into a private SQLite file on their own C: drive,
+        which the FIU unit never sees. No error, no warning. It would fire
+        fleet-wide the morning the host is renamed or a password rotates.
+
+        Reachability belongs downstream, where it can be REPORTED: for a client
+        that is bootstrap_replica (main.py:189), which is a stronger check
+        anyway -- it needs a real fiu_ro.db that only a live host publishes, and
+        no path mistake can manufacture one.
+        """
         if cls.MODE == "client":
-            return bool(cls.SHARE_PATH) and os.path.isdir(cls.SHARE_PATH)
+            return bool(cls.SHARE_PATH)
         # local / host: need a real local DB (existing behavior)
         if cls.DATABASE_PATH is None or cls.BACKUP_PATH is None:
             return False

@@ -78,12 +78,28 @@ def test_hard_reset():
     check("admin must change password", users and users[0][2] == 1, users)
     check("host lease reset to unclaimed", lease == [(1, None, 0)], lease)
 
-    # the fresh admin can authenticate with the temp password
+    # The go-live admin password is GENERATED and returned once -- never a
+    # literal. 'admin123' used to be hardcoded here and printed in SETUP.md: a
+    # published credential for the only account that exists on a bank's AML
+    # system at the moment it goes live with real data.
     from services.security_service import SecurityService
     conn = sqlite3.connect(db)
     pw = conn.execute("SELECT password FROM users WHERE username='admin'").fetchone()[0]
     conn.close()
-    check("fresh admin password is 'admin123'", SecurityService.verify_password('admin123', pw))
+    generated = summary.get("password")
+    check("the reset returns the admin password so it can be shown once",
+          bool(generated), summary)
+    check("and that password is what the admin account actually has",
+          SecurityService.verify_password(generated, pw))
+    check("it is NOT the old hardcoded literal",
+          not SecurityService.verify_password("admin123", pw))
+    check("it is long enough to not be guessable", len(generated) >= 12, generated)
+
+    # ...and a second reset must not produce the same one.
+    import importlib
+    rp = importlib.import_module("reset_to_production")
+    check("two resets do not share a password",
+          rp._fresh_admin_password() != rp._fresh_admin_password())
 
     check("summary reports cleared rows", summary['cleared'].get('reports') == 1, summary)
 

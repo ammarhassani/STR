@@ -18,6 +18,28 @@ def test_config_mode():
     # client mode is configured when SHARE_PATH is set, even with no local DB
     Config.MODE = "client"; Config.SHARE_PATH = tempfile.mkdtemp(); Config.DATABASE_PATH = None
     check("cfg client configured with share, no db", Config.is_configured() is True)
+
+    # A CONFIGURED CLIENT WHOSE SHARE IS UNREACHABLE IS STILL CONFIGURED.
+    #
+    # is_configured() used to also require os.path.isdir(SHARE_PATH), which made
+    # a sleeping host indistinguishable from a PC nobody had ever set up. False
+    # here sends main.py._start to the SETUP WIZARD, whose mode radio defaults to
+    # 'local' -- so an analyst whose share blipped could click through and start
+    # filing suspicious transaction reports into a private SQLite file on their
+    # own C: drive that the FIU unit never sees. Silent, and fleet-wide the
+    # morning the host is renamed or a share password rotates.
+    gone = Config.SHARE_PATH
+    Config.SHARE_PATH = os.path.join(gone, "no_such_dir_the_host_is_asleep")
+    check("client with an UNREACHABLE share is still configured "
+          "(reachability is reported, never treated as 'never set up')",
+          Config.is_configured() is True, Config.SHARE_PATH)
+    Config.SHARE_PATH = gone
+
+    # ...but a client with no share path at all genuinely is not set up.
+    Config.SHARE_PATH = None
+    check("client with no share path is NOT configured",
+          Config.is_configured() is False)
+    Config.SHARE_PATH = gone
     # bus derives from SHARE_PATH
     bus = Config.get_bus_dir()
     check("cfg bus under share", bus.startswith(Config.SHARE_PATH) and bus.endswith("str_bus"))

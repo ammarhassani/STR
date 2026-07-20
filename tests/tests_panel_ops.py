@@ -154,13 +154,16 @@ def test_client_kit_ships_the_app_not_the_panel():
         check("the kit builds", ok, msg)
         shipped = os.listdir(dest)
         check("it contains FIU_System.exe", "FIU_System.exe" in shipped, shipped)
-        check("it does NOT contain the control panel",
-              "FIU_Control_Panel.exe" not in shipped, shipped)
+        # The panel ships TOO, and that is the point of it shipping: its stated
+        # reason for existing is "the app will not start, so the button on the
+        # login screen is unreachable". It was absent from every client PC --
+        # precisely the machines where nobody can diagnose anything.
+        check("and the Control Panel, so a broken client can be diagnosed",
+              "FIU_Control_Panel.exe" in shipped, shipped)
         with open(os.path.join(dest, "READ ME FIRST.txt"), encoding="utf-8") as f:
             readme = f.read()
-        check("and the README tells the user to open the app",
-              "FIU_Control_Panel" not in readme and "FIU_System.exe" in readme,
-              readme[:200])
+        check("the README still tells the user to open the APP, not the panel",
+              "DOUBLE-CLICK FIU_System.exe" in readme, readme[:200])
 
         # no app beside the panel -> a plain refusal, never a wrong binary
         os.remove(app_exe)
@@ -173,6 +176,90 @@ def test_client_kit_ships_the_app_not_the_panel():
         else:
             sys.frozen = old_frozen
         sys.executable = old_exe
+
+
+def test_health_measures_THIS_pc_not_the_share():
+    """The panel reported the opposite of the truth on every client PC.
+
+    Two separate bugs, one screen -- and docs/OPERATIONS.md opens by telling the
+    operator to read that screen every morning.
+
+    1. "Data copy updated" stat'd the replica on the SHARE, which is when the
+       HOST last published. A client whose ReplicaRefresher had died showed a
+       perfectly fresh timestamp while serving hours-old AML data.
+    2. "Waiting to save" counted the SHARED queue. A client's unsent writes live
+       in its LOCAL outbox, so an analyst with 40 stuck reports read 0.
+    """
+    from panel.panel_controller import PanelController
+    d, bus, db = _seed()
+
+    # a local replica that is old, and a share replica that is fresh
+    local_replica = os.path.join(d, "client_replica.db")
+    with open(local_replica, "wb") as f:
+        f.write(b"x")
+    os.utime(local_replica, (time.time() - 7200, time.time() - 7200))  # 2h old
+    share_replica_dir = os.path.join(bus, "replica")
+    os.makedirs(share_replica_dir, exist_ok=True)
+    with open(os.path.join(share_replica_dir, "fiu_ro.db"), "wb") as f:
+        f.write(b"x")                                                  # just now
+
+    outbox = os.path.join(d, "outbox")
+    os.makedirs(outbox, exist_ok=True)
+    for i in range(3):
+        with open(os.path.join(outbox, f"cmd{i}.json"), "w") as f:
+            f.write("{}")
+
+    c = PanelController(bus, local_replica, "h1", mode="client",
+                        outbox_dir=outbox, config_file=os.path.join(d, "config.json"))
+    h = c.health(share_path=os.path.dirname(bus))
+
+    check("a client is told about ITS OWN replica, not the host's",
+          h["replica_age_seconds"] > 3600, h["replica_age_seconds"])
+    check("and the stale copy is reported as a problem",
+          any("copy of the data" in p for p in h["problems"]), h["problems"])
+    check("the path it measured is named on screen",
+          h["replica_path"] == local_replica, h["replica_path"])
+    check("unsent writes on THIS PC are counted",
+          h["outbox_pending"] == 3, h["outbox_pending"])
+    check("and they are reported as a problem",
+          any("not been sent" in p for p in h["problems"]), h["problems"])
+    check("the client is not nagged about backups (that is the host's job)",
+          not any("backups" in p for p in h["problems"]), h["problems"])
+    check("the screen says what this PC is set up as", h["mode"] == "client")
+    check("and where its settings live", h["config_file"].endswith("config.json"))
+
+    # A HOST keeps measuring the share -- that IS its own copy, and blinding the
+    # host operator to their own host having stopped republishing would be a
+    # second bug wearing the first one's clothes.
+    hc = PanelController(bus, db, "h1", mode="host")
+    hh = hc.health(share_path=os.path.dirname(bus))
+    check("a host still measures the published replica",
+          hh["replica_path"].startswith(bus), hh["replica_path"])
+
+
+def test_panel_opens_when_the_share_is_gone():
+    """The only time anyone opens the diagnostic tool is when things are broken.
+
+    __init__ did makedirs() on the share and let OSError out, so an unreachable
+    share killed the window before it drew: no window, no message, at exactly
+    the moment the operator needed one.
+    """
+    from panel.panel_controller import PanelController
+    # Under a root that cannot be created, not just one that does not exist yet:
+    # makedirs() builds intermediate directories, so a path under a writable
+    # temp dir would have been MADE reachable by the very constructor under
+    # test. That is what a real dead UNC path behaves like.
+    unreachable = os.path.join(os.sep, "str_no_such_root_9c1f", "share", "str_bus")
+    try:
+        c = PanelController(unreachable, "", "h1", mode="client")
+    except OSError as e:
+        check("constructing against an unreachable share must not raise", False, e)
+        return
+    check("constructing against an unreachable share does not raise", True)
+    h = c.health(share_path=os.path.dirname(unreachable))
+    check("and health() still answers, naming the share as the problem",
+          h["share_ok"] is False and any("Shared folder" in p for p in h["problems"]),
+          h["problems"])
 
 
 def test_stop_host_refuses_to_kill_another_pc_s_pid():
@@ -386,6 +473,8 @@ if __name__ == "__main__":
     test_panel_exe_refuses_arguments_meant_for_the_app()
     test_start_host_reports_failure_when_the_process_dies()
     test_client_kit_ships_the_app_not_the_panel()
+    test_health_measures_THIS_pc_not_the_share()
+    test_panel_opens_when_the_share_is_gone()
     test_stop_host_refuses_to_kill_another_pc_s_pid()
     test_check_share_requires_write_not_just_read()
     test_health_names_the_actual_problem()

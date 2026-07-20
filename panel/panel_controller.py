@@ -72,13 +72,30 @@ class PanelController:
     # The app executable, which is NOT necessarily the one this code runs in.
     APP_EXE = "FIU_System.exe"
 
-    def __init__(self, bus_dir, local_db_path, host_id):
+    def __init__(self, bus_dir, local_db_path, host_id,
+                 mode=None, outbox_dir=None, config_file=None):
         self.bus = bus_dir
         self.db_path = local_db_path
         self.host_id = host_id
+        # mode/outbox_dir/config_file are optional so the existing tests and any
+        # caller that only wants status() keep working. They exist because
+        # health() cannot tell the truth on a CLIENT without them: every number
+        # it reported was measured on the SHARE, which is a different machine's
+        # copy. See health() for what that cost.
+        self.mode = mode
+        self.outbox_dir = outbox_dir
+        self.config_file = config_file
         self.backups_dir = os.path.join(bus_dir, "backups")
-        os.makedirs(self.backups_dir, exist_ok=True)
-        os.makedirs(os.path.join(bus_dir, ".tmp"), exist_ok=True)  # manual_backup temp dir
+        # Best-effort: these live on the SHARE, and an unreachable share is the
+        # single most common reason anyone opens this tool. Raising here killed
+        # the diagnostic window before it drew, so the operator got no window
+        # and no explanation at exactly the moment they needed one. health()
+        # reports the share as unreachable, which is the useful answer.
+        for d in (self.backups_dir, os.path.join(bus_dir, ".tmp")):
+            try:
+                os.makedirs(d, exist_ok=True)
+            except OSError:
+                pass
 
     def status(self):
         hb = read_heartbeat(self.bus)
@@ -117,11 +134,31 @@ class PanelController:
         now_ms = time.time() * 1000
         hb_age = (now_ms - hb["epoch_ms"]) / 1000.0 if hb.get("epoch_ms") else None
 
-        # How stale is the copy this PC actually reads from?
-        replica = os.path.join(self.bus, "replica", "fiu_ro.db")
+        # How stale is the copy THIS PC actually reads from -- which on a client
+        # is the LOCAL replica, not the one on the share.
+        #
+        # This measured the share's copy for everyone, and the UI labels it
+        # "Data copy updated". So a client whose ReplicaRefresher had died --
+        # the exact case replica_sync warns about, where the local swap is
+        # blocked by an open read handle and the exception is swallowed --
+        # showed a perfectly fresh timestamp while serving hours-old AML data.
+        # The panel reported healthy. The docstring above even claims this
+        # metric answers "this client is reading an hour-old replica".
+        if self.mode == "client" and self.db_path:
+            replica = self.db_path
+        else:
+            replica = os.path.join(self.bus, "replica", "fiu_ro.db")
         replica_age = None
         if os.path.exists(replica):
             replica_age = max(0.0, time.time() - os.path.getmtime(replica))
+
+        # Writes this PC has not managed to send yet. They live in the LOCAL
+        # outbox, so the shared queue count says nothing about them: an analyst
+        # with 40 reports stuck on their own disk read "Waiting to save: 0".
+        outbox_pending = 0
+        if self.outbox_dir and os.path.isdir(self.outbox_dir):
+            outbox_pending = len([n for n in os.listdir(self.outbox_dir)
+                                  if n.endswith(".json")])
 
         share_ok, share_msg = self.check_share(share_path or os.path.dirname(self.bus))
 
@@ -130,6 +167,11 @@ class PanelController:
             problems.append("No host is running. Nobody can save changes.")
         if not share_ok:
             problems.append(f"Shared folder problem: {share_msg}")
+        if outbox_pending:
+            problems.append(
+                f"{outbox_pending} change(s) made on this PC have not been sent "
+                f"yet. They are safe here and will send by themselves once the "
+                f"host is back.")
         if replica_age is not None and replica_age > 300:
             # "908 minutes" makes an operator do arithmetic to find out whether
             # to worry; say it in the largest unit that still means something.
@@ -144,7 +186,10 @@ class PanelController:
         if st["queue_pending"] > 25:
             problems.append(f"{st['queue_pending']} changes are waiting to be saved. "
                             f"The host may be struggling or stopped.")
-        if not st["backups"]:
+        # Backups are the HOST's job -- it is the only PC holding real data.
+        # Telling a client operator "there are no backups yet" sends them
+        # looking for a problem on the wrong machine.
+        if not st["backups"] and self.mode != "client":
             problems.append("There are no backups yet.")
 
         return {
@@ -153,6 +198,15 @@ class PanelController:
             "host_pc": hb.get("hostname"),
             "heartbeat_age_seconds": hb_age,
             "replica_age_seconds": replica_age,
+            # Four facts, no logic. "Where is my data" and "what is this PC set
+            # up as" were unanswerable from this screen, and the settings path
+            # is the only thing that makes a misplaced install self-evident:
+            # a config path reading ...\Programs\Startup\config\config.json
+            # explains itself, where "No host is running" does not.
+            "mode": self.mode,
+            "replica_path": replica,
+            "outbox_pending": outbox_pending,
+            "config_file": self.config_file,
             "share_ok": share_ok,
             "share_message": share_msg,
             "problems": problems,
@@ -332,6 +386,18 @@ class PanelController:
             os.makedirs(dest_dir, exist_ok=True)
             os.makedirs(os.path.join(dest_dir, "config"), exist_ok=True)
             shutil.copyfile(exe, os.path.join(dest_dir, os.path.basename(exe)))
+
+            # The Control Panel goes too. Its entire stated reason for existing
+            # is "the app will not start, so the button on the login screen is
+            # unreachable" -- and it was absent from every client PC, which is
+            # exactly where nobody can diagnose anything. Best-effort: a kit
+            # built from a source tree with only the app exe is still a working
+            # kit, just without the check-up tool.
+            panel_exe = os.path.join(os.path.dirname(os.path.abspath(exe)),
+                                     "FIU_Control_Panel.exe")
+            if os.path.isfile(panel_exe):
+                shutil.copyfile(panel_exe,
+                                os.path.join(dest_dir, os.path.basename(panel_exe)))
 
             cfg = {
                 "database_path": None,

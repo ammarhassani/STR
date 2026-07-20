@@ -9,24 +9,27 @@ REM  "No module named components". See STR.spec for the details.
 REM ============================================================
 cd /d "%~dp0"
 
-echo Step 1: Installing PyInstaller...
-python -m pip install --upgrade pyinstaller
-if errorlevel 1 goto :failed
+REM PyInstaller is PINNED in requirements.txt and installed ONCE:
+REM     python -m pip install -r requirements.txt
+REM This used to run "pip install --upgrade pyinstaller" on every single build,
+REM which needed the network and let PyPI change the bootloader and the flet
+REM hook in the middle of a project. flet is pinned for exactly that reason --
+REM the tool that PACKAGES it should not float either. The _MEI behaviour this
+REM app has already been burned by is bootloader behaviour.
 
-echo.
-echo Step 2: Building the app from STR.spec...
+echo Step 1: Building the app from STR.spec...
 python -m PyInstaller --noconfirm --clean STR.spec
 if errorlevel 1 goto :failed
 
 echo.
-echo Step 3: Building the Control Panel from STR_Panel.spec...
+echo Step 2: Building the Control Panel from STR_Panel.spec...
 REM A separate executable because the panel has to work when the APP does not:
 REM the button on the login screen is unreachable if the app cannot start.
 python -m PyInstaller --noconfirm --clean STR_Panel.spec
 if errorlevel 1 goto :failed
 
 echo.
-echo Step 4: Verifying both builds...
+echo Step 3: Verifying both builds...
 python tools\verify_build.py
 if errorlevel 1 goto :failed
 

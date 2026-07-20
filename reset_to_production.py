@@ -44,10 +44,22 @@ def _table_exists(cur, name: str) -> bool:
     ).fetchone() is not None
 
 
-def _fresh_admin_hash() -> str:
-    """bcrypt hash for the temporary admin password 'admin123'."""
+def _fresh_admin_password() -> str:
+    """A one-off password for the go-live admin account.
+
+    Generated, not 'admin123'. The literal used to sit here in git and in
+    docs/SETUP.md -- a published credential for the only account that exists on
+    a bank's AML system at the exact moment it goes live with real data, on a PC
+    reachable from every workstation. It is printed once by main() and stored
+    only as a bcrypt hash, and the account is flagged must_change_password.
+    """
+    import secrets
+    return secrets.token_urlsafe(12)
+
+
+def _fresh_admin_hash(password: str) -> str:
     from services.security_service import SecurityService
-    return SecurityService.hash_password("admin123")
+    return SecurityService.hash_password(password)
 
 
 def hard_reset(db_path: str, admin_username: str = "admin") -> dict:
@@ -67,12 +79,15 @@ def hard_reset(db_path: str, admin_username: str = "admin") -> dict:
                 cleared[t] = n
 
         # Users -> a single clean admin that must change its password.
+        admin_password = None
         if _table_exists(cur, "users"):
+            admin_password = _fresh_admin_password()
             cur.execute("DELETE FROM users")
             cur.execute(
                 "INSERT INTO users (username, password, full_name, role, is_active, "
                 "must_change_password, created_by) VALUES (?,?,?,?,1,1,'SYSTEM')",
-                (admin_username, _fresh_admin_hash(), "Administrator", "admin"))
+                (admin_username, _fresh_admin_hash(admin_password),
+                 "Administrator", "admin"))
 
         # Single-writer lease back to a clean, unclaimed state.
         if _table_exists(cur, "host_lease"):
@@ -82,7 +97,8 @@ def hard_reset(db_path: str, admin_username: str = "admin") -> dict:
         conn.commit()
         cur.execute("VACUUM")
         conn.commit()
-        return {"cleared": cleared, "admin": admin_username}
+        return {"cleared": cleared, "admin": admin_username,
+                "password": admin_password}
     finally:
         conn.close()
 
@@ -110,8 +126,13 @@ def main(argv=None):
 
     print(f"Target database: {db_path}")
     print("This will PERMANENTLY DELETE all reports, approvals, versions, reserved")
-    print("numbers, activity and logs, and reset users to a single fresh admin.")
+    print("numbers, activity and logs.")
     print("Configuration (dropdowns, fields, dashboard widgets, settings) is kept.")
+    print()
+    print("*** EVERY USER ACCOUNT IS DELETED. ***")
+    print("You will be left with one 'admin'. Nobody else can log in until you")
+    print("recreate them, and there is no list afterwards -- write down who")
+    print("needs recreating (name, username, role) BEFORE continuing.")
     if not args.yes:
         if input('\nType "RESET" to proceed: ').strip() != "RESET":
             print("Aborted."); return 1
@@ -125,8 +146,11 @@ def main(argv=None):
     summary = hard_reset(db_path)
     total = sum(summary["cleared"].values())
     print(f"\nCleared {total} row(s) across {len(summary['cleared'])} table(s).")
-    print(f"Users reset to a single admin '{summary['admin']}' "
-          f"(temporary password 'admin123' — change on first login).")
+    print(f"\nUsers reset to a single admin: {summary['admin']}")
+    print(f"    TEMPORARY PASSWORD:  {summary['password']}")
+    print("    Shown ONCE. Copy it now -- it is stored only as a hash and")
+    print("    cannot be read back. You must change it at first login.")
+    print("\n  Every other user account was deleted. Recreate them after logging in.")
     print("Done. Restart the host so it republishes the clean database.")
     return 0
 

@@ -42,29 +42,49 @@ Currently: **ENGAMMARPC**, share `\\ENGAMMARPC\STR_data`
 
 ## A. Set up the HOST (once)
 
-### A1. Build the app
+### A1. Build
 
 ```
 build.bat
 ```
 
-Wait for `Build OK: dist\FIU_System.exe`.
+Wait for `Build OK`. If it says BUILD FAILED, stop — nothing else will work.
 
-If it says BUILD FAILED, stop. Nothing else will work. Read the error.
-
-### A2. Open the control panel
+Copy **both** files out of `dist\` into `C:\STR`:
 
 ```
-python flet_app\main.py --panel
+FIU_System.exe
+FIU_Control_Panel.exe
 ```
 
-### A3. Press these buttons, in this order
+### A2. Create the database
 
-1. **Check the shared folder** → must say *reachable and writable*
+Double-click **`FIU_System.exe`** and complete the setup wizard:
+
+- **Mode:** host
+- **Database folder / backup folder:** leave the defaults
+- **Shared folder:** `\\ENGAMMARPC\STR_data`
+
+This is the step that creates `database\`. Nothing later works without it —
+the host has no way to create a database for itself and will refuse to start.
+
+### A3. Open the control panel
+
+Double-click **`FIU_Control_Panel.exe`**, then click
+**"Show setup and recovery options ▾"** — the setup buttons are collapsed
+behind it.
+
+### A4. Press these buttons, in this order
+
+1. Type the share path into **Shared folder** — `\\ENGAMMARPC\STR_data`
 2. **Make this PC the host**
-3. **Start host on this PC**
+3. **Check the shared folder** → must say *reachable and writable*
+4. **Start host on this PC**
 
-### A4. Make it start at login
+> Order matters. "Check the shared folder" reads the box above it, so checking
+> before you have typed a path just tells you no path is set.
+
+### A5. Make it start at login
 
 > **Tell security BEFORE you do this.**
 >
@@ -84,14 +104,26 @@ python flet_app\main.py --panel
 Once it's declared:
 
 1. Press **Show me the Startup folder** → a window opens
-2. Drag `FIU_System.exe` into that window
-3. Right-click the copy that appears → **Properties** → in **Target**, add ` --host` at the end → OK
+2. Hold the **RIGHT** mouse button, drag `FIU_System.exe` into that window,
+   let go, and choose **Create shortcuts here**
+3. Right-click the new shortcut → **Properties** → in **Target**, add ` --host`
+   at the very end, after the closing quote → OK
+4. Log out and back in. The Control Panel must say the host is running.
 
-> Done by hand on purpose: creating that shortcut in code needs a Windows
+> **Right-drag, not left-drag.** A normal drag either moves the .exe out of
+> `C:\STR` or copies a 100 MB binary into your Startup folder — and a copied
+> .exe has no **Target** box to edit, because only shortcuts have one.
+>
+> An .exe sitting in Startup is worse than useless: the app finds `config\` and
+> `database\` next to itself, so it would look for them *inside the Startup
+> folder*, find nothing, and either open the setup wizard or die with no
+> message at all.
+>
+> The shortcut is made by hand on purpose: creating one in code needs a Windows
 > scripting component that endpoint security flags, and this app does not use
-> one.
+> one. A shortcut you make from Explorer's own menu runs nothing.
 
-### A4. Confirm
+### A6. Confirm
 
 The top of the panel must say **Everything is working**.
 
@@ -101,17 +133,20 @@ If it doesn't, it tells you what's wrong. Fix that, press **Refresh**.
 
 ---
 
-## B. Give client PCs permission (once)
+## B. Share permissions
 
-Client PCs are refused by default. They need an account.
+Nothing to do, as long as the people using STR can already open
+`\\ENGAMMARPC\STR_data` in File Explorer and save a file there.
 
-Run **as administrator**, on the host:
+Check it once: paste the path into File Explorer on one client PC, create a text
+file, delete it. If that works, skip to C.
 
-```
-powershell -ExecutionPolicy Bypass -File deploy\grant_share_access.ps1 -Password "PICK-A-STRONG-ONE"
-```
-
-Write the password down. You need it on every client PC.
+> If it does *not* work, the share needs permissions granted, and that needs
+> administrator rights on the host. `deploy\grant_share_access.ps1` is the
+> specification of what is required — treat it as the text of a request to
+> whoever administers that PC, not as something to run from this document. It
+> creates a local `STR_client` account and grants it **Change** (share) and
+> **Modify** (NTFS). Note it does *not* create the share itself.
 
 ---
 
@@ -136,12 +171,11 @@ Put it at **`C:\STR`**
 
 ### C4. If Windows asks for network credentials
 
-```
-user:     ENGAMMARPC\STR_client
-password: the one from step B
-```
+Normally it does not — if that person can already reach the share in File
+Explorer, the app can too.
 
-Tick **Remember my credentials**.
+If it does ask, enter the account that has access to `\\ENGAMMARPC\STR_data`
+and tick **Remember my credentials**.
 
 **Done with that PC.** Repeat C2–C4 for each one.
 
@@ -151,18 +185,30 @@ Tick **Remember my credentials**.
 
 Do this **once**, when you stop testing and start real work.
 
-It deletes every report, number and log made during testing, and keeps your
-users, settings and field configuration.
+It deletes every report, number and log made during testing.
+
+Settings and field configuration are kept.
+
+> **It also deletes every user account.** You are left with a single `admin`,
+> whose password is printed once when the script finishes. Nobody else can log
+> in until you recreate them.
+>
+> **Write down who needs recreating before you run this** — name, username and
+> role for each person. There is no list afterwards.
 
 1. Make sure nobody is using STR
 2. On the host PC, Control Panel → **Back up now**
-3. Run:
+3. Write down the user list
+4. Run:
 
 ```
 python reset_to_production.py
 ```
 
-4. It asks you to confirm. Read what it says before typing anything.
+5. It asks you to confirm. Read what it says before typing anything.
+6. **Copy the admin password it prints.** It is shown once and not stored
+   anywhere you can read it back.
+7. Log in as `admin`, change the password when asked, recreate the users.
 
 > **There is no undo.** The backup from step 2 is your only way back.
 > Do not skip it, even though the data is "only test data" — if the reset
@@ -175,21 +221,35 @@ After this, the numbering starts clean and the app is ready for real reports.
 
 ## Something is wrong
 
-### The app asks me to set up a database
+### The app says it can't reach the shared folder
 
-It can't see the shared folder.
+That screen is the *correct* behaviour and the PC is still set up properly —
+nothing local is lost, and anything saved earlier is queued and will send by
+itself. Usually the host PC is off, asleep, or nobody has logged into it.
 
 1. On that PC, open File Explorer
 2. Paste: `\\ENGAMMARPC\STR_data`
 3. Press Enter
 
-- **Asks for a password** → enter the step B credentials
-- **"Access denied"** → step B wasn't run, or the password is wrong
+- **Asks for a password** → enter the account that can reach the share
+- **"Access denied"** → that account has no permission (section B)
 - **"Can't find"** → the host PC is off, asleep, or the network is down
 
-### Access denied
+Press **Retry** on the app screen once it's back.
 
-The client PC doesn't have the share account. Redo step B, then C4.
+### The app asks me to set up a database
+
+On a client PC this should no longer happen just because the share is
+unreachable. If it does, this PC has genuinely lost its settings:
+
+Open `FIU_Control_Panel.exe` and read **My settings**. If the path is not
+`C:\STR\config\config.json`, the app is running from the wrong folder — most
+often a copy of the .exe left somewhere like the Startup folder. Delete that
+copy and run the one in `C:\STR`.
+
+> Never click through the wizard to make the message go away. Choosing "local"
+> creates a private database on that PC, and every report filed into it is
+> invisible to the FIU unit.
 
 ### The app opens but there are no reports
 
@@ -205,18 +265,32 @@ Most common: **the host stopped.** Press **Start host on this PC**.
 
 ### The host keeps stopping
 
-The host dies when the PC sleeps, logs off, or restarts.
+The host dies when the PC sleeps, logs off, or restarts. That is not
+preventable without administrator rights — but nothing is lost when it happens:
+client writes wait safely in each PC's local queue and send themselves when the
+host is back.
 
-- Press **Start automatically at login** (starts it again at every login)
+- Do section **A5** so it restarts at every login
 - Set the host PC to never sleep
-- After a restart, **someone must log in** for the host to start
+- The Startup entry runs at **login, not at boot** — after a restart, someone
+  must log in on the host PC
+
+If the host PC is gone for good: Control Panel → **Show setup and recovery
+options** → **Take over as host** on another PC.
+
+### The host won't start and says nothing
+
+It now tells you why, in a message box. If it says it cannot open the database,
+that PC never completed step **A2**, or `database\` is not next to the .exe.
 
 ### Changes aren't showing on other PCs
 
-Check the panel:
+Open the panel on the PC that looks wrong and read these two lines:
 
-- **Waiting to save** is a big number → the host is stopped or struggling
-- **Data copy updated** says hours/days ago → that PC isn't reaching the share
+- **Waiting to save** — `N on this PC` means that PC can't reach the host.
+  `N on the shared folder` means the host is stopped or struggling.
+- **My data** — names the file this PC is actually reading and how old it is.
+  Hours or days old means this PC isn't getting updates.
 
 ---
 
@@ -229,7 +303,7 @@ Check the panel:
 | Add a client PC | Host PC | Panel → Build client folder, copy to `C:\STR` |
 | Back up now | Host PC | Panel → Back up now |
 | See what's wrong | Any PC | Panel → top box |
-| Let a new PC in | Host PC, admin | `deploy\grant_share_access.ps1` |
+| Take over a dead host | Another PC | Panel → setup and recovery → Take over as host |
 
 ---
 
@@ -237,6 +311,10 @@ Check the panel:
 
 1. The host PC must be **on and logged in** for anyone to save.
 2. Clients go in **`C:\STR`**, never Program Files.
-3. Every client needs the share account (step B).
-4. Only the **host** holds the real data. Clients hold a copy.
-5. Back up before anything risky.
+3. Both .exe files stay in the same folder, on every PC.
+4. Every client must be able to reach `\\ENGAMMARPC\STR_data`.
+5. Only the **host** holds the real data. Clients hold a copy.
+6. Back up before anything risky.
+7. **Never click through the setup wizard to dismiss an error.** Choosing
+   "local" makes that PC a private island, and the reports filed on it are
+   invisible to the FIU unit.
