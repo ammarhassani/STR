@@ -1,15 +1,24 @@
-"""Mounting and unmounting things in `page.overlay` without leaking them.
+"""Showing and hiding dialogs and toasts without leaving a dead grey screen.
 
-Every dialog and every toast in this app was appended to `page.overlay` and
-never taken out again. Closing a dialog only set `open = False`, so the control
-stayed mounted forever. Open the report form ten times and the overlay holds ten
-dead dialogs; each one still draws its modal barrier, so the window fills with
-stacked grey scrims, clicks land on a corpse instead of the live control, and
-the app looks frozen for no visible reason. Toasts leaked the same way on every
-single message.
+Two separate bugs live in this file's history; both produced the same symptom
+and they need different fixes.
 
-`mount` prunes anything already closed before adding, and `dismiss` closes AND
-removes. Between them the overlay never grows past what is actually on screen.
+1. Dialogs and toasts were appended to `page.overlay` and never removed.
+   Closing one only set `open = False`, so it stayed mounted. Open the report
+   form ten times and the overlay held ten dead dialogs, each still drawing its
+   modal barrier.
+
+2. Closing was done with `page.update()`. Flet's own `Page.close()` calls
+   `control.update()` -- it updates THE DIALOG, not the page. That difference
+   is the "greyed out and unclickable" screen: after the shell is rebuilt (a
+   forced password change happens right after `_show_main_app()` clears and
+   redraws everything), a whole-page update does not reliably carry the
+   dialog's `open = False` to Flutter. The barrier stays up over a fully
+   rendered dashboard, and every click is swallowed.
+
+So this module now delegates to Flet's own `page.open()` / `page.close()`,
+which put the control in the offstage container and update the control itself.
+The manual path is kept only as a fallback for objects Flet will not take.
 """
 import flet as ft
 
@@ -20,7 +29,11 @@ def _is_dead(control) -> bool:
 
 
 def prune(page) -> int:
-    """Drop every closed control from the overlay. Returns how many went."""
+    """Drop every closed control from page.overlay. Returns how many went.
+
+    Only touches `page.overlay` -- what Flet's own open() uses (the offstage
+    container) is Flet's to manage.
+    """
     overlay = getattr(page, "overlay", None)
     if not overlay:
         return 0
@@ -34,8 +47,15 @@ def prune(page) -> int:
 
 
 def mount(page, control, update: bool = True):
-    """Show `control` in the overlay, clearing out anything already closed."""
+    """Show `control`, preferring Flet's own dialog handling."""
     prune(page)
+    opener = getattr(page, "open", None)
+    if callable(opener):
+        try:
+            opener(control)
+            return
+        except Exception:
+            pass  # fall through to the manual path below
     if control not in page.overlay:
         page.overlay.append(control)
     control.open = True
@@ -44,21 +64,32 @@ def mount(page, control, update: bool = True):
 
 
 def dismiss(page, control, update: bool = True):
-    """Close `control`. Unmounting happens later, at the next mount().
+    """Close `control` so its modal barrier actually goes away.
 
-    Do NOT remove it from the overlay here. Taking a dialog out of the tree in
-    the same breath as closing it leaves Flutter believing its modal barrier is
-    still up: the window looks normal, a sliver of the dialog stays painted, and
-    every click afterwards is swallowed -- the button that opens it stops
-    working and nothing is logged. That is exactly what an earlier version of
-    this file did, and it is what Flet's own Page.close() avoids by only setting
-    `open = False` and updating.
+    page.close() updates the CONTROL. That is the part that matters: a
+    page-wide update can lose the close when the page has been rebuilt
+    underneath the dialog, which leaves the barrier painted over a live screen.
 
-    Cleanup is not lost: mount() prunes every closed control before it adds a
-    new one, so at most one dead dialog sits in the overlay between operations
-    -- which is what Flet does on its own anyway.
+    The control is not removed from the tree here. Taking a dialog out in the
+    same breath as closing it leaves Flutter believing the barrier is still up
+    -- an earlier version of this file did exactly that. Cleanup happens in
+    mount(), which prunes closed controls before adding a new one.
     """
+    closer = getattr(page, "close", None)
+    if callable(closer):
+        try:
+            closer(control)
+            return
+        except Exception:
+            pass  # fall through
+
     control.open = False
+    # Update the control itself first; the page update is a belt-and-braces
+    # follow-up for the manual path.
+    try:
+        control.update()
+    except Exception:
+        pass
     if update:
         try:
             page.update()

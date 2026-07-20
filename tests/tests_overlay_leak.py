@@ -19,11 +19,78 @@ def check(label, cond, detail=""):
 
 
 class FakePage:
+    """A page WITHOUT Flet's open/close, so this exercises the fallback path."""
     def __init__(self):
         self.overlay = []
         self.snack_bar = None
     def update(self): pass
     def run_task(self, fn, *a): pass
+
+
+class FletLikePage(FakePage):
+    """A page WITH Flet's own open/close, which is what the real app has.
+
+    The plain FakePage silently exercises the manual fallback, so on its own it
+    would report a pass no matter what the Flet path did -- and the Flet path is
+    the one that ships.
+    """
+    def __init__(self):
+        super().__init__()
+        self.opened = []
+        self.closed = []
+    def open(self, control):
+        self.opened.append(control)
+        control.open = True
+    def close(self, control):
+        self.closed.append(control)
+        control.open = False
+
+
+class FakeDialog:
+    def __init__(self):
+        self.open = None
+        self.updates = 0
+    def update(self):
+        self.updates += 1
+
+
+def test_uses_flets_own_dialog_api():
+    """Delegate to page.open/page.close when the page has them.
+
+    Flet's close() calls control.update() -- it updates THE DIALOG. Our old code
+    called page.update(), which updates the whole tree, and after the shell had
+    been rebuilt (a forced password change happens right after the dashboard is
+    drawn) the dialog's open=False did not reach Flutter. The barrier stayed up
+    over a live screen: everything visible, nothing clickable.
+    """
+    from components.overlay import mount, dismiss
+
+    page = FletLikePage()
+    dlg = FakeDialog()
+
+    mount(page, dlg)
+    check("mount goes through page.open", page.opened == [dlg], page.opened)
+    check("and the dialog is open", dlg.open is True)
+
+    dismiss(page, dlg)
+    check("dismiss goes through page.close", page.closed == [dlg], page.closed)
+    check("and the dialog is closed", dlg.open is False)
+
+
+def test_fallback_updates_the_control_not_just_the_page():
+    """Without page.close, dismiss must still update the CONTROL itself."""
+    from components.overlay import mount, dismiss
+
+    page = FakePage()          # no open/close
+    dlg = FakeDialog()
+
+    mount(page, dlg)
+    check("fallback mounts into the overlay", dlg in page.overlay)
+
+    dismiss(page, dlg)
+    check("fallback closes the dialog", dlg.open is False)
+    check("fallback updates the control itself, not only the page",
+          dlg.updates >= 1, dlg.updates)
 
 
 def test_helper_mounts_and_unmounts():
@@ -126,6 +193,8 @@ def test_refused_form_still_explains_itself():
 
 if __name__ == "__main__":
     test_helper_mounts_and_unmounts()
+    test_uses_flets_own_dialog_api()
+    test_fallback_updates_the_control_not_just_the_page()
     test_repeated_dialog_cycles_do_not_pile_up()
     test_toasts_do_not_stack()
     test_refused_form_still_explains_itself()
